@@ -4,3 +4,7 @@ dist
 *.local
 .env
 .env.*
+
+# Local agent/editor scratch. launch.json pins a machine-specific Node
+# toolchain, so it should not be prescribed to contributors.
+.claude/

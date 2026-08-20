@@ -10,7 +10,7 @@ sniffing) is in progress; parts ordered but not all delivered.
 
 ## The site
 
-Residential pool + raised spa, shared equipment, Kendale Lakes FL.
+Residential pool + raised spa, shared equipment, South Florida.
 
 | Equipment | Detail |
 |---|---|
@@ -127,15 +127,47 @@ state and sends intents (`setMode('spa')`). It never sends relay primitives.
 A phone loses signal; the state machine must hold regardless.
 
 `src/lib/sequences.js` is the executable spec. The server sequencer must
-implement the same steps in the same order.
+implement the same steps in the same order. Five named sequences: `spa`,
+`pool`, `heatEngage`, `heatRelease`, `boot`.
+
+### Bypass policy
+
+The bypass follows the mode — **flow** in spa, **around** in pool — and
+swings back to flow whenever pool heat is called. Spa mode always heats, so
+one rule covers nearly every case; winter pool heating gets the explicit
+`heatEngage`/`heatRelease` pair instead of a special case inside the mode
+sequences.
+
+The valve is binary, so a heat call with the bypass around means **zero**
+flow through the exchanger. Both directions of the interlock are load-bearing.
 
 ### Invariants — assert continuously, not just at transitions
 
 - `heaterCall !== 'off'` implies `pumpRpm >= HEATER_MIN_RPM`
 - `heaterCall !== 'off'` implies `valves.bypass === 'flow'`
+- `valves.bypass === 'around'` implies `heaterCall === 'off'`
 - Bypass may only move when heater is off and purge has elapsed
 - No valve command while another valve move is in flight
+- `mode !== 'spa'` implies `blower === false` (preference, not safety —
+  see the blower note below; relax the gate and drop this with it)
 - Spa mode auto-reverts to pool after timeout (prevents overnight spa mode)
+
+The two bypass implications are converses and both are needed. The first
+keeps a call from being made into a bypassed exchanger; the second keeps the
+valve from swinging away under a live call. Either alone leaves a hole.
+
+### Transitions cannot be cancelled
+
+`ABORTABLE` is false. Aborting mid-travel would leave a dead-reckoned valve
+at an unknown angle with no feedback to recover from, and aborting only at
+step boundaries buys little when the bound is a 45 sec move.
+
+### Pump speed under a live heat call
+
+The pump slider clamps at `HEATER_MIN_RPM` while any heat call is active,
+with the threshold marker carrying the reason. Spa mode owns the pump.
+Silently dropping the heat call because someone dragged a slider is a worse
+surprise than a slider that will not go lower.
 
 ### Fail-safe states
 
@@ -154,6 +186,9 @@ re-drive all valves to pool position to resynchronize.
 Skip the purge step entirely if the compressor hasn't run in the last five
 minutes — the common case. Makes "Spa now" ~2 minutes instead of 5.
 
+Render a skipped step struck through rather than dropping it, so the short
+path and the long path look like the same sequence.
+
 ---
 
 ## Product decisions worth preserving
@@ -162,7 +197,10 @@ minutes — the common case. Makes "Spa now" ~2 minutes instead of 5.
   spa and gets in immediately. Preheat is an option, not a mandate.
 - **The blower is not safety-gated.** The spa is always full, so it can never
   run dry. It's gated to spa mode only as a preference (jets while spilling
-  dump heat and noise into the pool). Relax freely.
+  dump heat and noise into the pool). Relax freely — but the `pool` sequence
+  must keep clearing it, or the gate strands it on and unreachable.
+- **A disabled control never renders an active state.** If it is on, its
+  toggle has to be actionable.
 - **Blower + heater roughly cancel.** Heat pump gains ~20–25 °F/hr on a
   spa-sized volume in Florida winter air; a 115 CFM blower takes back most of
   it. Surface this as a sentence in the UI, never as a lockout.
@@ -181,6 +219,9 @@ minutes — the common case. Makes "Spa now" ~2 minutes instead of 5.
 - [ ] Replace `useController` with real njsPC transport
 - [ ] Build server-side sequencer service (owns all interlocks)
 - [ ] Schedule editor: add/edit are stubbed
+- [ ] Scheduled spa preheat — button is a stub
+- [ ] UI pass on the sequence spec: rpm clamp, skipped-step rendering,
+      spa auto-revert countdown, heating estimate at the real ~20 °F/hr
 - [ ] Daylight theme — this is used poolside in Florida sun
 - [ ] RS-485 diagnostics view
 

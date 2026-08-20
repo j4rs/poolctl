@@ -76,9 +76,16 @@ export default function PoolSpaControl({ controller }) {
         })}
       </div>
 
+      {/* Preheat needs a scheduled trigger and a heat-time estimate, so it
+          cannot exist until the server sequencer does. Disabled and labelled
+          rather than left as a button that silently does nothing. */}
       {mode !== "spa" && !busy && (
-        <button style={{ width: "100%", padding: 13, marginBottom: 16, borderRadius: 10, border: `1px dashed ${C.line}`, background: "transparent", color: C.muted, fontFamily: FONT_UI, fontSize: 13, cursor: "pointer" }}>
+        <button disabled
+          style={{ width: "100%", padding: 13, marginBottom: 16, borderRadius: 10, border: `1px dashed ${C.line}`, background: "transparent", color: C.muted, fontFamily: FONT_UI, fontSize: 13, cursor: "not-allowed", opacity: 0.7, display: "block" }}>
           Have the spa ready at a set time
+          <span style={{ display: "block", fontSize: 10.5, color: C.faint, marginTop: 4 }}>
+            Not built yet — needs the sequencer
+          </span>
         </button>
       )}
 

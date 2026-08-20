@@ -2,6 +2,8 @@
   "name": "poolctl-ui",
   "private": true,
   "version": "0.1.0",
+  "description": "Phone-first controller UI for a DIY pool/spa automation system built on nodejs-poolController",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "vite",

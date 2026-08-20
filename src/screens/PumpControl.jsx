@@ -5,10 +5,13 @@ import { HEATER_MIN_RPM, CELL_MIN_RPM } from "../lib/sequences";
 const RPM_MIN = 450;
 const RPM_MAX = 3450;
 const WATTS_MAX = 2400;   // IntelliFlo VSF at full speed, approximate
-const RATE = 0.15;        // $/kWh — set to your FPL rate
+const RATE = 0.15;        // $/kWh — set to your own utility rate
 
 /** Affinity law: power scales with the cube of speed. */
 export const watts = (rpm) => Math.round(WATTS_MAX * Math.pow(rpm / RPM_MAX, 3));
+
+const MARKER_ROW = 14;    // vertical offset between staggered marker labels
+const MARKER_H = 44;      // total height of the marker strip above the slider
 
 const THRESHOLDS = [
   { rpm: CELL_MIN_RPM, label: "Chlorinator flow", color: C.waterDim },
@@ -78,14 +81,18 @@ export default function PumpControl({ controller }) {
           </div>
         </div>
 
-        <div style={{ position: "relative", height: 30, marginBottom: 2 }}>
-          {THRESHOLDS.map((t) => {
+        {/* Labels alternate rows. The two thresholds sit close enough on the
+            scale that centred captions collide, and they will move again once
+            the real flow rates are measured — staggering holds either way. */}
+        <div style={{ position: "relative", height: MARKER_H, marginBottom: 2 }}>
+          {THRESHOLDS.map((t, i) => {
             const p = ((t.rpm - RPM_MIN) / (RPM_MAX - RPM_MIN)) * 100;
             const met = rpm >= t.rpm;
+            const row = i % 2;
             return (
-              <div key={t.label} style={{ position: "absolute", left: `${p}%`, transform: "translateX(-50%)", textAlign: "center", width: 96 }}>
-                <div style={{ fontFamily: FONT_DATA, fontSize: 9, color: met ? t.color : C.faint, lineHeight: 1.25, transition: "color 200ms" }}>{t.label}</div>
-                <div style={{ width: 1, height: 8, background: met ? t.color : C.line, margin: "3px auto 0", transition: "background 200ms" }} />
+              <div key={t.label} style={{ position: "absolute", left: `${p}%`, top: row * MARKER_ROW, transform: "translateX(-50%)", textAlign: "center", width: 96 }}>
+                <div style={{ fontFamily: FONT_DATA, fontSize: 9, color: met ? t.color : C.faint, lineHeight: 1.25, whiteSpace: "nowrap", transition: "color 200ms" }}>{t.label}</div>
+                <div style={{ width: 1, height: MARKER_H - row * MARKER_ROW - 14, background: met ? t.color : C.line, margin: "3px auto 0", transition: "background 200ms" }} />
               </div>
             );
           })}
@@ -134,7 +141,11 @@ export default function PumpControl({ controller }) {
 
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
         <div style={{ fontSize: 17, fontWeight: 600 }}>Schedules</div>
-        <button style={{ background: "transparent", border: "none", color: C.water, fontFamily: FONT_UI, fontSize: 13, cursor: "pointer", padding: 0 }}>Add</button>
+        {/* Stubbed — see the schedule editor item in CLAUDE.md. */}
+        <button disabled aria-label="Add schedule — not built yet"
+          style={{ background: "transparent", border: "none", color: C.faint, fontFamily: FONT_UI, fontSize: 13, cursor: "not-allowed", padding: 0 }}>
+          Add <span style={{ fontSize: 11 }}>(not built yet)</span>
+        </button>
       </div>
 
       <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, overflow: "hidden", marginBottom: 12 }}>
