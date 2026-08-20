@@ -1,33 +1,38 @@
 import React from "react";
 import { C, FONT_UI, FONT_DATA } from "../theme";
-import { SEQUENCES, MODES } from "../lib/sequences";
+import { SEQUENCES, MODES, SPA_HEAT_RATE } from "../lib/sequences";
 import Schematic from "../components/Schematic";
 import Stat from "../components/Stat";
 import Toggle from "../components/Toggle";
 
-export default function PoolSpaControl({ controller }) {
+export default function PoolSpaControl({ controller, onOpenHeat }) {
   const { state, setMode, toggle } = controller;
   const {
-    mode, target, stepIndex, valves, pumpRpm, waterTemp,
+    mode, target, activeSequence, stepIndex, valves, pumpRpm, waterTemp, targets,
     setpoint, heaterCall, blower, light, saltPpm, cellOutput, connected,
   } = state;
 
-  const busy = Boolean(target);
-  const steps = target ? SEQUENCES[target] : [];
+  const busy = Boolean(activeSequence);
+  const steps = activeSequence ? SEQUENCES[activeSequence] : [];
+  /* No estimate while the blower runs: blower and heater roughly cancel, so
+     any figure would be an artefact of dividing by nearly zero. PR-4 asks
+     only that the copy say so. */
   const minsToSetpoint =
-    heaterCall === "spa" && setpoint
-      ? Math.max(0, Math.round(((setpoint - waterTemp) / (blower ? 1.2 : 5.4)) * 60))
+    heaterCall === "spa" && setpoint && !blower
+      ? Math.max(0, Math.round(((setpoint - waterTemp) / SPA_HEAT_RATE) * 60))
       : null;
 
   return (
     <div style={{ padding: "20px 16px 32px", fontFamily: FONT_UI, color: C.stone }}>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 22 }}>
         <div>
+          {/* Keyed off `target`, not `busy`: a heat sequence runs without
+              changing mode, and there is no mode to name for it. */}
           <div style={{ fontSize: 11, letterSpacing: 2, color: C.muted, fontFamily: FONT_DATA, textTransform: "uppercase" }}>
-            {busy ? "Changing to" : "Mode"}
+            {target ? "Changing to" : "Mode"}
           </div>
           <div style={{ fontSize: 30, fontWeight: 600, letterSpacing: -0.5, lineHeight: 1.2 }}>
-            {MODES.find((m) => m.id === (busy ? target : mode)).label}
+            {MODES.find((m) => m.id === (target || mode)).label}
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: FONT_DATA, fontSize: 10, color: connected ? C.water : C.alert, letterSpacing: 1 }}>
@@ -37,7 +42,7 @@ export default function PoolSpaControl({ controller }) {
       </div>
 
       <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, padding: "18px 12px", marginBottom: 14 }}>
-        <Schematic valves={valves} />
+        <Schematic valves={valves} onHeaterTap={onOpenHeat} />
       </div>
 
       {busy && (
@@ -95,10 +100,36 @@ export default function PoolSpaControl({ controller }) {
         <Stat label="Pump" value={pumpRpm} unit="rpm" />
       </div>
 
-      {heaterCall === "spa" && minsToSetpoint > 0 && (
+      {/* Heater section. Tapping opens the lean heat screen; the subtitle
+          carries enough state that most of the time you never need to. */}
+      <button onClick={onOpenHeat} aria-label="Heater settings"
+        style={{
+          width: "100%", display: "flex", alignItems: "center", gap: 12,
+          background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14,
+          padding: "14px 16px", marginBottom: 10, cursor: "pointer", textAlign: "left",
+        }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontFamily: FONT_UI, fontSize: 13.5, fontWeight: 500, color: C.stone }}>
+            Heater
+          </div>
+          <div style={{ fontFamily: FONT_DATA, fontSize: 10.5, color: heaterCall !== "off" ? C.heat : C.muted, marginTop: 3 }}>
+            {heaterCall !== "off"
+              ? `Calling for ${heaterCall} · ${setpoint}°F`
+              : valves.bypass === "around"
+                ? "Isolated · bypass around heater"
+                : "Idle · flow through heater"}
+          </div>
+        </div>
+        <div style={{ fontFamily: FONT_DATA, fontSize: 18, color: C.stone }}>
+          {targets[mode]}<span style={{ fontSize: 11, color: C.muted, marginLeft: 1 }}>°F</span>
+        </div>
+        <span style={{ color: C.muted, fontSize: 18, lineHeight: 1 }}>›</span>
+      </button>
+
+      {heaterCall === "spa" && (blower || minsToSetpoint > 0) && (
         <div style={{ fontSize: 12.5, color: blower ? C.heat : C.muted, marginBottom: 16, paddingLeft: 2, lineHeight: 1.5 }}>
           {blower
-            ? `Blower is running — heating has nearly stalled. About ${minsToSetpoint} min to ${setpoint}°F.`
+            ? `Blower is running — it takes back about as much heat as the heater adds, so the water will hold rather than climb.`
             : `About ${minsToSetpoint} min to ${setpoint}°F.`}
         </div>
       )}

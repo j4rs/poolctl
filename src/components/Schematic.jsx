@@ -9,7 +9,7 @@ import { C, FONT_UI, FONT_DATA } from "../theme";
  *
  * The spa always has flow in pool mode, which is why it never goes dark.
  */
-export default function Schematic({ valves }) {
+export default function Schematic({ valves, onHeaterTap }) {
   const returnsSplit = valves.returns === "split";
   const poolReturn = returnsSplit;
   const spaIntake = valves.intake === "spa";
@@ -64,6 +64,14 @@ export default function Schematic({ valves }) {
       <text x="56" y="112" textAnchor="middle" fill={C.muted} fontFamily={FONT_DATA} fontSize="8" letterSpacing="1">FILTER</text>
       <text x="56" y="126" textAnchor="middle" fill={valves.bypass === "flow" ? C.heat : C.faint}
         fontFamily={FONT_DATA} fontSize="8" letterSpacing="1">HEATER</text>
+
+      {/* Transparent hit area over the HEATER label — the same destination
+          as the heater row below the schematic. */}
+      {onHeaterTap && (
+        <rect x="20" y="118" width="72" height="14" fill="transparent"
+          onClick={onHeaterTap} role="button" tabIndex={0}
+          aria-label="Heater settings" style={{ cursor: "pointer" }} />
+      )}
 
       <circle cx="176" cy="92" r="5" fill={C.ground} stroke={C.water} strokeWidth="1.5" />
       <circle cx="196" cy="120" r="5" fill={C.ground} stroke={C.water} strokeWidth="1.5" />

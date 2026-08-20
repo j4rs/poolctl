@@ -162,6 +162,17 @@ valve from swinging away under a live call. Either alone leaves a hole.
 at an unknown angle with no feedback to recover from, and aborting only at
 step boundaries buys little when the bound is a 45 sec move.
 
+### Target temperatures are cutoffs, not setpoints
+
+The 3-wire interface carries no temperature (ADR-4). The heater holds its own
+setpoint on its board; the app can neither read nor write it. `state.targets`
+tells the controller when to *stop* calling for heat, clamped to the heater's
+firmware caps (`HEATER_CAP`: 95 °F pool, 104 °F spa). The app can end a call
+early and can never ask for more heat than the heater allows.
+
+A cutoff needs a trusted water temperature. There is no sensor in the BOM
+yet — see open items.
+
 ### Pump speed under a live heat call
 
 The pump slider clamps at `HEATER_MIN_RPM` while any heat call is active,
@@ -218,10 +229,12 @@ path and the long path look like the same sequence.
 - [ ] Confirm spill stops when return diverter goes full-spa
 - [ ] Replace `useController` with real njsPC transport
 - [ ] Build server-side sequencer service (owns all interlocks)
-- [ ] Schedule editor: add/edit are stubbed
+- [ ] Decide the water temperature source — target cutoffs and the preheat
+      estimate both need one, and the BOM has no sensor
 - [ ] Scheduled spa preheat — button is a stub
-- [ ] UI pass on the sequence spec: rpm clamp, skipped-step rendering,
-      spa auto-revert countdown, heating estimate at the real ~20 °F/hr
+- [ ] Pump speed clamp at `HEATER_MIN_RPM` under a live heat call
+- [ ] Render skipped sequence steps struck through
+- [ ] Spa auto-revert countdown — `SPA_TIMEOUT_MIN` has no surface yet
 - [ ] Daylight theme — this is used poolside in Florida sun
 - [ ] RS-485 diagnostics view
 

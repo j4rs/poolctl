@@ -1,14 +1,10 @@
 import React, { useState, useMemo } from "react";
 import { C, FONT_UI, FONT_DATA } from "../theme";
 import { HEATER_MIN_RPM, CELL_MIN_RPM } from "../lib/sequences";
+import { RPM_MIN, RPM_MAX, watts, daysLabel, hoursBetween } from "../lib/pump";
+import ScheduleEditor from "../components/ScheduleEditor";
 
-const RPM_MIN = 450;
-const RPM_MAX = 3450;
-const WATTS_MAX = 2400;   // IntelliFlo VSF at full speed, approximate
 const RATE = 0.15;        // $/kWh — set to your own utility rate
-
-/** Affinity law: power scales with the cube of speed. */
-export const watts = (rpm) => Math.round(WATTS_MAX * Math.pow(rpm / RPM_MAX, 3));
 
 const MARKER_ROW = 14;    // vertical offset between staggered marker labels
 const MARKER_H = 44;      // total height of the marker strip above the slider
@@ -25,24 +21,25 @@ const PRESETS = [
   { id: "spa", label: "Spa jets", rpm: 2800 },
 ];
 
+const EVERY_DAY = [0, 1, 2, 3, 4, 5, 6];
+
 const INITIAL = [
-  { id: 1, start: "08:00", end: "12:00", rpm: 1600, days: "Every day", on: true },
-  { id: 2, start: "12:00", end: "16:00", rpm: 2600, days: "Every day", on: true, note: "Solar gain hours" },
-  { id: 3, start: "16:00", end: "20:00", rpm: 1400, days: "Every day", on: true },
-  { id: 4, start: "22:00", end: "23:30", rpm: 2100, days: "Sat, Sun", on: false, note: "Weekend skim" },
+  { id: 1, start: "08:00", end: "12:00", rpm: 1600, days: EVERY_DAY, on: true },
+  { id: 2, start: "12:00", end: "16:00", rpm: 2600, days: EVERY_DAY, on: true, note: "Solar gain hours" },
+  { id: 3, start: "16:00", end: "20:00", rpm: 1400, days: EVERY_DAY, on: true },
+  { id: 4, start: "22:00", end: "23:30", rpm: 2100, days: [0, 6], on: false, note: "Weekend skim" },
 ];
 
-const hoursBetween = (a, b) => {
-  const [ah, am] = a.split(":").map(Number);
-  const [bh, bm] = b.split(":").map(Number);
-  let h = bh + bm / 60 - (ah + am / 60);
-  return h < 0 ? h + 24 : h;
-};
+const blankSchedule = () => ({
+  id: `new-${Math.random().toString(36).slice(2, 8)}`,
+  start: "09:00", end: "13:00", rpm: 1600, days: EVERY_DAY, on: true, isNew: true,
+});
 
 export default function PumpControl({ controller }) {
   const { state, setRpm } = controller;
   const rpm = state.pumpRpm;
   const [schedules, setSchedules] = useState(INITIAL);
+  const [editing, setEditing] = useState(null);
 
   const w = watts(rpm);
   const pct = ((rpm - RPM_MIN) / (RPM_MAX - RPM_MIN)) * 100;
@@ -58,6 +55,18 @@ export default function PumpControl({ controller }) {
 
   const toggleSchedule = (id) =>
     setSchedules((ss) => ss.map((s) => (s.id === id ? { ...s, on: !s.on } : s)));
+
+  const saveSchedule = (draft) => {
+    const { isNew, ...clean } = draft;
+    setSchedules((ss) =>
+      isNew ? [...ss, clean] : ss.map((s) => (s.id === clean.id ? clean : s)));
+    setEditing(null);
+  };
+
+  const deleteSchedule = (id) => {
+    setSchedules((ss) => ss.filter((s) => s.id !== id));
+    setEditing(null);
+  };
 
   return (
     <div style={{ padding: "20px 16px 32px", fontFamily: FONT_UI, color: C.stone }}>
@@ -141,32 +150,43 @@ export default function PumpControl({ controller }) {
 
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
         <div style={{ fontSize: 17, fontWeight: 600 }}>Schedules</div>
-        {/* Stubbed — see the schedule editor item in CLAUDE.md. */}
-        <button disabled aria-label="Add schedule — not built yet"
-          style={{ background: "transparent", border: "none", color: C.faint, fontFamily: FONT_UI, fontSize: 13, cursor: "not-allowed", padding: 0 }}>
-          Add <span style={{ fontSize: 11 }}>(not built yet)</span>
+        <button onClick={() => setEditing(blankSchedule())} aria-label="Add schedule"
+          style={{ background: "transparent", border: "none", color: C.water, fontFamily: FONT_UI, fontSize: 13, cursor: "pointer", padding: "4px 2px" }}>
+          Add
         </button>
       </div>
 
       <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, overflow: "hidden", marginBottom: 12 }}>
+        {schedules.length === 0 && (
+          <div style={{ padding: "18px 14px", fontSize: 13, color: C.muted, textAlign: "center" }}>
+            No schedules. The pump only runs when you set a speed by hand.
+          </div>
+        )}
         {schedules.map((s) => {
           const kwh = (watts(s.rpm) / 1000) * hoursBetween(s.start, s.end);
           return (
             <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 14px", borderBottom: `1px solid ${C.line}`, opacity: s.on ? 1 : 0.42 }}>
-              <button onClick={() => toggleSchedule(s.id)} aria-pressed={s.on} aria-label={`Schedule ${s.start} to ${s.end}`}
+              <button onClick={() => toggleSchedule(s.id)} aria-pressed={s.on}
+                aria-label={`Enable schedule ${s.start} to ${s.end}`}
                 style={{ width: 34, height: 20, borderRadius: 10, border: "none", flexShrink: 0, background: s.on ? C.water : C.line, position: "relative", cursor: "pointer", transition: "background 180ms" }}>
                 <span style={{ position: "absolute", top: 3, left: s.on ? 17 : 3, width: 14, height: 14, borderRadius: 7, background: s.on ? C.ground : C.surfaceUp, transition: "left 180ms" }} />
               </button>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontFamily: FONT_DATA, fontSize: 14 }}>{s.start} – {s.end}</div>
-                <div style={{ fontSize: 11.5, color: C.muted, marginTop: 3 }}>{s.days}{s.note ? ` · ${s.note}` : ""}</div>
-              </div>
-              <div style={{ textAlign: "right", flexShrink: 0 }}>
-                <div style={{ fontFamily: FONT_DATA, fontSize: 14, color: C.water }}>
-                  {s.rpm}<span style={{ fontSize: 10, color: C.muted, marginLeft: 2 }}>rpm</span>
+              {/* The row body opens the editor; the switch stays its own
+                  target so enabling never means editing by accident. */}
+              <button onClick={() => setEditing(s)} aria-label={`Edit schedule ${s.start} to ${s.end}`}
+                style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 12, background: "transparent", border: "none", padding: 0, cursor: "pointer", textAlign: "left", color: "inherit" }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontFamily: FONT_DATA, fontSize: 14, color: C.stone }}>{s.start} – {s.end}</div>
+                  <div style={{ fontSize: 11.5, color: C.muted, marginTop: 3 }}>{daysLabel(s.days)}{s.note ? ` · ${s.note}` : ""}</div>
                 </div>
-                <div style={{ fontFamily: FONT_DATA, fontSize: 11, color: C.muted, marginTop: 3 }}>{kwh.toFixed(1)} kWh</div>
-              </div>
+                <div style={{ textAlign: "right", flexShrink: 0 }}>
+                  <div style={{ fontFamily: FONT_DATA, fontSize: 14, color: C.water }}>
+                    {s.rpm}<span style={{ fontSize: 10, color: C.muted, marginLeft: 2 }}>rpm</span>
+                  </div>
+                  <div style={{ fontFamily: FONT_DATA, fontSize: 11, color: C.muted, marginTop: 3 }}>{kwh.toFixed(1)} kWh</div>
+                </div>
+                <span style={{ color: C.muted, fontSize: 16, lineHeight: 1 }}>›</span>
+              </button>
             </div>
           );
         })}
@@ -180,6 +200,15 @@ export default function PumpControl({ controller }) {
         Manual speed changes hold until the next schedule begins. Spa mode sets
         its own speed and ignores schedules while active.
       </div>
+
+      {editing && (
+        <ScheduleEditor
+          value={editing}
+          others={schedules.filter((s) => s.id !== editing.id)}
+          onSave={saveSchedule}
+          onDelete={deleteSchedule}
+          onCancel={() => setEditing(null)} />
+      )}
     </div>
   );
 }

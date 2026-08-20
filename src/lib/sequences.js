@@ -32,6 +32,24 @@ export const SPA_TIMEOUT_MIN = 120;
 /** Skip the exchanger purge if the compressor has been idle this long. */
 export const PURGE_SKIP_AFTER_MIN = 5;
 
+/**
+ * Hard caps enforced by the heater's own firmware (ADR-4). The 3-wire
+ * interface carries no temperature — closing a contact calls for heat at a
+ * setpoint held on the heater's board, which the app can neither read nor
+ * write. These are the ceilings that board will not exceed.
+ */
+export const HEATER_CAP = { pool: 95, spa: 104 };
+
+/** Floors for the target steppers. Below these, calling for heat is pointless. */
+export const TARGET_MIN = { pool: 70, spa: 80 };
+
+/**
+ * Spa heating rate, °F/hr. PRD §Thermal reality: 20–25 °F/hr on a spa-sized
+ * volume in Florida winter air, giving 45–75 min for a 80->102 preheat.
+ * Inherits the PRD's unmeasured ~500 gal assumption — correct once known.
+ */
+export const SPA_HEAT_RATE = 20;
+
 /** Resting speeds. Spa jet rpm is a guess — tune once settable from a phone. */
 export const POOL_RPM = 1600;
 export const SPA_RPM = 2800;

@@ -3,6 +3,7 @@ import { C, FONT_UI } from "./theme";
 import { useController } from "./lib/useController";
 import PoolSpaControl from "./screens/PoolSpaControl";
 import PumpControl from "./screens/PumpControl";
+import HeatControl from "./screens/HeatControl";
 
 const TABS = [
   { id: "water", label: "Water", Screen: PoolSpaControl },
@@ -11,12 +12,23 @@ const TABS = [
 
 export default function App() {
   const [tab, setTab] = useState("water");
+  /* A focused screen pushed over the tabs. Not a router — one level, one
+     way back. The tab bar hides so the screen stays lean. */
+  const [pushed, setPushed] = useState(null);
   const controller = useController();
   const { Screen } = TABS.find((t) => t.id === tab);
 
+  if (pushed === "heat") {
+    return (
+      <div style={{ background: C.ground, minHeight: "100vh", maxWidth: 460, margin: "0 auto" }}>
+        <HeatControl controller={controller} onBack={() => setPushed(null)} />
+      </div>
+    );
+  }
+
   return (
     <div style={{ background: C.ground, minHeight: "100vh", maxWidth: 460, margin: "0 auto", paddingBottom: 92 }}>
-      <Screen controller={controller} />
+      <Screen controller={controller} onOpenHeat={() => setPushed("heat")} />
 
       {/* The mock badge lives inside the nav so it sits on an opaque surface.
           Floating it over the page put it on top of whatever happened to

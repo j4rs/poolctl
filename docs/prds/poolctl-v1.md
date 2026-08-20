@@ -403,6 +403,22 @@ from, and aborting only at step boundaries buys little when the bound is a
 45 sec move. The owner is committed for the duration, and the UI should say
 so rather than offer a cancel that lies.
 
+### Target temperatures
+
+The 3-wire interface carries no temperature. The heater holds its own
+setpoint on its own board, and the app can neither read it nor write it —
+closing a contact only says "call for heat".
+
+So the app's targets are **cutoffs, not setpoints**. They tell the controller
+when to stop calling for heat, and they clamp to the heater's firmware caps
+(95 °F pool, 104 °F spa). The app can end a call early; it can never ask for
+more heat than the heater allows, which keeps ADR-4's guarantee intact — no
+bug here produces a scalding spa.
+
+The consequence worth stating plainly: a cutoff needs a trusted water
+temperature reading, and the BOM does not currently include a water
+temperature sensor. Resolve the source before Phase 3 — see open questions.
+
 ### Pump speed under a live heat call
 
 The pump slider clamps at `HEATER_MIN_RPM` whenever a heat call is active,
@@ -611,6 +627,10 @@ eyes on bonding.
 - [ ] **Spill confirmation.** Verify the pool returns actually go dead when
       the return diverter moves to full-spa. If they keep flowing, the spill
       is plumbed off an independent tee and the model needs revision.
+- [ ] **Water temperature source.** The BOM has no water temp sensor, and the
+      3-wire heater interface reports nothing. Target cutoffs and the preheat
+      estimate both need a trusted reading — from the pump bus, a REM probe,
+      or elsewhere. Settle before Phase 3.
 - [ ] **Spa volume.** Never measured. All preheat estimates assume ~500 gal.
 - [ ] **Spa jet rpm.** 2800 is a guess. Tune empirically once speed is
       settable from a phone.
@@ -623,13 +643,19 @@ eyes on bonding.
 
 - [ ] Replace `useController` with real njsPC transport (MQTT or WebSocket)
 - [ ] Build the server-side sequencer service that owns all interlocks
-- [ ] Schedule editor — add and edit are stubbed
+- [x] Schedule editor — add, edit, delete, day selection, overlap warning
+- [x] Target temperatures per body, clamped to the heater caps
+- [x] Pool heat on/off, driving heatEngage / heatRelease
 - [ ] Scheduled spa preheat ("ready at 7:30") — button is a stub
+- [ ] Pump speed clamp at `HEATER_MIN_RPM` under a live heat call
+- [ ] Render skipped sequence steps struck through
+- [ ] Spa auto-revert countdown — `SPA_TIMEOUT_MIN` has no surface yet
 - [ ] Daylight theme
 - [ ] RS-485 diagnostics view for Phase 1 work
 - [ ] Home Assistant / MQTT bridge
 - [ ] Salt trend history and threshold alerts (Path A)
-- [ ] Winter pool-heating mode: target temperature + maintenance schedule
+- [ ] Winter pool-heating mode: the target and the on/off exist; the
+      multi-day maintenance schedule does not
 
 ---
 

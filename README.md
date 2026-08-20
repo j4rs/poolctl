@@ -42,8 +42,11 @@ the same network — worth doing, since this is a phone-first UI.
 
 - **Water** — mode switching with a live water-path schematic, transition
   step list, temperatures, blower and light.
+- **Heat** — target temperature per body and pool heat on/off. Reached by
+  tapping the heater. Targets are cutoffs clamped to the heater's own caps,
+  never setpoints — see ADR-4.
 - **Pump** — speed with flow-constraint markers, presets, and schedules with
-  real energy cost.
+  add/edit/delete and real energy cost.
 
 ## Structure
 
