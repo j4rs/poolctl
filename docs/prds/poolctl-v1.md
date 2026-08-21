@@ -539,55 +539,45 @@ AGPL, taking the MIT licence with it. So keep forks surgical: fix njsPC's bugs
 inside njsPC, keep our interlocks in our own process. (Not legal advice —
 confirm before relying on it.)
 
-### ADR-11 — Schedule ownership: unresolved, and njsPC alone is not safe
+### ADR-11 — njsPC owns schedules; a schedule may end a spa session
 
-**Status: open.** Revised twice, and the second revision was wrong. This entry
-records what a live test actually showed rather than what the source implied.
+**Resolved August 2026**, after a bench test and an owner decision. Third and
+final revision of this entry; the earlier drafts are summarised below because
+the sequence is instructive.
 
-**The test.** njsPC 10.0.1 in Nixie mode, `nxps` shared-body model, no serial
-port and no REM, `sys.general.options.manualPriority = true`. Spa circuit
-turned on manually. A schedule on the Pool circuit set to start two minutes
-later.
+**Decision:** njsPC keeps its scheduler. A schedule reaching its start boundary
+takes the shared body and ends a spa session. **This is accepted.**
 
-**The result: at the schedule boundary the Pool circuit came on and the spa
-went off.** `manualPriorityActive` was never set. Someone in the spa would
-have had the water switched out from under them.
+**The bench test.** njsPC 10.0.1, Nixie `nxps`, `manualPriority = true`, spa
+held on manually, schedule on the Pool circuit starting two minutes later. At
+the boundary the Pool circuit came on and the spa went off;
+`manualPriorityActive` was never set. Holding the *same* circuit the schedule
+targets fared no better — it flipped to `priority: 'scheduled'` and lost its
+manual egg timer.
 
-A control run — holding the *same* circuit the schedule targets — behaved no
-better: the circuit stayed on, but flipped to `priority: 'scheduled'` and its
-end time was replaced by the schedule's. `manualPriorityActive` again never
-set.
+**Why it is acceptable here.** The spa is used at night, with the pool off.
+Filtration schedules run 08:00–20:00, so no schedule has a start boundary
+during spa hours. The collision needs a boundary to fall *inside* a soak,
+which this usage pattern does not produce. And the consequence is bounded: the
+spa cannot run dry, so a takeover means the spill resumes and the pump changes
+speed. Interrupted soak, not a hazard.
 
-**So the second revision of this ADR was wrong.** It read `ManualPriorityDelay`
-in `Lockouts.ts`, saw *"will override future schedules until expired/cancelled"*,
-and concluded njsPC already had the override we needed. Reading the scheduler
-more carefully afterwards, `manualPriorityActive` is set only on a narrow path
-— a schedule that has already been *triggered* and whose circuit is then
-manually turned back on, which keeps the egg timer in charge instead of the
-schedule's end time. It is not protection against a schedule *taking* a
-circuit at its start. (That reading is tentative; the observed behaviour is
-not.)
+**The one trap:** the weekend `22:00–23:30` skim schedule sits squarely in spa
+hours. It ships disabled. Enabling it reintroduces exactly this collision, and
+whoever enables it should know that.
 
-This matters here specifically because pool and spa are one shared body: a
-schedule on the pool circuit is not merely a pump-speed change, it is a body
-switch. And in njsPC pump speeds derive from circuits, so filtration
-scheduling *is* body-circuit scheduling. The PRD's own warning — *"a schedule
-dropping the pump to 1400 rpm mid-soak would be a bad surprise"* — is real and
-njsPC does not prevent it.
+**Design consequence, and it simplifies things.** Since njsPC owns mode and may
+change it at any time, the supervisor **observes and reacts** rather than
+asserting mode itself. A schedule-driven body change is then just a mode change
+the supervisor responds to — clear the blower, drop the heat call, re-apply the
+bypass. There is no state to keep in sync and no veto to arbitrate, which
+removes the distributed-lock problem the first draft was worried about.
 
-**Options, none yet chosen:**
-
-1. **Supervisor owns schedules** — the original first draft, now partly
-   vindicated. Total control; we pay for windows, day masks, DST, overlap.
-2. **Supervisor disables body-circuit schedules while spa mode is active**
-   using njsPC's per-schedule `isActive` flag, restoring them on exit. Cheap,
-   but it is soft state across two processes: a supervisor crash mid-soak
-   leaves schedules disabled until something restores them. Boot resync would
-   have to cover it.
-3. **Keep schedules off body circuits entirely** and drive filtration some
-   other way. Needs investigation — it may not be expressible in njsPC's model.
-
-**Decide before writing the supervisor, not after.**
+**Superseded drafts:** the first said the sequencer must own schedules, on the
+theory that njsPC could not check `heaterCall` before firing. The second
+reversed it after reading `ManualPriorityDelay` and assuming its semantics.
+The bench test contradicted the second, and the owner's usage made the first
+unnecessary. Reading beat reasoning; running beat reading.
 
 ### ADR-12 — Watchdog health spans both processes
 
@@ -1020,6 +1010,16 @@ eyes on bonding.
       Fallback if it does not: a REM temperature probe, which is the only
       option left, since the 3-wire heater interface reports nothing and the
       pump does not measure water. Settle before Phase 3.
+- [ ] **Do valves move under full flow?** The safety question the schedule test
+      did not answer, because no pump was configured. njsPC *does* implement
+      `setPumpValveDelays` in `NixieBoard.ts`, but it is gated on
+      `sys.general.options.pumpDelay`, which **defaults to false**, and it
+      delays a pump *start after* a valve change rather than stopping the pump
+      *before* one. Whether a body switch drops the pump first is untested.
+      This is the one bench test that matters before an actuator is wired:
+      configure a pump, enable `pumpDelay`, switch bodies, watch the rpm
+      through the transition. Water hammer and a stalled actuator are the
+      failure modes.
 - [ ] **Spa volume.** Never measured. All preheat estimates assume ~500 gal.
 - [ ] **Spa jet rpm.** 2800 is a guess. Tune empirically once speed is
       settable from a phone.

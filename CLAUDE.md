@@ -106,10 +106,13 @@ the supervisor adds** — diagnostic tool, not operator interface. Forking njsPC
 is a legitimate tactic (ADR-13), but it is AGPL-3.0: keep the supervisor a
 separate process or this repo stops being MIT.
 
-**Schedule ownership is unresolved (ADR-11)** and it is the next decision.
-A bench test showed a schedule taking the shared body at its start boundary
-and switching the spa off, with `manualPriority` enabled and ineffective.
-Do not assume njsPC's scheduler is safe to keep.
+**njsPC owns schedules, and a schedule may end a spa session (ADR-11).**
+Accepted: the spa is used at night with the pool off, and filtration runs
+08:00–20:00, so no boundary falls during a soak. The weekend 22:00 skim
+schedule is the exception — it ships disabled, and enabling it reintroduces
+the collision. Because njsPC owns mode and can change it at any time, the
+supervisor **observes and reacts** rather than asserting mode: a body change
+is just something to respond to, which is why there is no state to sync.
 
 ---
 
@@ -118,12 +121,13 @@ Do not assume njsPC's scheduler is safe to keep.
 Full lists in PRD §10 (open questions) and §11 (backlog). Available without
 hardware, highest value first:
 
-1. **Settle ADR-11 — schedule ownership.** Bench-tested and *open*: a schedule
-   at its start boundary took the shared body and switched the spa off, and
-   `manualPriority` did not prevent it. Three options in the ADR; pick one
-   before writing the supervisor, because it decides how big the supervisor is.
-   (njsPC runs on a laptop with comms disabled — no hardware needed. `anslq25`
-   is *not* the tool; it only mocks an EasyTouch OCP.)
+1. **Bench whether valves move under full flow.** The safety question, still
+   open. `pumpDelay` defaults to false and njsPC delays a pump *start after* a
+   valve change rather than stopping it *before* one. Configure a pump, switch
+   bodies, watch the rpm. Water hammer and a stalled actuator are the failure
+   modes, so settle this before an actuator is wired. (njsPC runs on a laptop
+   with comms disabled — no hardware needed. `anslq25` is *not* the tool; it
+   only mocks an EasyTouch OCP.)
 2. **Re-read `sequences.js` against njsPC's body/circuit model.** Some steps
    are probably njsPC configuration rather than code; what survives that pass
    is the supervisor's real scope.
