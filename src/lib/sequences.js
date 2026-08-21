@@ -39,6 +39,13 @@ export const SPA_TIMEOUT_MIN = 120;
 export const PURGE_SKIP_AFTER_MIN = 5;
 
 /**
+ * Intermatic duty cycle: 1 min ON max, 8 min OFF min. An actuator may not be
+ * re-driven inside this window. Nothing enforces it yet — a user toggling
+ * spa -> pool -> spa would violate it with three normal transitions.
+ */
+export const ACTUATOR_COOLDOWN_MIN = 8;
+
+/**
  * Hard caps enforced by the heater's own firmware (ADR-4). The 3-wire
  * interface carries no temperature — closing a contact calls for heat at a
  * setpoint held on the heater's board, which the app can neither read nor
@@ -183,6 +190,7 @@ export const INVARIANTS = [
   "no valve command may be issued while another valve move is in flight",
   "mode !== 'spa' implies blower === false (preference, not safety)",
   "spa mode auto-reverts to pool after SPA_TIMEOUT_MIN",
+  "an actuator may not be re-driven within ACTUATOR_COOLDOWN_MIN of its last move",
 ];
 
 /**

@@ -382,6 +382,35 @@ diverter sits close to neighboring risers.
 
 All 24 VAC actuators are functionally interchangeable across brands.
 
+**Specifications, from the Intermatic manual (PE24VA — the PE24GVA is the
+next-generation successor and should be confirmed against its own sheet):**
+
+| Spec | Value | Consequence |
+|---|---|---|
+| Supply | 24 VAC, 60 Hz, **0.75 A** | PRD previously said ~0.7 A. Three sequenced actuators draw 18 VA at a time; 75 VA is ample |
+| **Duty cycle** | **1 min ON max, 8 min OFF min** | **New constraint — see below** |
+| Circuit rating | Class 2, 24 V, 4 A / 100 VA max | 75 VA transformer complies |
+| Operating temp | −10 °C to 75 °C | Actuators sit outside the enclosure; not a factor |
+| Wiring | black common, red/white switched; rear toggle AUTO 1 / OFF / AUTO 2 | Matches the SPDT selection design |
+
+**The duty cycle is a real constraint and the design does not honour it.**
+Nothing in `sequences.js` or the invariants prevents an actuator being
+re-driven inside eight minutes. A user toggling spa → pool → spa, each
+transition completing normally, would do exactly that. Needs an invariant:
+
+```
+an actuator may not be re-driven within ACTUATOR_COOLDOWN_MIN of its last move
+```
+
+It also bounds travel: a 180° swing must finish inside the 1-minute ON limit,
+so travel is **under 60 sec**. That is consistent with the assumed 45 sec but
+does not confirm it — the figure still wants timing.
+
+Note the motor stops itself at the cam limit switch (see the manual's wiring
+diagram), so holding a line energised after the valve has arrived does not run
+the motor. ADR-9's standing energisation of relay 3 through pool mode is
+therefore fine; the duty cycle governs *movement*, not *position holding*.
+
 **Revisited, August 2026.** Reconsidered whether Jandy or Pentair actuators
 would reduce the driver-side risk found in ADR-10 — REM inverting a latched
 relay mid-travel. They would not. Every actuator in this class is a three-wire
@@ -740,6 +769,7 @@ bypass may move only when heaterCall === 'off' and purge has elapsed
 no valve command while another valve move is in flight
 mode !== 'spa'            ⟹  blower === false
 spa mode auto-reverts to pool after SPA_TIMEOUT_MIN
+an actuator may not be re-driven within ACTUATOR_COOLDOWN_MIN of its last move
 ```
 
 The two bypass implications are converses of one another and both are
@@ -1061,7 +1091,8 @@ eyes on bonding.
       configure a pump, enable `pumpDelay`, switch bodies, watch the rpm
       through the transition. Water hammer and a stalled actuator are the
       failure modes.
-- [ ] **Valve travel time.** `sequences.js` assumes 45 sec per PE24GVA move
+- [ ] **Valve travel time.** Bounded **under 60 sec** by the manual's 1-minute
+      duty cycle, but not stated exactly. `sequences.js` assumes 45 sec per move
       and three of them dominate a transition. Never measured. Three things
       lean on it: the "about two minutes" figure in PR-2, the conditional
       purge's payoff, and — most importantly — the `ABORTABLE = false`
@@ -1089,7 +1120,13 @@ eyes on bonding.
 - [ ] **Spa jet rpm.** 2800 is a guess. Tune empirically once speed is
       settable from a phone.
 - [ ] **Contactor inrush VA.** Read the nameplate before finalizing the
-      transformer at 75 VA vs 100 VA.
+      transformer at 75 VA vs 100 VA. Actuator draw is now confirmed at
+      0.75 A each, so three sequenced actuators need 18 VA; the contactor coil
+      is the only remaining unknown.
+- [ ] **Boot resync vs the actuator duty cycle.** The boot sequence re-drives
+      all three valves unconditionally. If njsPC or the supervisor restarts
+      repeatedly — a crash loop — that violates the 8-minute rule every cycle.
+      Needs a guard, or a persisted last-moved timestamp that survives restart.
 
 ---
 

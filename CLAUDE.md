@@ -85,6 +85,7 @@ bypass moves only when heaterCall === 'off' and purge has elapsed
 no valve command while another valve move is in flight
 mode !== 'spa'             ⟹  blower === false
 spa mode auto-reverts to pool after SPA_TIMEOUT_MIN
+an actuator may not be re-driven within ACTUATOR_COOLDOWN_MIN (8) of its last move
 ```
 
 The two bypass implications are converses and both are needed: one stops a
