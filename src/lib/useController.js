@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import {
   SEQUENCES, isSkipped, POOL_RPM, SPA_RPM, VALVE_RPM,
-  HEATER_MIN_RPM, HEATER_CAP, TARGET_MIN,
+  HEATER_MIN_RPM, HEATER_CAP, TARGET_MIN, SPA_TIMEOUT_MIN, SPA_HEAT_RATE,
 } from "./sequences";
 
 /**
@@ -97,7 +97,19 @@ export function useController() {
     light: false,
     saltPpm: 3150,
     cellOutput: 45,
+    /* Connection. `connected` is now driven by a heartbeat rather than being
+       hardcoded true — a client showing LIVE beside frozen state is the one
+       thing ADR-7 says must never happen. */
     connected: true,
+    lastSeen: Date.now(),
+    /* Steps for the running sequence, each annotated `skipped`. Planned up
+       front so the UI can strike skipped steps through instead of dropping
+       them, keeping the short and long paths visually identical. */
+    steps: [],
+    /* When spa mode auto-reverts. Null outside spa mode. */
+    spaExpiresAt: null,
+    /* Scheduled preheat: { readyAt, startsAt } or null. */
+    preheat: null,
   });
 
   const timer = useRef(null);
@@ -105,13 +117,20 @@ export function useController() {
      Null means it has not run since the app loaded — the common case, and
      the one where "Spa now" skips the purge entirely. */
   const compressorAt = useRef(null);
+  /* Mock transport outage, toggled from the connection badge. */
+  const outage = useRef(false);
+  /* The heartbeat runs on a mount-once interval, so it needs a live handle
+     on the current runSequence rather than the one captured at mount. */
+  const runRef = useRef(null);
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
   /**
    * Run a named sequence. `mode` is the mode to land in, if this sequence
    * changes mode at all; `seed` patches state before the first step.
    */
   const runSequence = (name, { mode: landing = null, seed = {} } = {}) => {
-    const steps = SEQUENCES[name];
+    const raw = SEQUENCES[name];
     const sim = {
       valves: { ...state.valves },
       pumpRpm: state.pumpRpm,
@@ -119,6 +138,21 @@ export function useController() {
       targets: { ...state.targets },
       ...seed,
     };
+    /* Walk the sequence against a throwaway copy of the simulation first, so
+       every skip decision is known before the first step runs. Skips depend
+       on the state left by earlier steps, so this has to be a forward walk
+       rather than a map. */
+    const plan = (() => {
+      const probe = { ...sim, valves: { ...sim.valves } };
+      const idleMin = compressorAt.current == null
+        ? Infinity : (Date.now() - compressorAt.current) / 60000;
+      return raw.map((step) => {
+        const skipped = isSkipped(step, { ...probe, compressorIdleMin: idleMin });
+        if (!skipped) applyStep(step.id, probe);
+        return { ...step, skipped };
+      });
+    })();
+    const steps = plan;
     let i = 0;
 
     const advance = () => {
@@ -126,25 +160,27 @@ export function useController() {
         setState((s) => ({
           ...s,
           ...(landing ? { mode: landing } : {}),
-          target: null, activeSequence: null, step: null, stepIndex: 0,
+          /* Spa mode is time-boxed. The PRD is emphatic: this is what saves
+             the system when someone opens the spa and forgets. */
+          ...(landing === "spa"
+            ? { spaExpiresAt: Date.now() + SPA_TIMEOUT_MIN * 60000 }
+            : landing === "pool"
+              ? { spaExpiresAt: null, preheat: null }
+              : {}),
+          target: null, activeSequence: null, step: null, stepIndex: 0, steps: [],
         }));
         return;
       }
 
       const step = steps[i];
-      const skipped = isSkipped(step, {
-        ...sim,
-        compressorIdleMin: compressorAt.current == null
-          ? Infinity
-          : (Date.now() - compressorAt.current) / 60000,
-      });
+      const skipped = step.skipped;
       const patch = skipped ? {} : applyStep(step.id, sim);
 
       setState((s) => ({
         ...s, ...seed, ...patch,
         /* A sequence takes the pump, so any manual hold is over. */
         pumpHold: null,
-        target: landing, activeSequence: name, step, stepIndex: i,
+        target: landing, activeSequence: name, step, stepIndex: i, steps: plan,
       }));
 
       i += 1;
@@ -155,6 +191,8 @@ export function useController() {
 
     advance();
   };
+
+  runRef.current = runSequence;
 
   const setMode = (target) => {
     /* No abort: ABORTABLE is false, so a sequence in flight is committed. */
@@ -201,6 +239,38 @@ export function useController() {
 
   const releasePump = () => setState((s) => ({ ...s, pumpHold: null }));
 
+  /** Push the spa auto-revert out by another full timeout from now. */
+  const extendSpa = () =>
+    setState((s) =>
+      s.mode === "spa"
+        ? { ...s, spaExpiresAt: Date.now() + SPA_TIMEOUT_MIN * 60000 }
+        : s);
+
+  /**
+   * Schedule the spa to be ready at a wall-clock time.
+   *
+   * Works backwards: warm-up at SPA_HEAT_RATE from the current water temp to
+   * the spa target, plus the transition itself. Both inputs are estimates —
+   * the rate especially — so this is a best effort, not a promise, and the
+   * UI says so.
+   */
+  const schedulePreheat = (readyAt) => {
+    setState((s) => {
+      const rise = Math.max(0, s.targets.spa - s.waterTemp);
+      const warmMs = (rise / SPA_HEAT_RATE) * 3600 * 1000;
+      const transitionMs = 3 * 60 * 1000;
+      return { ...s, preheat: { readyAt, startsAt: readyAt - warmMs - transitionMs } };
+    });
+  };
+
+  const cancelPreheat = () => setState((s) => ({ ...s, preheat: null }));
+
+  /** Mock only: pretend the transport dropped, so the offline path is real. */
+  const simulateOutage = () => {
+    outage.current = !outage.current;
+    setState((s) => ({ ...s, connected: !outage.current }));
+  };
+
   /* `next` may be a value or an updater. Steppers must pass an updater:
      tapping faster than React re-renders would otherwise compute every tap
      from the same stale degree and lose all but one of them. */
@@ -228,17 +298,50 @@ export function useController() {
       return { ...s, [key]: !s[key] };
     });
 
+  /**
+   * Heartbeat. Stands in for the transport's state stream: while it ticks the
+   * client is live, and when it stops the UI must say so rather than showing
+   * stale numbers under a LIVE badge.
+   */
   useEffect(() => {
     const t = setInterval(() => {
+      /* An outage means no beat arrives. `lastSeen` therefore stops advancing,
+         which is exactly what the real failure looks like. */
+      if (outage.current) return;
+
+      const now = Date.now();
+      const cur = stateRef.current;
+
+      /* Spa auto-revert. Fires only when nothing else is running, so it can
+         never interleave with a transition already in flight. */
+      if (cur.mode === "spa" && !cur.activeSequence
+          && cur.spaExpiresAt && now >= cur.spaExpiresAt) {
+        runRef.current?.("pool", { mode: "pool" });
+        return;
+      }
+
+      /* Scheduled preheat reaching its computed start. */
+      if (cur.preheat && !cur.activeSequence && cur.mode !== "spa"
+          && now >= cur.preheat.startsAt) {
+        runRef.current?.("spa", { mode: "spa" });
+        return;
+      }
+
       setState((s) => {
-        const expired = s.pumpHold?.expiresAt && Date.now() >= s.pumpHold.expiresAt;
-        if (s.heaterCall === "off") return expired ? { ...s, pumpHold: null } : s;
+        const expired = s.pumpHold?.expiresAt && now >= s.pumpHold.expiresAt;
+        const beat = { lastSeen: now, connected: true };
+        if (s.heaterCall === "off") {
+          return { ...s, ...beat, ...(expired ? { pumpHold: null } : {}) };
+        }
         const base = expired ? { ...s, pumpHold: null } : s;
-        compressorAt.current = Date.now();
+        compressorAt.current = now;
         /* Compressed for the mock. The blower figure is near zero because
            blower and heater roughly cancel — see PRD §Thermal reality. */
         const rate = base.blower ? 0.004 : 0.09;
-        return { ...base, waterTemp: Math.min(base.waterTemp + rate, base.setpoint ?? base.targets.spa) };
+        return {
+          ...base, ...beat,
+          waterTemp: Math.min(base.waterTemp + rate, base.setpoint ?? base.targets.spa),
+        };
       });
     }, 1000);
     return () => clearInterval(t);
@@ -246,5 +349,8 @@ export function useController() {
 
   useEffect(() => () => clearTimeout(timer.current), []);
 
-  return { state, setMode, setRpm, holdPump, releasePump, setTarget, setPoolHeat, toggle };
+  return {
+    state, setMode, setRpm, holdPump, releasePump, setTarget, setPoolHeat, toggle,
+    extendSpa, schedulePreheat, cancelPreheat, simulateOutage,
+  };
 }

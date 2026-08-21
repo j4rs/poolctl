@@ -80,7 +80,7 @@ export default function BusMonitor() {
               style={{
                 flex: 1, padding: "9px 4px", borderRadius: 8,
                 border: `1px solid ${on ? C.water : C.line}`,
-                background: on ? "rgba(79,191,180,0.12)" : "transparent",
+                background: on ? C.wash : "transparent",
                 color: on ? C.water : C.muted,
                 fontFamily: FONT_UI, fontSize: 12, fontWeight: 500, cursor: "pointer",
               }}>

@@ -9,10 +9,11 @@ import { C, FONT_UI, FONT_DATA } from "../theme";
  *
  * The spa always has flow in pool mode, which is why it never goes dark.
  */
-export default function Schematic({ valves, onHeaterTap }) {
+export default function Schematic({ valves, heaterCall = "off", onHeaterTap }) {
   const returnsSplit = valves.returns === "split";
   const poolReturn = returnsSplit;
   const spaIntake = valves.intake === "spa";
+  const throughHeater = valves.bypass === "flow";
 
   const rail = (active) => ({
     fill: "none",
@@ -26,7 +27,7 @@ export default function Schematic({ valves, onHeaterTap }) {
   });
 
   const bodyStyle = (active) => ({
-    fill: active ? "rgba(79,191,180,0.10)" : "transparent",
+    fill: active ? C.wash : "transparent",
     stroke: active ? C.water : C.line,
     strokeWidth: 1.5,
   });
@@ -37,10 +38,20 @@ export default function Schematic({ valves, onHeaterTap }) {
       <style>{`@keyframes flow { to { stroke-dashoffset: -28; } }
         @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }`}</style>
 
-      <path d="M96,92 H176 V54 H236" style={rail(true)} />
-      <path d="M96,92 H176 V154 H236" style={rail(poolReturn)} />
-      <path d="M236,68 H196 V120 H96" style={rail(spaIntake)} />
-      <path d="M236,168 H196 V120 H96" style={rail(!spaIntake)} />
+      {/* Return side: pump -> heater branch -> return diverter -> bodies.
+          The heater is drawn as a real branch rather than a word in the pump
+          box, because the bypass is one of the three valves and its position
+          is otherwise invisible. Water visibly goes through it or around it. */}
+      <path d="M84,92 H104" style={rail(true)} />
+      <path d="M104,92 V64 H120" style={rail(throughHeater)} />
+      <path d="M180,64 H196 V92" style={rail(throughHeater)} />
+      <path d="M104,92 H196" style={rail(!throughHeater)} />
+      <path d="M196,92 H214 V54 H236" style={rail(true)} />
+      <path d="M196,92 H214 V154 H236" style={rail(poolReturn)} />
+
+      {/* Intake side: bodies -> pump. Runs below, and never sees the heater. */}
+      <path d="M236,68 H224 V128 H84" style={rail(spaIntake)} />
+      <path d="M236,168 H224 V128 H84" style={rail(!spaIntake)} />
 
       {returnsSplit && (
         <g>
@@ -54,35 +65,53 @@ export default function Schematic({ valves, onHeaterTap }) {
               animation: "flow 0.8s linear infinite",
             }}
           />
-          <path d="M273,112 L278,120 L283,112" fill="none" stroke={C.water}
-            strokeWidth={2} strokeLinecap="round" />
+          <path d="M273,112 L278,120 L283,112" strokeWidth={2} strokeLinecap="round"
+            style={{ fill: "none", stroke: C.water }} />
         </g>
       )}
 
-      <rect x="16" y="76" width="80" height="60" rx="8" fill={C.surfaceUp} stroke={C.line} />
-      <text x="56" y="98" textAnchor="middle" fill={C.muted} fontFamily={FONT_DATA} fontSize="8" letterSpacing="1">PUMP</text>
-      <text x="56" y="112" textAnchor="middle" fill={C.muted} fontFamily={FONT_DATA} fontSize="8" letterSpacing="1">FILTER</text>
-      <text x="56" y="126" textAnchor="middle" fill={valves.bypass === "flow" ? C.heat : C.faint}
-        fontFamily={FONT_DATA} fontSize="8" letterSpacing="1">HEATER</text>
+      {/* Pump and filter are permanently inline and never switch, so they
+          share one box. The heater used to sit here too — it moved out to its
+          own branch because, unlike these, it can be valved out of the path. */}
+      <rect x="16" y="82" width="68" height="56" rx="8" style={{ fill: C.surfaceUp, stroke: C.line }} />
+      <text x="50" y="105" textAnchor="middle" style={{ fill: C.muted }} fontFamily={FONT_DATA} fontSize="8" letterSpacing="1">PUMP</text>
+      <text x="50" y="119" textAnchor="middle" style={{ fill: C.muted }} fontFamily={FONT_DATA} fontSize="8" letterSpacing="1">FILTER</text>
 
-      {/* Transparent hit area over the HEATER label — the same destination
-          as the heater row below the schematic. */}
-      {onHeaterTap && (
-        <rect x="20" y="118" width="72" height="14" fill="transparent"
-          onClick={onHeaterTap} role="button" tabIndex={0}
-          aria-label="Heater settings" style={{ cursor: "pointer" }} />
-      )}
+      {/* Heater, on its own branch. Amber and filled when water is routed
+          through it; outlined and dim when the bypass sends water around. */}
+      <g onClick={onHeaterTap} role={onHeaterTap ? "button" : undefined}
+        tabIndex={onHeaterTap ? 0 : undefined} aria-label="Heater settings"
+        style={{ cursor: onHeaterTap ? "pointer" : "default" }}>
+        <rect x="120" y="48" width="60" height="32" rx="7"
+          style={{
+            fill: throughHeater ? "var(--wash)" : "transparent",
+            stroke: throughHeater ? C.heat : C.line,
+            strokeWidth: 1.5,
+            transition: "fill 200ms, stroke 200ms",
+          }} />
+        <text x="150" y="61" textAnchor="middle" fontFamily={FONT_DATA} fontSize="8" letterSpacing="1"
+          style={{ fill: throughHeater ? C.heat : C.faint }}>HEATER</text>
+        <text x="150" y="72" textAnchor="middle" fontFamily={FONT_DATA} fontSize="7" letterSpacing="0.5"
+          style={{ fill: throughHeater ? C.heat : C.faint, opacity: 0.75 }}>
+          {heaterCall !== "off" ? "calling" : throughHeater ? "flow" : "bypassed"}
+        </text>
+      </g>
 
-      <circle cx="176" cy="92" r="5" fill={C.ground} stroke={C.water} strokeWidth="1.5" />
-      <circle cx="196" cy="120" r="5" fill={C.ground} stroke={C.water} strokeWidth="1.5" />
+      {/* Branch and rejoin points for the bypass. */}
+      <circle cx="104" cy="92" r="4" strokeWidth="1.5" style={{ fill: C.ground, stroke: C.water }} />
+      <circle cx="196" cy="92" r="4" strokeWidth="1.5" style={{ fill: C.ground, stroke: C.water }} />
+      {/* Return diverter, and the intake diverter below it. */}
+      <circle cx="214" cy="92" r="5" strokeWidth="1.5" style={{ fill: C.ground, stroke: C.water }} />
+      <circle cx="224" cy="128" r="5" strokeWidth="1.5" style={{ fill: C.ground, stroke: C.water }} />
 
       <rect x="236" y="30" width="84" height="50" rx="8" style={bodyStyle(true)} />
-      <text x="278" y="60" textAnchor="middle" fill={C.water} fontFamily={FONT_UI}
-        fontSize="13" fontWeight="500" letterSpacing="2">SPA</text>
+      <text x="278" y="60" textAnchor="middle" fontFamily={FONT_UI}
+        fontSize="13" fontWeight="500" letterSpacing="2" style={{ fill: C.water }}>SPA</text>
 
       <rect x="236" y="126" width="84" height="58" rx="8" style={bodyStyle(poolReturn || !spaIntake)} />
-      <text x="278" y="160" textAnchor="middle" fill={poolReturn || !spaIntake ? C.water : C.faint}
-        fontFamily={FONT_UI} fontSize="13" fontWeight="500" letterSpacing="2">POOL</text>
+      <text x="278" y="160" textAnchor="middle" fontFamily={FONT_UI} fontSize="13"
+        fontWeight="500" letterSpacing="2"
+        style={{ fill: poolReturn || !spaIntake ? C.water : C.faint }}>POOL</text>
     </svg>
   );
 }

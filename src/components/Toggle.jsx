@@ -24,7 +24,7 @@ export default function Toggle({ label, on, disabled, reason, onClick }) {
         padding: "14px 8px",
         borderRadius: 10,
         border: `1px solid ${on ? C.water : C.line}`,
-        background: on ? "rgba(79,191,180,0.12)" : "transparent",
+        background: on ? C.wash : "transparent",
         color: disabled ? C.muted : on ? C.water : C.stone,
         fontFamily: FONT_UI,
         fontSize: 13,

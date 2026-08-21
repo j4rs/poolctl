@@ -1,0 +1,101 @@
+/*
+ * Design tokens.
+ *
+ * Defined as CSS custom properties rather than JS values so the palette can
+ * swap at runtime without re-rendering the tree. `theme.js` maps the same
+ * names onto `var(--x)` strings, so every consumer keeps writing `C.water`
+ * and nothing downstream had to change.
+ *
+ * Dark is the default: this is used at night, at a spa, and a white screen
+ * in the dark is hostile. Daylight exists because the other half of the time
+ * it is read at midday in Florida sun, where the dark palette is unreadable.
+ *
+ * Resolution order: an explicit data-theme wins; otherwise follow the OS.
+ */
+
+:root {
+  --ground: #0c1618;
+  --surface: #132325;
+  --surface-up: #1b2f32;
+  --line: #27454a;
+  --water: #4fbfb4;
+  --water-dim: #2a6b68;
+  --heat: #e08b4c;
+  --stone: #e6e2d7;
+  --muted: #7b9295;
+  --faint: #4e6669;
+  --alert: #d9705c;
+
+  /* Tint behind selected/active surfaces. Was a hardcoded rgba in six files. */
+  --wash: rgba(79, 191, 180, 0.12);
+  /* Modal backdrop. */
+  --scrim: rgba(0, 0, 0, 0.55);
+  /* Shadow under sheets — near-invisible on dark, meaningful on light. */
+  --lift: 0 -8px 32px rgba(0, 0, 0, 0.5);
+}
+
+/*
+ * Daylight.
+ *
+ * Not a naive inversion. Sunlight washes out contrast, so this leans harder
+ * than a typical light theme: near-white ground, near-black text, and the
+ * accents darkened until they hold up against white rather than glowing on
+ * black. Teal at #4fbfb4 is ~1.9:1 on white and effectively invisible
+ * outdoors; #0f7a70 is ~5.3:1.
+ */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --ground: #f2f5f4;
+    --surface: #ffffff;
+    --surface-up: #e7ecea;
+    --line: #c2d0cd;
+    --water: #0f7a70;
+    --water-dim: #6ba8a2;
+    --heat: #a9530c;
+    --stone: #14201f;
+    --muted: #465957;
+    --faint: #677876;
+    --alert: #a8321f;
+    --wash: rgba(15, 122, 112, 0.1);
+    --scrim: rgba(20, 32, 31, 0.4);
+    --lift: 0 -8px 32px rgba(20, 32, 31, 0.18);
+  }
+}
+
+:root[data-theme="light"] {
+  --ground: #f2f5f4;
+  --surface: #ffffff;
+  --surface-up: #e7ecea;
+  --line: #c2d0cd;
+  --water: #0f7a70;
+  --water-dim: #6ba8a2;
+  --heat: #a9530c;
+  --stone: #14201f;
+  --muted: #465957;
+  --faint: #677876;
+  --alert: #a8321f;
+  --wash: rgba(15, 122, 112, 0.1);
+  --scrim: rgba(20, 32, 31, 0.4);
+  --lift: 0 -8px 32px rgba(20, 32, 31, 0.18);
+}
+
+* { box-sizing: border-box; }
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  background: var(--ground);
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  /* Hold-to-confirm needs a long press not to raise the iOS callout. */
+  -webkit-touch-callout: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}

@@ -212,7 +212,7 @@ export default function PumpControl({ controller }) {
               const on = holdFor === o.id;
               return (
                 <button key={o.id} onClick={() => setHoldFor(o.id)} aria-pressed={on}
-                  style={{ flex: 1, padding: "9px 4px", borderRadius: 8, border: `1px solid ${on ? C.water : C.line}`, background: on ? "rgba(79,191,180,0.12)" : "transparent", color: on ? C.water : C.muted, fontFamily: FONT_UI, fontSize: 12, fontWeight: 500, cursor: "pointer" }}>
+                  style={{ flex: 1, padding: "9px 4px", borderRadius: 8, border: `1px solid ${on ? C.water : C.line}`, background: on ? C.wash : "transparent", color: on ? C.water : C.muted, fontFamily: FONT_UI, fontSize: 12, fontWeight: 500, cursor: "pointer" }}>
                   {o.label}
                 </button>
               );
@@ -241,7 +241,7 @@ export default function PumpControl({ controller }) {
           return (
             <button key={p.id} onClick={() => setRpm(p.rpm)}
               style={{ padding: "12px 14px", borderRadius: 11, border: `1px solid ${active ? C.water : C.line}`,
-                background: active ? "rgba(79,191,180,0.10)" : "transparent", color: C.stone,
+                background: active ? C.wash : "transparent", color: C.stone,
                 textAlign: "left", cursor: "pointer", transition: "all 160ms ease" }}>
               <div style={{ fontSize: 13.5, fontWeight: 500 }}>{p.label}</div>
               <div style={{ fontFamily: FONT_DATA, fontSize: 11, color: active ? C.water : C.muted, marginTop: 4 }}>

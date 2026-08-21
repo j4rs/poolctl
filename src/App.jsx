@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { C, FONT_UI } from "./theme";
+import React, { useState, useEffect } from "react";
+import { C, FONT_UI, FONT_DATA, THEMES, readTheme, applyTheme } from "./theme";
 import { useController } from "./lib/useController";
 import PoolSpaControl from "./screens/PoolSpaControl";
 import PumpControl from "./screens/PumpControl";
@@ -14,8 +14,21 @@ const TABS = [
   { id: "bus", label: "Bus", Screen: BusMonitor },
 ];
 
+const THEME_LABEL = { auto: "Auto", dark: "Dark", light: "Day" };
+
 export default function App() {
   const [tab, setTab] = useState("water");
+  /* Daylight matters here: this is read at midday in Florida sun, where the
+     dark palette is unreadable. Auto follows the OS; the override exists
+     because the OS often does not know you have walked outside. */
+  const [theme, setTheme] = useState(readTheme);
+  /* The updater stays pure — React runs it during render and double-invokes
+     it under StrictMode, so touching the DOM in there is a bug waiting to
+     happen. The side effect belongs in an effect. Functional form so taps
+     arriving faster than a re-render do not all compute from a stale value. */
+  const cycleTheme = () =>
+    setTheme((cur) => THEMES[(THEMES.indexOf(cur) + 1) % THEMES.length]);
+  useEffect(() => { applyTheme(theme); }, [theme]);
   /* A focused screen pushed over the tabs. Not a router — one level, one
      way back. The tab bar hides so the screen stays lean. */
   const [pushed, setPushed] = useState(null);
@@ -42,8 +55,19 @@ export default function App() {
         background: C.surface, borderTop: `1px solid ${C.line}`,
         paddingBottom: "env(safe-area-inset-bottom)",
       }}>
-        <div style={{ textAlign: "center", fontSize: 9, color: C.faint, letterSpacing: 1, padding: "7px 0 8px" }}>
-          MOCK DATA
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+          fontSize: 9, color: C.faint, letterSpacing: 1, padding: "7px 0 8px",
+        }}>
+          <span>MOCK DATA</span>
+          <button onClick={cycleTheme} aria-label={`Theme: ${THEME_LABEL[theme]}. Tap to change.`}
+            style={{
+              background: "transparent", border: `1px solid ${C.line}`, borderRadius: 999,
+              color: C.muted, fontFamily: FONT_DATA, fontSize: 9, letterSpacing: 1,
+              padding: "2px 8px", cursor: "pointer", textTransform: "uppercase",
+            }}>
+            {THEME_LABEL[theme]}
+          </button>
         </div>
         <div style={{ display: "flex" }}>
           {TABS.map((t) => (

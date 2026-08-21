@@ -38,7 +38,7 @@ export default function ScheduleEditor({ value, others, onSave, onDelete, onCanc
     <div
       onClick={onCancel}
       style={{
-        position: "fixed", inset: 0, zIndex: 20, background: "rgba(0,0,0,0.6)",
+        position: "fixed", inset: 0, zIndex: 20, background: C.scrim,
         display: "flex", alignItems: "flex-end", justifyContent: "center",
       }}>
       <div
@@ -73,7 +73,7 @@ export default function ScheduleEditor({ value, others, onSave, onDelete, onCanc
                   style={{
                     flex: 1, height: 40, borderRadius: 8,
                     border: `1px solid ${on ? C.water : C.line}`,
-                    background: on ? "rgba(79,191,180,0.14)" : "transparent",
+                    background: on ? C.wash : "transparent",
                     color: on ? C.water : C.muted,
                     fontFamily: FONT_UI, fontSize: 12.5, fontWeight: 600, cursor: "pointer",
                   }}>

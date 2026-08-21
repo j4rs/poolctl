@@ -1263,19 +1263,19 @@ temperature (read from source).
 - [ ] Build the supervisor — the six interlocks njsPC lacks (ADR-10), not a
       sequencer that owns everything
 - [ ] Replace `useController` with real njsPC transport (MQTT or WebSocket)
-- [ ] Real connection state. `connected` is hardcoded `true` and nothing ever
+- [x] Real connection state. `connected` is hardcoded `true` and nothing ever
       clears it, so the LIVE indicator is decorative — a phone out of range
       would show LIVE beside frozen state, which is exactly what ADR-7 says
       cannot be trusted. Prerequisite for any PWA or installable client
 - [x] Schedule editor — add, edit, delete, day selection, overlap warning
 - [x] Target temperatures per body, clamped to the heater caps
 - [x] Pool heat on/off, driving heatEngage / heatRelease
-- [ ] Scheduled spa preheat ("ready at 7:30") — button is a stub
+- [x] Scheduled spa preheat ("ready at 7:30")
 - [x] Pump speed clamp at `HEATER_MIN_RPM` under a live heat call
 - [x] Manual pump hold, open-ended or on an egg-timer
-- [ ] Render skipped sequence steps struck through
-- [ ] Spa auto-revert countdown — `SPA_TIMEOUT_MIN` has no surface yet
-- [ ] Daylight theme
+- [x] Render skipped sequence steps struck through
+- [x] Spa auto-revert countdown, with an Extend action
+- [x] Daylight theme — CSS custom properties, auto/dark/day
 - [x] RS-485 diagnostics view for Phase 1 work — decode rate, per-frame hex
       and checksum, undecoded frames surfaced as the ADR-6 evidence
 - [ ] Verify the decoders in `src/lib/rs485.js` against the real bus. They
