@@ -137,6 +137,34 @@ heatsink at this duty cycle. njsPC + REM + dashPanel is a modest Node
 workload and 2 GB is not a constraint. Pi 5 would also push the 5 V supply
 requirement from ~5 A to ~7 A.
 
+**Measured, August 2026** — bare board, 3-piece heatsink kit fitted, open air
+on a bench at 25 °C ambient, on a 20 W USB-C supply:
+
+| State | Temp | ΔT over ambient | Clock | `get_throttled` |
+|---|---|---|---|---|
+| Idle | 38.9 °C | +14 °C | 700 MHz | `0x0` |
+| 4 cores, 6 min | 81.8 °C | +57 °C | 1800 MHz | `0x80000` |
+
+No undervoltage bits at any point, so the supply is not implicated. Bit 18
+never set — it never hard-throttled — but it crossed the 80 °C **soft** limit
+at 5½ minutes and was still climbing ~1 °C per 30 s when the test ended, so
+81.8 °C is not the steady-state figure.
+
+Two things this changes:
+
+- This Rev 1.5 board clocks at **1800 MHz**, not the 1500 MHz most Pi 4
+  passive-cooling guidance assumes. It runs hotter than that guidance implies.
+- The decision survives on **workload**, not on cooling. njsPC is nowhere near
+  four cores pegged, and +14 °C over ambient is fine in any plausible
+  enclosure. Full-load headroom, however, is gone.
+
+**Not yet measured, and worse than the above in three compounding ways:** the
+relay HAT mounts on 11 mm standoffs directly over the SoC heatsink, blocking
+its convection path; the sealed non-metallic enclosure has no airflow at all;
+and the Pi is not the only heat source in that box — the 75 VA transformer
+and the 5 V supply likely put total dissipation near 15–25 W inside a sealed
+14×12×6. Re-measure in the assembled enclosure before Phase 4.
+
 **Trade-off accepted:** no battery-backed RTC on the Pi 4. NTP over WiFi
 covers it.
 
@@ -609,6 +637,7 @@ preheat, and a physical weatherproof "spa on" button near the spa itself.
 | Software bug overheats spa | Impossible by construction — heater firmware owns the cap (ADR-4) |
 | Blower relay welds closed | Definite-purpose contactor sized for inrush |
 | Pi crashes mid-transition | Hardware watchdog drops relays to fail-safe |
+| Pi overheats in the sealed enclosure | Measured +14 °C over ambient at njsPC-like load, so fine on workload — but untested with the HAT fitted, the box sealed, and the transformer dissipating alongside it. Re-measure assembled; mitigations below |
 | Actuator stalls against a valve stop | Verify travel before install; cams set to hard stops |
 | Losing Pentair Home features owner values | ADR-6 Path B preserves them |
 
@@ -634,6 +663,15 @@ eyes on bonding.
 - [ ] **Spill confirmation.** Verify the pool returns actually go dead when
       the return diverter moves to full-spa. If they keep flowing, the spill
       is plumbed off an independent tee and the model needs revision.
+- [ ] **Enclosure thermals.** Bench figures are in ADR-3; the assembled case
+      is untested. Re-measure with the HAT fitted, the box closed, and the
+      transformer energised, on a hot afternoon. Mitigations in rough order
+      of cost: mount out of direct sun or add a shade; cap `arm_freq=1500`
+      in `config.txt`, which costs this workload nothing; move the
+      transformer to its own enclosure so the biggest heat source is not
+      sharing air with the Pi; add a conduction path from the SoC heatsink
+      to a plate through the wall — checking first that it raises no NEC 680
+      bonding question, which is why the box is non-metallic to begin with.
 - [ ] **Water temperature source.** The BOM has no water temp sensor, and the
       3-wire heater interface reports nothing. Target cutoffs and the preheat
       estimate both need a trusted reading — from the pump bus, a REM probe,

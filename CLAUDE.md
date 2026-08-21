@@ -53,6 +53,12 @@ which. No position feedback — position is dead-reckoned.
 
 - Raspberry Pi 4 Model B 2 GB. Chosen over Pi 5 for thermal reasons: the
   enclosure is sealed NEMA 4X, so no fan is possible. Passive heatsink only.
+  Measured on the bench at 25 °C ambient: **+14 °C over ambient at idle,
+  +57 °C at four cores pegged**, where it crosses the 80 °C soft limit and
+  keeps climbing. The board clocks at 1800 MHz, not the 1500 MHz most Pi 4
+  cooling guidance assumes. njsPC's real duty cycle is near idle, so this
+  holds — but on workload, not on cooling, and it is untested with the HAT
+  fitted and the box sealed. See ADR-3 and the enclosure-thermals open item.
 - Sequent Microsystems Eight Relays 4A/120V stackable HAT. NO/NC contacts on
   every channel (needed for the actuators), RS-485 port built in with TVS
   protection (so no separate USB adapter), DIN-rail mountable. Powers the Pi
@@ -243,6 +249,8 @@ path and the long path look like the same sequence.
 - [ ] Confirm spill stops when return diverter goes full-spa
 - [ ] Replace `useController` with real njsPC transport
 - [ ] Build server-side sequencer service (owns all interlocks)
+- [ ] Re-measure thermals with the HAT fitted and the enclosure sealed —
+      the transformer shares that box and the bench figures don't cover it
 - [ ] Decide the water temperature source — target cutoffs and the preheat
       estimate both need one, and the BOM has no sensor
 - [ ] Scheduled spa preheat — button is a stub
