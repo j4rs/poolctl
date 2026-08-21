@@ -53,14 +53,14 @@ which. No position feedback — position is dead-reckoned.
 
 - Raspberry Pi 4 Model B 2 GB. Chosen over Pi 5 for thermal reasons: the
   enclosure is sealed NEMA 4X, so no fan is possible. Passive heatsink only.
-  Measured on the bench at 25 °C ambient: **+14 °C over ambient at idle,
-  +57 °C at four cores pegged**, where it crosses the 80 °C soft limit and
-  keeps climbing. The board clocks at 1800 MHz, not the 1500 MHz most Pi 4
-  cooling guidance assumes, so `arm_freq=1500` is set in
-  `/boot/firmware/config.txt` — worth about 9 °C at full load, enough that the
-  soft limit is never reached, and invisible to this workload. njsPC's real
-  duty cycle is near idle, so this holds — but on workload, not on cooling,
-  and it is untested with the HAT fitted and the box sealed. See ADR-3 and the
+  Runs **Raspberry Pi OS Lite 64-bit** — headless, sealed, no display ever.
+  Measured on the bench at 25 °C ambient with heatsinks fitted: **+46 °C over
+  ambient at four cores pegged**, levelling off, soft limit never reached.
+  The board clocks at 1800 MHz stock, not the 1500 MHz most Pi 4 cooling
+  guidance assumes, so `arm_freq=1500` is set in `/boot/firmware/config.txt`
+  — worth ~9 °C and invisible to this workload. njsPC's real duty cycle is
+  near idle, so this holds on workload rather than on cooling, and it is
+  untested with the HAT fitted and the box sealed. See ADR-3 and the
   enclosure-thermals open item.
 - Sequent Microsystems Eight Relays 4A/120V stackable HAT. NO/NC contacts on
   every channel (needed for the actuators), RS-485 port built in with TVS

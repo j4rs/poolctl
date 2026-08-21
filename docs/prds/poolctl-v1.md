@@ -140,36 +140,44 @@ requirement from ~5 A to ~7 A.
 **Measured, August 2026** — bare board, 3-piece heatsink kit fitted, open air
 on a bench at 25 °C ambient, on a 20 W USB-C supply:
 
-| State | Temp | ΔT over ambient | Clock | `get_throttled` |
-|---|---|---|---|---|
-| Idle | 38.9 °C | +14 °C | 700 MHz | `0x0` |
-| 4 cores, 6 min | 81.8 °C | +57 °C | 1800 MHz | `0x80000` |
-| 4 cores, 6 min, **capped** | 73.0 °C | +48 °C | 1500 MHz | `0x0` |
+Identical 6-minute 4-core soak in every row. **The last row is the shipping
+configuration**; the first three were taken before it was noticed that the
+desktop image had been written instead of Lite.
 
-No undervoltage bits at any point, so the supply is not implicated. Bit 18
-never set — it never hard-throttled — but it crossed the 80 °C **soft** limit
-at 5½ minutes and was still climbing ~1 °C per 30 s when the test ended, so
-81.8 °C is not the steady-state figure.
+| Image | State | Temp | ΔT over ambient | Clock | `get_throttled` |
+|---|---|---|---|---|---|
+| Desktop | Idle | 38.9 °C | +14 °C | 700 MHz | `0x0` |
+| Desktop | 4 cores, 6 min | 81.8 °C | +57 °C | 1800 MHz | `0x80000` |
+| Desktop | 4 cores, 6 min | 73.0 °C | +48 °C | 1500 MHz | `0x0` |
+| **Lite** | Idle | 41.3 °C | +16 °C | 600 MHz | `0x0` |
+| **Lite** | **4 cores, 6 min** | **71.5 °C** | **+46 °C** | 1500 MHz | `0x0` |
 
-Two things this changes:
+No undervoltage bits in any run, so the supply is never implicated. Bit 18 was
+never set either — it never hard-throttled. The one failure is the stock-clock
+row: it crossed the 80 °C **soft** limit at 5½ minutes and was still climbing
+~1 °C per 30 s when the run ended, so 81.8 °C is not its steady state.
+
+What the numbers say:
 
 - This Rev 1.5 board clocks at **1800 MHz**, not the 1500 MHz most Pi 4
   passive-cooling guidance assumes. It runs hotter than that guidance implies.
-- The decision survives on **workload**, not on cooling. njsPC is nowhere near
-  four cores pegged, and +14 °C over ambient is fine in any plausible
-  enclosure. Full-load headroom, however, is gone.
+- **`arm_freq=1500` is the fix**, and it is applied in
+  `/boot/firmware/config.txt`. Worth ~9 °C at full load, enough that the soft
+  limit is never approached. The workload cannot tell 1.5 GHz from 1.8 GHz.
+- **The image barely matters under saturation** — 71.5 °C on Lite against
+  73.0 °C on desktop, both capped. Expected: with four cores pegged, a mostly
+  idle compositor is noise. Lite was chosen for RAM, SD writes and attack
+  surface, not for peak temperature.
+- **Idle figures are the weak row.** Settle times differed between runs, so
+  treat them as indicative only. A properly settled Lite idle would be below
+  41.3 °C.
+- The decision ultimately survives on **workload**, not on cooling. njsPC is
+  nowhere near four cores pegged.
 
-**`arm_freq=1500` is set in `/boot/firmware/config.txt`** and buys about 9 °C
-at full load — enough that the soft limit is never reached. The real gap is
-wider than 9 °C: the uncapped run was still climbing ~1 °C per 30 s at cutoff
-while the capped run had levelled off. The comparison is conservative in the
-cap's favour too, since the capped run started 5.4 °C hotter and still
-finished 9 °C cooler. The workload cannot tell the difference between 1.5 and
-1.8 GHz, so this costs nothing.
-
-It does not make sustained full load safe in a hot sealed box — +48 °C over a
-50 °C interior is still past the 85 °C hard limit. What it does is restore
-margin for the case that actually occurs.
+Capping does not make sustained full load safe in a hot sealed box — +46 °C
+over a 50 °C interior still exceeds the 85 °C hard limit. What it does is
+restore margin for the case that actually occurs, and make an unexpected busy
+spell degrade gracefully rather than throttle.
 
 **Not yet measured, and worse than the above in three compounding ways:** the
 relay HAT mounts on 11 mm standoffs directly over the SoC heatsink, blocking
