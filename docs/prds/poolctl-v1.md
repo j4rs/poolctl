@@ -747,6 +747,11 @@ from, and aborting only at step boundaries buys little when the bound is a
 45 sec move. The owner is committed for the duration, and the UI should say
 so rather than offer a cancel that lies.
 
+**This decision rests on an unmeasured number.** The 45 sec travel is an
+assumption, not a measurement. If a PE24GVA actually swings in 15 sec, the
+argument weakens considerably and abort-at-step-boundary becomes worth
+revisiting. Re-examine once travel is timed.
+
 ### Target temperatures
 
 The 3-wire interface carries no temperature. The heater holds its own
@@ -831,8 +836,9 @@ setpoint.
 
 ### PR-2 — Show the water path, not a spinner
 
-Transitions take about two minutes. A spinner over two minutes of silence
-produces button-mashing. The schematic shows which valve points where and
+Transitions take about two minutes — an estimate built on assumed valve
+travel, not a measurement. A spinner over two minutes of silence produces
+button-mashing. The schematic shows which valve points where and
 where flow is going, making the wait legible. It is also the only honest way
 to render the spill.
 
@@ -1027,11 +1033,56 @@ eyes on bonding.
       configure a pump, enable `pumpDelay`, switch bodies, watch the rpm
       through the transition. Water hammer and a stalled actuator are the
       failure modes.
+- [ ] **Valve travel time.** `sequences.js` assumes 45 sec per PE24GVA move
+      and three of them dominate a transition. Never measured. Three things
+      lean on it: the "about two minutes" figure in PR-2, the conditional
+      purge's payoff, and — most importantly — the `ABORTABLE = false`
+      decision, whose whole argument is that a 45 sec bound makes
+      abort-at-boundary pointless. Time one actuator before trusting any of
+      the three.
+- [ ] **Purge duration.** `sequences.js` assumes 3 min. The Raypak's real
+      requirement after a compressor stop is unconfirmed; the ~5 min
+      anti-short-cycle figure is a different thing. Overstating it makes
+      "Spa now" slower than it needs to be; understating it pushes hot water
+      through a stopped exchanger.
+- [ ] **Blower airflow.** "115 CFM" underpins the break-even claim in PR-4 and
+      the estimate copy. Read the nameplate.
+- [ ] **IntelliFlo VSF power curve.** `pump.js` uses `WATTS_MAX = 2400` at
+      3450 rpm, marked "approximate". Every watt and dollar the UI shows
+      derives from it, and njsPC reports real consumption off the bus once
+      connected — so this is a placeholder with a known replacement.
 - [ ] **Spa volume.** Never measured. All preheat estimates assume ~500 gal.
 - [ ] **Spa jet rpm.** 2800 is a guess. Tune empirically once speed is
       settable from a phone.
 - [ ] **Contactor inrush VA.** Read the nameplate before finalizing the
       transformer at 75 VA vs 100 VA.
+
+---
+
+### Claims resting on unmeasured values
+
+An audit prompted by finding that ADR-11 had been justified on the
+prototype's invented schedule data. Everything below is a real statement in
+this document that depends on a number nobody has measured. None of these are
+wrong; they are simply unproven, and they should not be cited as fact until
+the corresponding open question above is closed.
+
+| Claim | Rests on | Would change if wrong |
+|---|---|---|
+| `ABORTABLE = false` — abort-at-boundary "buys little" | 45 sec valve travel | **A decision.** Short travel makes abort worth reconsidering |
+| PR-2 — "transitions take about two minutes" | 45 sec × 3 valve moves | The case for a water-path view over a spinner |
+| Conditional purge — "two minutes instead of five" | 45 sec travel + 3 min purge | The payoff that justifies the skip logic |
+| ADR-9 — pool heat costs "one 45 sec valve move" | 45 sec travel | How expensive engaging pool heat feels |
+| PR-4 — blower and heater "roughly cancel" | 115 CFM, 20–25 °F/hr | The estimate copy, and whether the advice is right |
+| Spa preheat 45–75 min | 20–25 °F/hr, ~500 gal | Every preheat estimate, and scheduled preheat later |
+| Pool heating ~4 days from cold | unstated | How winter pool-heating mode is modelled |
+| Watts and dollars shown in the UI | `WATTS_MAX = 2400` | Every cost figure — though njsPC replaces it with real telemetry |
+
+**Verified, for contrast** — these look like assumptions and are not:
+heater caps 95/104 °F (Raypak firmware, ADR-4), Pi thermals (measured, ADR-3),
+`latch` inverting the relay (read from REM source), the `nxps` shared-body
+model (observed on the bench), and njsPC decoding iChlor output and
+temperature (read from source).
 
 ---
 
