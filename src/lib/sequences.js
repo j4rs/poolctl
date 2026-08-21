@@ -63,9 +63,18 @@ export const HEATER_CAP = { pool: 95, spa: 104 };
 export const TARGET_MIN = { pool: 70, spa: 80 };
 
 /**
- * Spa heating rate, °F/hr. PRD §Thermal reality: 20–25 °F/hr on a spa-sized
- * volume in Florida winter air, giving 45–75 min for a 80->102 preheat.
- * Inherits the PRD's unmeasured ~500 gal assumption — correct once known.
+ * Spa heating rate, °F/hr. The conservative end of the PRD's 20–25 range.
+ *
+ * Deliberately NOT derived from volume. The spa is now estimated at ~340 gal
+ * (5 ft diameter, ~2.3 ft average depth), where nameplate 140k BTU/hr would
+ * give 49 °F/hr before losses — so 20 implies the heater delivers ~41% of
+ * nameplate. That is plausible for winter air plus evaporative loss, but
+ * computing the rate from a geometric volume and a guessed derate factor
+ * would look rigorous while resting on two assumptions instead of one.
+ *
+ * Erring slow is the right direction: the spa is ready sooner than promised.
+ * A single heating run against the iChlor temp probe replaces all of this
+ * with a measured effective thermal mass.
  */
 export const SPA_HEAT_RATE = 20;
 

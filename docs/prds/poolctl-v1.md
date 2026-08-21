@@ -1135,8 +1135,41 @@ eyes on bonding.
 - [ ] **Exchanger pressure drop.** ADR-5's energy justification cites 9–11 psi
       with no source. Get it from the Raypak spec sheet. If it is low
       single-digit psi, that half of ADR-5 falls away.
-- [ ] **Spa volume.** Never measured; all preheat estimates assume ~500 gal.
-      It is a round spa, so geometry gives a first pass:
+- [~] **Spa volume — estimated ~340 gal, was assumed 500.** Round spa, 5 ft
+      diameter, ~3 ft at the footwell (owner, August 2026). At 5 ft the
+      geometry gives 147 gal per foot of *average* depth, and a bench at
+      roughly half the plan area and half the depth puts the average near
+      2.3 ft:
+
+      | Bench share of area | Avg depth | Volume |
+      |---|---|---|
+      | 40% | 2.44 ft | 358 gal |
+      | 50% | 2.30 ft | **338 gal** |
+      | 60% | 2.16 ft | 317 gal |
+
+      So **~340 gal, about a third less than assumed.** The old 500 gal would
+      have required 3.4 ft of average depth — a 5 ft tub that deep throughout,
+      with no seats.
+
+      **This makes the heating rate an explicit, checkable claim.** At 340 gal
+      the nameplate 140k BTU/hr would give 49 °F/hr with no losses. For the
+      PRD's 20–25 °F/hr to hold, the heater must be delivering **41–51% of
+      nameplate** — heavy, though not implausible once winter air derating and
+      evaporative loss off 100 °F water are counted.
+
+      `SPA_HEAT_RATE` is deliberately **left at 20** rather than recomputed.
+      Rebuilding it on a geometric volume and an invented derate factor would
+      swap one honest guess for a formula that merely looks rigorous, which is
+      the failure this document has been correcting all week. Twenty is the
+      conservative end, and erring slow means the spa is ready sooner than
+      promised rather than later.
+
+      Still open, and the calibration run closes it properly: one heating run
+      against the iChlor probe gives effective thermal mass directly —
+      plumbing, losses and all — and settles both the volume and the rate at
+      once.
+
+      Original method, for reference:
 
       `gallons ≈ 5.9 × diameter² × average depth` (feet)
 
