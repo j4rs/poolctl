@@ -260,7 +260,8 @@ path and the long path look like the same sequence.
 - [ ] Render skipped sequence steps struck through
 - [ ] Spa auto-revert countdown — `SPA_TIMEOUT_MIN` has no surface yet
 - [ ] Daylight theme — this is used poolside in Florida sun
-- [ ] RS-485 diagnostics view
+- [ ] Verify the RS-485 decoders in `src/lib/rs485.js` against the real bus —
+      they come from public reverse-engineering and are unconfirmed here
 
 ---
 

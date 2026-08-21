@@ -4,10 +4,14 @@ import { useController } from "./lib/useController";
 import PoolSpaControl from "./screens/PoolSpaControl";
 import PumpControl from "./screens/PumpControl";
 import HeatControl from "./screens/HeatControl";
+import BusMonitor from "./screens/BusMonitor";
 
 const TABS = [
   { id: "water", label: "Water", Screen: PoolSpaControl },
   { id: "pump", label: "Pump", Screen: PumpControl },
+  /* Diagnostics, not daily use — but Phase 1 lives here, so it earns a tab
+     until the chlorinator path is settled. */
+  { id: "bus", label: "Bus", Screen: BusMonitor },
 ];
 
 export default function App() {

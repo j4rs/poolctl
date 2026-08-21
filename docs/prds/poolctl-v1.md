@@ -718,7 +718,11 @@ eyes on bonding.
 - [ ] Render skipped sequence steps struck through
 - [ ] Spa auto-revert countdown — `SPA_TIMEOUT_MIN` has no surface yet
 - [ ] Daylight theme
-- [ ] RS-485 diagnostics view for Phase 1 work
+- [x] RS-485 diagnostics view for Phase 1 work — decode rate, per-frame hex
+      and checksum, undecoded frames surfaced as the ADR-6 evidence
+- [ ] Verify the decoders in `src/lib/rs485.js` against the real bus. They
+      are transcribed from public reverse-engineering and unconfirmed on this
+      equipment; the iChlor 30 is the least well covered of the lot
 - [ ] Home Assistant / MQTT bridge
 - [ ] Salt trend history and threshold alerts (Path A)
 - [ ] Winter pool-heating mode: the target and the on/off exist; the

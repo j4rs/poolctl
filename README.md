@@ -47,6 +47,9 @@ the same network — worth doing, since this is a phone-first UI.
   never setpoints — see ADR-4.
 - **Pump** — speed with flow-constraint markers, presets, and schedules with
   add/edit/delete and real energy cost.
+- **Bus** — RS-485 frame monitor for Phase 1 sniffing. Decode rate, per-frame
+  hex and checksum, and undecoded frames surfaced rather than hidden, since
+  those are what decide the chlorinator path (ADR-6).
 
 ## Structure
 
