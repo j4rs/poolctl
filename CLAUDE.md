@@ -151,6 +151,12 @@ the heat-conditional pump floor, the bypass policy, PE24GVA travel modelling,
 targets-as-cutoffs, purge conditional on compressor idle, and spa auto-revert.
 njsPC keeps its scheduler.
 
+Forking njsPC is allowed and sometimes right (ADR-13), but as a tactic, not
+an architecture: route around it, else upstream a patch, else pin a local one.
+The likely fork case is ADR-6 iChlor decoding, which cannot be routed around.
+njsPC is **AGPL-3.0**, REM is GPL-3.0 — a separate-process supervisor keeps
+this repo MIT; folding our logic into njsPC would not.
+
 Two things to hold onto: **dashPanel bypasses whatever the supervisor adds** —
 diagnostic tool, not operator interface — and `sequences.js` needs re-reading
 against njsPC's body/circuit model, because some of its steps are probably

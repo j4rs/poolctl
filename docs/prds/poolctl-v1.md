@@ -418,6 +418,39 @@ as dumb outputs. It would have duplicated a large tested subsystem and then
 fought it for control. It was written before anyone had read njsPC, which is
 the actual lesson.
 
+Forking njsPC is *not* rejected outright — see ADR-13 for when it is the right
+tool. What is rejected is treating a fork as the architecture.
+
+### ADR-13 — Forking njsPC is a tactic, not an architecture
+
+**Decision:** patching or forking njsPC is available and sometimes correct.
+Apply this ladder, cheapest first:
+
+1. **Route around it.** If we can simply not use the component, do that. It
+   costs nothing and carries no maintenance. The valve latch (ADR-10 item 3)
+   is this case: we don't need njsPC's valve model at all.
+2. **Upstream a patch.** `CONTRIBUTING.md` explicitly invites third-party
+   patches. If the change is generally useful, this is the best outcome — the
+   fork dissolves on merge.
+3. **Pinned local patch** while a PR is in flight, or for something too
+   site-specific to upstream. Bounded and visible; pin the version.
+4. **Reconsider njsPC** only if the needed change is pervasive rather than
+   surgical.
+
+**The case where a fork is genuinely likely is ADR-6.** If iChlor 30 frames
+do not decode, that cannot be routed around — decoding happens inside njsPC's
+comms layer, and the telemetry either reaches MQTT or it does not. That is
+step 2 or 3 territory, and `src/lib/rs485.js` already carries IC-framing
+decoders that could seed the patch.
+
+**Licensing consequence, and a real reason to keep the supervisor separate.**
+njsPC is **AGPL-3.0-only**; REM is **GPL-3.0**. A supervisor running as its own
+process and talking to njsPC over its network API is a separate program, and
+this repository stays MIT. Fold our logic *into* njsPC and that code becomes
+AGPL, taking the MIT licence with it. So keep forks surgical: fix njsPC's bugs
+inside njsPC, keep our interlocks in our own process. (Not legal advice —
+confirm before relying on it.)
+
 ### ADR-11 — njsPC owns schedules
 
 **Status: proposed.** Reverses the first draft, which said the opposite.
