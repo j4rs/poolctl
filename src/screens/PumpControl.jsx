@@ -54,6 +54,17 @@ export default function PumpControl({ controller }) {
   const scheduled = activeSchedule(schedules);
   const spaOwnsPump = mode === "spa";
 
+  /* In spa mode the pump is already immune to schedules, so a hold would
+     protect against nothing — and the pool sequence resets the speed on the
+     way out regardless. */
+  const owner = spaOwnsPump
+    ? { label: "Spa mode", tone: C.heat }
+    : pumpHold
+      ? { label: "Held", tone: C.heat }
+      : scheduled
+        ? { label: "Schedule", tone: C.water }
+        : { label: "Manual", tone: C.muted };
+
   const w = watts(rpm);
   const pct = ((rpm - RPM_MIN) / (RPM_MAX - RPM_MIN)) * 100;
   const activePreset = PRESETS.find((p) => Math.abs(p.rpm - rpm) < 60);
@@ -83,9 +94,21 @@ export default function PumpControl({ controller }) {
 
   return (
     <div style={{ padding: "20px 16px 32px", fontFamily: FONT_UI, color: C.stone }}>
-      <div style={{ marginBottom: 22 }}>
-        <div style={{ fontSize: 11, letterSpacing: 2, color: C.muted, fontFamily: FONT_DATA, textTransform: "uppercase" }}>Pump</div>
-        <div style={{ fontSize: 30, fontWeight: 600, letterSpacing: -0.5, lineHeight: 1.2 }}>Speed</div>
+      {/* Who is driving the pump. Without this the screen asserts things
+          like "spa mode owns the pump" while showing no sign anywhere that
+          spa mode is even on. */}
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 22 }}>
+        <div>
+          <div style={{ fontSize: 11, letterSpacing: 2, color: C.muted, fontFamily: FONT_DATA, textTransform: "uppercase" }}>Pump</div>
+          <div style={{ fontSize: 30, fontWeight: 600, letterSpacing: -0.5, lineHeight: 1.2 }}>Speed</div>
+        </div>
+        <div style={{
+          fontFamily: FONT_DATA, fontSize: 10, letterSpacing: 1, textTransform: "uppercase",
+          color: owner.tone, border: `1px solid ${owner.tone}`, borderRadius: 999,
+          padding: "4px 9px", opacity: 0.9,
+        }}>
+          {owner.label}
+        </div>
       </div>
 
       <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, padding: "20px 16px 16px", marginBottom: 12 }}>
@@ -176,7 +199,7 @@ export default function PumpControl({ controller }) {
           <div style={{ fontSize: 13.5, fontWeight: 500, marginBottom: 4 }}>Hold this speed</div>
           <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5, marginBottom: 12 }}>
             {spaOwnsPump
-              ? "Spa mode owns the pump. Available back in pool mode."
+              ? "Spa mode already ignores schedules, so there is nothing to hold against. Set the jet speed with the slider."
               : scheduled
                 ? `Otherwise the ${scheduled.start}–${scheduled.end} schedule takes it back to ${scheduled.rpm} rpm.`
                 : "No schedule is running now, but the next one would take the pump back."}
@@ -195,8 +218,16 @@ export default function PumpControl({ controller }) {
           <button
             onClick={() => holdPump(HOLD_OPTIONS.find((o) => o.id === holdFor).minutes)}
             disabled={spaOwnsPump}
-            style={{ width: "100%", padding: 13, borderRadius: 10, border: `1px solid ${spaOwnsPump ? C.line : C.water}`, background: spaOwnsPump ? "transparent" : C.water, color: spaOwnsPump ? C.faint : C.ground, fontFamily: FONT_UI, fontSize: 14, fontWeight: 600, cursor: spaOwnsPump ? "not-allowed" : "pointer", opacity: spaOwnsPump ? 0.6 : 1 }}>
+            aria-label={spaOwnsPump ? `Hold ${rpm} rpm — not in spa mode` : `Hold ${rpm} rpm`}
+            style={{ width: "100%", padding: 13, borderRadius: 10, border: `1px solid ${spaOwnsPump ? C.line : C.water}`, background: spaOwnsPump ? "transparent" : C.water, color: spaOwnsPump ? C.muted : C.ground, fontFamily: FONT_UI, fontSize: 14, fontWeight: 600, cursor: spaOwnsPump ? "not-allowed" : "pointer", opacity: spaOwnsPump ? 0.75 : 1 }}>
             Hold {rpm} rpm
+            {/* The reason rides on the control, matching Toggle and PR-3,
+                rather than sitting in a paragraph above it. */}
+            {spaOwnsPump && (
+              <span style={{ display: "block", fontSize: 10.5, fontWeight: 400, color: C.faint, marginTop: 4 }}>
+                Not in spa mode
+              </span>
+            )}
           </button>
         </div>
       )}
