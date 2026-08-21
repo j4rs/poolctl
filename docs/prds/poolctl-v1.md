@@ -309,6 +309,25 @@ diverter sits close to neighboring risers.
 
 All 24 VAC actuators are functionally interchangeable across brands.
 
+**Revisited, August 2026.** Reconsidered whether Jandy or Pentair actuators
+would reduce the driver-side risk found in ADR-10 — REM inverting a latched
+relay mid-travel. They would not. Every actuator in this class is a three-wire
+24 VAC cam-limited motor with no position feedback, held in place by gearing
+rather than by power, and driven by an SPDT relay selecting which line is
+energised. A brand change cannot fix a driver bug, and the interchangeability
+noted above cuts both ways.
+
+The one hardware change that *would* buy something is **position feedback**.
+Dead reckoning is what forces `ABORTABLE = false`, the unconditional boot
+re-drive, and the "valve position drifts — detected by: nothing" row in the
+failure table. An actuator with auxiliary position contacts would retire all
+three. Whether one exists as a drop-in at this price is unverified; do not
+assume it without checking.
+
+Keeping the PE24GVA on merit rather than price: the infinite cam adjustment is
+what lets one part number cover the 180° intake and both 90° valves, with one
+spare covering any failure.
+
 ### ADR-9 — Bypass follows the mode, with a pool-heat override
 
 **Decision:** the bypass rests in *flow* during spa mode and *around* during
@@ -833,12 +852,15 @@ eyes on bonding.
       `sys.equipment.shared`. If that models a shared pool+spa that spills,
       "mode" may be njsPC body selection rather than anything we write, and
       much of `sequences.js` becomes configuration. Test in Phase 2.
-- [ ] **REM latch semantics against the PE24GVA.** `nixie/valves/Valve.ts`
-      drives a valve as `{ isOn, latch: 10000 }`. The PE24GVA is an SPDT
-      selector that must stay energised to hold position B, and takes 45 sec
-      to travel. If `latch` means "de-energise after 10 s" the valve returns
-      to position A on its own, which would be silently wrong. Confirm what
-      REM does with `latch` before wiring an actuator.
+- [x] **REM latch semantics against the PE24GVA.** *Answered by reading the
+      source.* `SequentIO.ts` sets `state: !newState` when the latch timer
+      expires — it **inverts** the relay. njsPC hardcodes `latch: 10000` for
+      valves, so a divert command would reverse after 10 sec, against 45 sec
+      of travel, while `isDiverted` still read true. Not an actuator problem:
+      any 24 VAC three-wire actuator behaves the same. **Resolution:** the
+      supervisor drives the three valve relays through REM directly with no
+      latch, per ADR-10 item 3. njsPC's Nixie valve model is not used for
+      these actuators.
 - [ ] **Does `manualPriorityActive` survive a schedule boundary?** ADR-11
       depends on it. Set an override, let a schedule window roll over it,
       watch the pump.
