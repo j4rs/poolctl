@@ -241,6 +241,22 @@ when water passes through an idle exchanger. Two reasons changed it:
 exchanger is roughly 9–11 psi — 20+ feet of head the pump pays for on every
 filtration hour. Bypassing in summer is real energy savings on a VSF.
 
+> **⚠ Reason (b) is unsourced and may be wrong.** The 9–11 psi figure has no
+> citation, and it is high for a heat-pump exchanger — published drops for
+> this class are commonly quoted in low single-digit psi at typical flow. If
+> the real figure is 1–2 psi, the head the pump pays is a few feet rather than
+> twenty, the summer saving is marginal, and **reason (b) does not survive**.
+>
+> That matters because a great deal was built on it: a third actuator and its
+> relay channel, the whole of ADR-9, two of the seven invariants, and one of
+> the supervisor's six responsibilities. Reason (a) — the owner wants remote
+> control of every valve — is independent and still stands on its own, so the
+> decision does not necessarily reverse. But the energy argument should not be
+> repeated until the Raypak spec sheet confirms it.
+>
+> Found the same way as the fabricated pool-heating figure: by asking where a
+> number came from and finding no answer.
+
 **Because the bypass is binary — full flow or full bypass, not a partial
 split — a heater call with the valve in bypass means zero flow through the
 exchanger.** The interlock is therefore load-bearing in both directions:
@@ -802,9 +818,17 @@ five, almost all of it valve travel.
 - Spa preheat from ~80 °F to 102 °F: **45–75 minutes**.
 - A 115 CFM blower moving ambient air through 100 °F water takes back most
   of the heater's output. Blower + heater is roughly break-even.
-- Pool heating is a multi-day operation (~4 days typical from cold), most
-  efficient during warm daylight hours. Model it as a target temperature
-  with a maintenance schedule, not a button.
+- Pool heating is slow — **order of days, not hours** — and most efficient
+  during warm daylight hours. Model it as a target temperature with a
+  maintenance schedule, not a button.
+
+  An earlier draft said "~4 days typical from cold". **That figure was
+  invented.** It had no source and should never have been written down. The
+  qualitative claim survives on physics — a 140k BTU heat pump against a
+  pool-sized volume raises temperature roughly an order of magnitude slower
+  than it does the spa, and overnight losses eat into each day's gain — but
+  the design consequence rests on "slow", not on any particular number. Pool
+  volume has never been measured either, so nobody can currently compute it.
 
 ### Pump
 
@@ -1051,6 +1075,12 @@ eyes on bonding.
       3450 rpm, marked "approximate". Every watt and dollar the UI shows
       derives from it, and njsPC reports real consumption off the bus once
       connected — so this is a placeholder with a known replacement.
+- [ ] **Pool volume.** Never measured, and not previously listed. Needed
+      before winter pool-heating can be modelled as anything more precise
+      than "slow".
+- [ ] **Exchanger pressure drop.** ADR-5's energy justification cites 9–11 psi
+      with no source. Get it from the Raypak spec sheet. If it is low
+      single-digit psi, that half of ADR-5 falls away.
 - [ ] **Spa volume.** Never measured. All preheat estimates assume ~500 gal.
 - [ ] **Spa jet rpm.** 2800 is a guess. Tune empirically once speed is
       settable from a phone.
@@ -1062,10 +1092,16 @@ eyes on bonding.
 ### Claims resting on unmeasured values
 
 An audit prompted by finding that ADR-11 had been justified on the
-prototype's invented schedule data. Everything below is a real statement in
-this document that depends on a number nobody has measured. None of these are
-wrong; they are simply unproven, and they should not be cited as fact until
-the corresponding open question above is closed.
+prototype's invented schedule data. Everything below is a statement in this
+document that depends on a number nobody has measured, and should not be
+cited as fact until the corresponding open question above is closed.
+
+Two of them turned out to be worse than unmeasured — they were **invented**,
+with no source at all: "pool heating ~4 days from cold", now removed, and
+ADR-5's "9–11 psi" exchanger drop, now flagged in place because a decision
+rests on it. Both were found by the same simple test: ask where the number
+came from. Any figure in this document that cannot answer that should be
+treated as fiction until it can.
 
 | Claim | Rests on | Would change if wrong |
 |---|---|---|
@@ -1075,7 +1111,8 @@ the corresponding open question above is closed.
 | ADR-9 — pool heat costs "one 45 sec valve move" | 45 sec travel | How expensive engaging pool heat feels |
 | PR-4 — blower and heater "roughly cancel" | 115 CFM, 20–25 °F/hr | The estimate copy, and whether the advice is right |
 | Spa preheat 45–75 min | 20–25 °F/hr, ~500 gal | Every preheat estimate, and scheduled preheat later |
-| Pool heating ~4 days from cold | unstated | How winter pool-heating mode is modelled |
+| ~~Pool heating ~4 days from cold~~ | **nothing — invented** | Removed. The qualitative "order of days" survives on physics |
+| ADR-5(b) — exchanger drop "9–11 psi, 20+ ft head" | **no source, and looks high** | The energy case for automating the bypass. ADR-5(a) is independent and holds |
 | Watts and dollars shown in the UI | `WATTS_MAX = 2400` | Every cost figure — though njsPC replaces it with real telemetry |
 
 **Verified, for contrast** — these look like assumptions and are not:

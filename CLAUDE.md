@@ -60,6 +60,11 @@ form is here so it never gets skipped.
   never as `title` tooltips — phone-first, no hover. (PR-3)
 - **`src/lib/sequences.js` is the executable spec.** The server implements the
   same steps in the same order. If they disagree, one of them is a bug.
+- **Every number needs a source.** Two figures in the PRD turned out to be
+  invented outright — a pool-heating duration and the exchanger pressure drop
+  that justifies automating the bypass. If a number cannot say where it came
+  from, treat it as fiction. PRD §10 has the audit of what still rests on
+  unmeasured values.
 - **Nothing in the mock is real.** Every value in `useController.js`,
   `useBus.js` and `PumpControl`'s schedule array is invented to make the UI
   demonstrable — temperatures, salt, rpm, targets, schedules, and the step
