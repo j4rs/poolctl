@@ -1253,10 +1253,13 @@ temperature (read from source).
 
 ## 11. Software backlog
 
-- [ ] Stand njsPC + REM up against the `anslq25` simulator. Tests the two
-      assumptions ADR-10 rests on — whether njsPC can be supervised, and
-      whether `manualPriorityActive` survives a schedule boundary. No hardware
-      needed; do this before writing the supervisor
+- [x] Stand njsPC up on a laptop and test ADR-10's assumptions. Done — see
+      the bench findings under ADR-10. `anslq25` was the wrong tool (it only
+      mocks an EasyTouch OCP); Nixie with comms disabled is the way
+- [ ] Bench the pump through a body switch — the one safety question left
+      that needs no hardware. Configure a pump, switch bodies, watch the rpm.
+      Pass is "holds ~1000 rpm"; "stopped" means the supervisor cannot
+      delegate the switch to njsPC. Do this before designing the supervisor
 - [ ] Re-read `sequences.js` against njsPC's body/circuit model. Some steps
       are likely njsPC configuration rather than code; what survives that pass
       is the supervisor's actual scope
