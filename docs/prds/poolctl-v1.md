@@ -1135,13 +1135,46 @@ eyes on bonding.
 - [ ] **Exchanger pressure drop.** ADR-5's energy justification cites 9–11 psi
       with no source. Get it from the Raypak spec sheet. If it is low
       single-digit psi, that half of ADR-5 falls away.
-- [ ] **Spa volume.** Never measured. All preheat estimates assume ~500 gal.
+- [ ] **Spa volume.** Never measured; all preheat estimates assume ~500 gal.
+      It is a round spa, so geometry gives a first pass:
+
+      `gallons ≈ 5.9 × diameter² × average depth` (feet)
+
+      Measure the diameter at the waterline and the depth at the footwell.
+      Seats matter — a perimeter bench typically occupies a third to a half of
+      the plan area at roughly half depth, so the *average* depth is well
+      below the footwell figure. Getting that wrong by 20% is fine; the
+      estimate is order-of-magnitude sensitive, not percent sensitive.
+
+      **Better, once the system runs:** back out the *effective thermal mass*
+      from a real heating run — `BTU delivered = gallons × 8.34 × ΔT` — using
+      the iChlor temperature probe. That is strictly better than geometry
+      because it captures plumbing volume and standing losses too, which is
+      what the preheat estimate actually needs. Geometry now, calibration
+      later.
 - [ ] **Spa jet rpm.** 2800 is a guess. Tune empirically once speed is
       settable from a phone.
-- [ ] **Contactor inrush VA.** Read the nameplate before finalizing the
-      transformer at 75 VA vs 100 VA. Actuator draw is now confirmed at
-      0.75 A each, so three sequenced actuators need 18 VA; the contactor coil
-      is the only remaining unknown.
+- [ ] **Contactor inrush VA.** Still unread — the Eaton datasheet did not
+      retrieve. The arithmetic mostly settles it anyway, and exposes a
+      dependency worth knowing:
+
+      | Load | VA at 24 V |
+      |---|---|
+      | One actuator moving | 18 |
+      | Three actuators moving **simultaneously** | 54 |
+      | Contactor coil inrush | unknown; tens of VA for this class |
+
+      Sequenced, one actuator plus a contactor pull-in is comfortably inside
+      75 VA. **Simultaneous, it is not** — 54 VA of actuators plus inrush
+      plausibly exceeds it. So the "sequenced, never simultaneous" note in the
+      power budget is not a stylistic preference, it is what makes 75 VA work.
+      And njsPC violates it by default: the bench test showed it diverting
+      both valves at once. Same finding as the water-hammer concern, second
+      consequence.
+
+      **Recommendation: buy the 100 VA transformer.** It is roughly $10 more,
+      it removes the dependency on an unread datasheet, and it survives a
+      future mistake where two actuators do move together.
 - [ ] **Boot resync vs the actuator duty cycle.** The boot sequence re-drives
       all three valves unconditionally. If njsPC or the supervisor restarts
       repeatedly — a crash loop — that violates the 8-minute rule every cycle.
