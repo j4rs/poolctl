@@ -1003,7 +1003,9 @@ eyes on bonding.
 
 ## 10. Open questions
 
-- [ ] **Chlorinator path.** Blocked on Phase 1 sniffing.
+- [x] **Chlorinator path.** *Resolved* — Path A (ADR-6). What remains is
+      narrower and tracked there: whether an iChlor 30 emits the case-18 salt
+      message. Salt has been accepted as expendable either way.
 - [ ] **`HEATER_MIN_RPM`.** Currently 1900, a placeholder. Measure by ramping
       the pump and noting where the heat pump's flow fault clears.
 - [ ] **`CELL_MIN_RPM`.** Currently 1150, a placeholder. Measure by noting
@@ -1020,11 +1022,12 @@ eyes on bonding.
       sharing air with the Pi; add a conduction path from the SoC heatsink
       to a plate through the wall — checking first that it raises no NEC 680
       bonding question, which is why the box is non-metallic to begin with.
-- [ ] **Does njsPC's shared-equipment model fit this plumbing?**
-      `SystemBoard.ts` has `spillway` and `spadrain` circuit functions gated on
-      `sys.equipment.shared`. If that models a shared pool+spa that spills,
-      "mode" may be njsPC body selection rather than anything we write, and
-      much of `sequences.js` becomes configuration. Test in Phase 2.
+- [x] **Does njsPC's shared-equipment model fit this plumbing?** *Answered on
+      the bench* — yes. The `nxps` model creates Pool/Spa bodies, Pool/Spa
+      circuits and Intake/Return valves unprompted, and turning the Spa circuit
+      on switches the body and diverts both valves. Mode switching is njsPC's.
+      The residual — whether the spill actually stops in full-spa — is the
+      separate spill-confirmation question below.
 - [x] **REM latch semantics against the PE24GVA.** *Answered by reading the
       source.* `SequentIO.ts` sets `state: !newState` when the latch timer
       expires — it **inverts** the relay. njsPC hardcodes `latch: 10000` for
@@ -1034,9 +1037,10 @@ eyes on bonding.
       supervisor drives the three valve relays through REM directly with no
       latch, per ADR-10 item 3. njsPC's Nixie valve model is not used for
       these actuators.
-- [ ] **Does `manualPriorityActive` survive a schedule boundary?** ADR-11
-      depends on it. Set an override, let a schedule window roll over it,
-      watch the pump.
+- [x] **Does `manualPriorityActive` survive a schedule boundary?** *Answered
+      on the bench* — **no.** The schedule took the shared body and switched
+      the spa off; the flag was never set, with `manualPriority` enabled. See
+      ADR-11, which is resolved on the strength of this.
 - [x] **Water temperature source.** *Likely answered.* njsPC case 22 assigns
       the iChlor's own temperature probe to the current body when running in
       Nixie mode, so the BOM needs no sensor. Caveats: one byte, so 1 °F
