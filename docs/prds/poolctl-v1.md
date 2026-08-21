@@ -144,6 +144,7 @@ on a bench at 25 °C ambient, on a 20 W USB-C supply:
 |---|---|---|---|---|
 | Idle | 38.9 °C | +14 °C | 700 MHz | `0x0` |
 | 4 cores, 6 min | 81.8 °C | +57 °C | 1800 MHz | `0x80000` |
+| 4 cores, 6 min, **capped** | 73.0 °C | +48 °C | 1500 MHz | `0x0` |
 
 No undervoltage bits at any point, so the supply is not implicated. Bit 18
 never set — it never hard-throttled — but it crossed the 80 °C **soft** limit
@@ -157,6 +158,18 @@ Two things this changes:
 - The decision survives on **workload**, not on cooling. njsPC is nowhere near
   four cores pegged, and +14 °C over ambient is fine in any plausible
   enclosure. Full-load headroom, however, is gone.
+
+**`arm_freq=1500` is set in `/boot/firmware/config.txt`** and buys about 9 °C
+at full load — enough that the soft limit is never reached. The real gap is
+wider than 9 °C: the uncapped run was still climbing ~1 °C per 30 s at cutoff
+while the capped run had levelled off. The comparison is conservative in the
+cap's favour too, since the capped run started 5.4 °C hotter and still
+finished 9 °C cooler. The workload cannot tell the difference between 1.5 and
+1.8 GHz, so this costs nothing.
+
+It does not make sustained full load safe in a hot sealed box — +48 °C over a
+50 °C interior is still past the 85 °C hard limit. What it does is restore
+margin for the case that actually occurs.
 
 **Not yet measured, and worse than the above in three compounding ways:** the
 relay HAT mounts on 11 mm standoffs directly over the SoC heatsink, blocking
@@ -666,8 +679,8 @@ eyes on bonding.
 - [ ] **Enclosure thermals.** Bench figures are in ADR-3; the assembled case
       is untested. Re-measure with the HAT fitted, the box closed, and the
       transformer energised, on a hot afternoon. Mitigations in rough order
-      of cost: mount out of direct sun or add a shade; cap `arm_freq=1500`
-      in `config.txt`, which costs this workload nothing; move the
+      of cost: mount out of direct sun or add a shade; `arm_freq=1500` is
+      already applied and worth ~9 °C; move the
       transformer to its own enclosure so the biggest heat source is not
       sharing air with the Pi; add a conduction path from the SoC heatsink
       to a plate through the wall — checking first that it raises no NEC 680

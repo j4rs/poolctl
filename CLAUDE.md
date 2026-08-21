@@ -56,9 +56,12 @@ which. No position feedback — position is dead-reckoned.
   Measured on the bench at 25 °C ambient: **+14 °C over ambient at idle,
   +57 °C at four cores pegged**, where it crosses the 80 °C soft limit and
   keeps climbing. The board clocks at 1800 MHz, not the 1500 MHz most Pi 4
-  cooling guidance assumes. njsPC's real duty cycle is near idle, so this
-  holds — but on workload, not on cooling, and it is untested with the HAT
-  fitted and the box sealed. See ADR-3 and the enclosure-thermals open item.
+  cooling guidance assumes, so `arm_freq=1500` is set in
+  `/boot/firmware/config.txt` — worth about 9 °C at full load, enough that the
+  soft limit is never reached, and invisible to this workload. njsPC's real
+  duty cycle is near idle, so this holds — but on workload, not on cooling,
+  and it is untested with the HAT fitted and the box sealed. See ADR-3 and the
+  enclosure-thermals open item.
 - Sequent Microsystems Eight Relays 4A/120V stackable HAT. NO/NC contacts on
   every channel (needed for the actuators), RS-485 port built in with TVS
   protection (so no separate USB adapter), DIN-rail mountable. Powers the Pi
