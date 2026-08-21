@@ -314,6 +314,89 @@ mode sequences.
 - *Bypassing only inside scheduled filtration windows* — fewer coil-hours,
   more states to reason about, marginal gain.
 
+### ADR-10 — The sequencer is a separate service, and the only writer
+
+**Status: proposed.** Not yet ratified.
+
+**Decision:** a standalone Node service on the Pi, alongside njsPC and REM. It
+owns modes, the five sequences, every interlock and invariant, valve
+dead-reckoning, targets, the pump hold, and schedules. It drives equipment
+through njsPC (pump, bus) and REM (relays). **No other process commands
+equipment.**
+
+**Rationale:** ADR-2 chose njsPC precisely so this project would not own a
+reverse-engineered protocol stack. Forking it to add interlocks gives that
+burden straight back. REM is an I/O driver and interlock logic does not belong
+there. ADR-7 already rules out the client. That leaves a service of our own,
+which has the further advantage of being testable on a bench with no hardware
+attached — which is exactly what Phase 2 is.
+
+**Consequences:**
+
+- **dashPanel is a diagnostic tool, not an operator interface.** It can command
+  equipment directly, bypassing every interlock in this system. Do not put it
+  on a phone home screen, and consider not exposing it at all once the
+  sequencer is running.
+- njsPC's own scheduler must be off — see ADR-11.
+- Clients talk to the sequencer, never to njsPC. One source of truth, one shape.
+- `src/lib/sequences.js` is the spec this service implements. Disagreement
+  between them is a bug in one of them.
+
+**Rejected:** forking njsPC or writing a plugin (hands back the maintenance
+ADR-2 avoided); logic in REM (wrong layer); logic in the client (ADR-7).
+
+### ADR-11 — The sequencer owns schedules; njsPC's scheduler is off
+
+**Status: proposed.** Not yet ratified.
+
+**Decision:** disable njsPC's scheduler entirely. The sequencer owns schedule
+definitions, evaluation, and the resulting pump commands.
+
+**Rationale:** ADR-1 rejected two masters on the RS-485 bus, and named the
+failure concretely — *valves in spa position while the other controller runs a
+schedule that stops the pump.* Two schedulers on the Pi is that same failure
+moved indoors. It is worse, not better, for being inside one box: the pieces
+look cooperative.
+
+The alternative — njsPC keeps schedules, the sequencer suspends them during
+modes and holds — is a distributed lock between two processes with no shared
+state. A schedule firing from njsPC cannot be checked against
+`heaterCall !== 'off' ⟹ pumpRpm >= HEATER_MIN_RPM` at the instant it fires,
+because njsPC does not know what `heaterCall` is.
+
+One owner means every equipment command passes one place that can assert the
+invariants before issuing it. That is the whole design.
+
+**Cost, stated plainly:** we reimplement schedule evaluation — windows, day
+masks, DST, overlap resolution. Bounded, and the data model already exists in
+`src/lib/pump.js`, but it is real work that would otherwise have been free.
+
+**Consequence:** njsPC is demoted to what ADR-2 actually wanted from it — a bus
+master and telemetry source with an excellent pump driver.
+
+### ADR-12 — The watchdog watches the sequencer, and health is conditional
+
+**Status: proposed.** Not yet ratified.
+
+**Decision:** the hardware watchdog is fed by the **sequencer**, not njsPC.
+Feeding is conditional on a health check — invariants currently hold, no valve
+move orphaned, njsPC and REM both answering — and not merely on the process
+being alive.
+
+**Rationale:** §5 originally specified the watchdog against njsPC, which was
+right when njsPC was going to be the whole controller. Under ADR-10 it is not.
+The dangerous state is *the interlock owner is dead*: a valve mid-travel with
+nothing left to finish the sequence, or a heat call standing with nothing left
+to check flow against. If njsPC dies instead, the sequencer notices its calls
+failing and can drive to fail-safe deliberately.
+
+A liveness ping from a wedged process is worse than no watchdog, because it
+buys false confidence. Tie the heartbeat to the thing the watchdog exists to
+protect.
+
+**Consequence:** killing the sequencer must be part of the Phase 2 bench test,
+alongside killing njsPC. Both should end with every relay de-energised.
+
 ---
 
 ## 4. Hardware design
@@ -367,7 +450,10 @@ Relay NO/NC selection must place the de-energized state at:
 - Heater contacts → open
 - Blower → off
 
-A hardware watchdog drops all relays if njsPC stops heartbeating.
+A hardware watchdog drops all relays if the **sequencer** stops asserting
+health — see ADR-12. Earlier drafts pointed this at njsPC, which was correct
+while njsPC was going to be the entire controller and is not correct under
+ADR-10.
 
 ### Enclosure
 

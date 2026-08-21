@@ -60,6 +60,7 @@ src/
   lib/useController.js     mock state — THE ONLY FILE TO SWAP for real data
   components/              Schematic, Stat, Toggle
   screens/                 PoolSpaControl, PumpControl
+docs/architecture.md       system view, state ownership, failure modes
 docs/prds/poolctl-v1.md    full requirements, ADRs, and open questions
 CLAUDE.md                  compressed operating context for agents
 ```

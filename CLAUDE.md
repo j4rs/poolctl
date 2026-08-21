@@ -135,6 +135,17 @@ njsPC's iChlor 30 support is less mature than its IntelliChlor support.
 state and sends intents (`setMode('spa')`). It never sends relay primitives.
 A phone loses signal; the state machine must hold regardless.
 
+See `docs/architecture.md` for the system view — components, state ownership,
+and failure modes. Three decisions there are **proposed, not ratified**: the
+sequencer is a separate service and the only writer (ADR-10), it owns
+schedules with njsPC's scheduler disabled (ADR-11), and the watchdog watches
+the sequencer rather than njsPC (ADR-12).
+
+Two consequences worth holding onto: **dashPanel bypasses every interlock in
+this system** — it is a diagnostic tool, not an operator interface — and
+everything `useController` currently holds (mode, valves, targets, pumpHold,
+schedules) is sequencer state living temporarily in the client.
+
 `src/lib/sequences.js` is the executable spec. The server sequencer must
 implement the same steps in the same order. Five named sequences: `spa`,
 `pool`, `heatEngage`, `heatRelease`, `boot`.
