@@ -60,6 +60,13 @@ form is here so it never gets skipped.
   never as `title` tooltips — phone-first, no hover. (PR-3)
 - **`src/lib/sequences.js` is the executable spec.** The server implements the
   same steps in the same order. If they disagree, one of them is a bug.
+- **Nothing in the mock is real.** Every value in `useController.js`,
+  `useBus.js` and `PumpControl`'s schedule array is invented to make the UI
+  demonstrable — temperatures, salt, rpm, targets, schedules, and the step
+  durations in `sequences.js` alike. The PRD is the source of truth. If a
+  decision needs a real number and the PRD lacks one, it is unknown; say so
+  rather than reading it off the prototype. An ADR was once justified on mock
+  schedule data by mistake.
 
 ---
 
@@ -107,10 +114,9 @@ is a legitimate tactic (ADR-13), but it is AGPL-3.0: keep the supervisor a
 separate process or this repo stops being MIT.
 
 **njsPC owns schedules, and a schedule may end a spa session (ADR-11).**
-Accepted: the spa is used at night with the pool off, and filtration runs
-08:00–20:00, so no boundary falls during a soak. The weekend 22:00 skim
-schedule is the exception — it ships disabled, and enabling it reintroduces
-the collision. Because njsPC owns mode and can change it at any time, the
+Accepted: the spa is used at night with the pool off, and filtration is a
+single daily 08:00–18:00 window, so no boundary falls during a session. Any
+schedule starting in evening hours reintroduces the collision. Because njsPC owns mode and can change it at any time, the
 supervisor **observes and reacts** rather than asserting mode: a body change
 is just something to respond to, which is why there is no state to sync.
 

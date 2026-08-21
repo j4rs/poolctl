@@ -41,6 +41,20 @@ function applyStep(id, sim) {
 /**
  * Mock controller.
  *
+ * ┌──────────────────────────────────────────────────────────────────────┐
+ * │ NOTHING IN THIS FILE IS REAL.                                        │
+ * │                                                                      │
+ * │ Every number below — temperatures, salt, cell output, rpm, targets — │
+ * │ is invented to make the UI demonstrable. None of it is measured, and │
+ * │ none of it describes the actual site. The same goes for the schedule │
+ * │ rows in PumpControl and the traffic in useBus.                       │
+ * │                                                                      │
+ * │ `docs/prds/poolctl-v1.md` is the source of truth. If a decision      │
+ * │ needs a real value and the PRD does not have one, the value is       │
+ * │ unknown — say so rather than reading it off this screen. An ADR was  │
+ * │ once justified on mock schedule data by mistake.                     │
+ * └──────────────────────────────────────────────────────────────────────┘
+ *
  * THIS IS THE ONLY FILE THAT CHANGES when you wire up real hardware.
  * Replace the body with a hook that:
  *   - subscribes to njsPC over MQTT or its WebSocket

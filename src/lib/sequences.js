@@ -5,8 +5,14 @@
  * sequencer MUST implement the same steps in the same order. If the UI and
  * the server disagree about the sequence, that is a bug.
  *
- * `real` is the true duration. `ms` is compressed for the mock so the
- * sequence is watchable during development.
+ * `real` is the intended duration; `ms` is compressed so the sequence is
+ * watchable during development.
+ *
+ * NONE OF THE DURATIONS BELOW ARE MEASURED. The 45 sec valve travel, the
+ * 3 min purge and the 20 sec pump ramp are all assumptions, as are the rpm
+ * constants. Every one of them wants timing against the real equipment
+ * before it is trusted. Same rule as the rest of the mock: if a decision
+ * needs a real number, get it from the PRD or from hardware — not from here.
  *
  * Site facts these encode:
  *   - Intake diverter: 180 deg. A = pool main drain, B = spa main drain.

@@ -555,16 +555,23 @@ the boundary the Pool circuit came on and the spa went off;
 targets fared no better — it flipped to `priority: 'scheduled'` and lost its
 manual egg timer.
 
-**Why it is acceptable here.** The spa is used at night, with the pool off.
-Filtration schedules run 08:00–20:00, so no schedule has a start boundary
-during spa hours. The collision needs a boundary to fall *inside* a soak,
-which this usage pattern does not produce. And the consequence is bounded: the
-spa cannot run dry, so a takeover means the spill resumes and the pump changes
-speed. Interrupted soak, not a hazard.
+**Why it is acceptable here.** Both facts below are from the owner, not from
+the prototype: the spa is used **at night, with the pool off**, and filtration
+today is a **single daily 08:00–18:00 window**. No schedule therefore has a
+start boundary during spa hours. The collision needs a boundary to fall
+*inside* a session, which this usage does not produce. The consequence is
+bounded in any case — the spa cannot run dry, so a takeover means the spill
+resumes and the pump changes speed. Interrupted soak, not a hazard.
 
-**The one trap:** the weekend `22:00–23:30` skim schedule sits squarely in spa
-hours. It ships disabled. Enabling it reintroduces exactly this collision, and
-whoever enables it should know that.
+**The trap:** any schedule that starts during evening or night hours
+reintroduces this exactly. Adding an evening skim window, or extending
+filtration past dusk, puts a boundary back inside spa time.
+
+**Correction worth recording.** The first version of this justification cited
+"08:00–20:00", read off the prototype's `INITIAL` schedule array — which is
+invented demo data. Nothing in the mock describes this site. The reasoning
+happened to survive contact with the real schedule, but it was sourced from
+fiction, and the mock now says so in three places.
 
 **Design consequence, and it simplifies things.** Since njsPC owns mode and may
 change it at any time, the supervisor **observes and reacts** rather than

@@ -25,6 +25,9 @@ const PRESETS = [
 
 const EVERY_DAY = [0, 1, 2, 3, 4, 5, 6];
 
+/* ILLUSTRATIVE ONLY — see the mock-data warning in useController.js.
+   Several windows, varying speeds, a note and a disabled row, chosen to
+   exercise the UI. The real schedule is a single daily window; the PRD has it. */
 const INITIAL = [
   { id: 1, start: "08:00", end: "12:00", rpm: 1600, days: EVERY_DAY, on: true },
   { id: 2, start: "12:00", end: "16:00", rpm: 2600, days: EVERY_DAY, on: true, note: "Solar gain hours" },
