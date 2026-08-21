@@ -1,320 +1,133 @@
 # Project context
 
-DIY pool/spa controller replacing a Pentair IntelliConnect. This file carries
-the decisions made during design so they don't have to be rediscovered.
-
-**Status:** UI prototype on mock data. No hardware yet. Phase 1 (Pi + bus
-sniffing) is in progress; parts ordered but not all delivered.
-
----
-
-## The site
-
-Residential pool + raised spa, shared equipment, South Florida.
-
-| Equipment | Detail |
-|---|---|
-| Pump | Pentair IntelliFlo VSF, RS-485 |
-| Heater | Raypak Classic heat pump R8450TI-E, digital board |
-| Sanitizer | Pentair iChlor 30 + IntelliChlor Power Center |
-| Blower | Silencer Air Blower, 1.5 HP, 120 V, 7.3 A |
-| Light | Jandy Color, LED |
-| Filter | Cartridge |
-| Old controller | Pentair IntelliConnect — being retired |
-
-### Valves — all binary, all hard stops
-
-| Valve | Travel | Position A (de-energized) | Position B |
-|---|---|---|---|
-| Intake | 180° | Pool main drain | Spa main drain |
-| Returns | 90° | Pool + spa (spilling) | Spa only |
-| Heater bypass | 90° | Flow through heater | Around heater |
-
-**Pool mode spills continuously through the spa.** The return diverter feeds
-a shared pool+spa line in position A. The spa is therefore always full,
-filtered and chlorinated. There is no separate "spillover" mode — spilling is
-the default state. Spa mode isolates the pool.
-
-There is no third valve position available, so the spill cannot be turned off
-while remaining in pool mode.
-
-### Actuators
-
-Intermatic PE24GVA, ×3. Chosen over Jandy JVA 2444 ($231–282) and Pentair
-CVA24 (90°/120° variants cost ~2× the 180°). PE24GVA has infinite cam
-adjustment, so one part number covers both 90° and 180° valves. ~0.7 A each
-at 24 VAC. Three-wire: black = 24 VAC common, red/white = switched lines.
-One of the two switched lines is always energized; an SPDT relay selects
-which. No position feedback — position is dead-reckoned.
-
----
-
-## Control hardware
-
-- Raspberry Pi 4 Model B 2 GB. Chosen over Pi 5 for thermal reasons: the
-  enclosure is sealed NEMA 4X, so no fan is possible. Passive heatsink only.
-  Runs **Raspberry Pi OS Lite 64-bit** — headless, sealed, no display ever.
-  Measured on the bench at 25 °C ambient with heatsinks fitted: **+46 °C over
-  ambient at four cores pegged**, levelling off, soft limit never reached.
-  The board clocks at 1800 MHz stock, not the 1500 MHz most Pi 4 cooling
-  guidance assumes, so `arm_freq=1500` is set in `/boot/firmware/config.txt`
-  — worth ~9 °C and invisible to this workload. njsPC's real duty cycle is
-  near idle, so this holds on workload rather than on cooling, and it is
-  untested with the HAT fitted and the box sealed. See ADR-3 and the
-  enclosure-thermals open item.
-- Sequent Microsystems Eight Relays 4A/120V stackable HAT. NO/NC contacts on
-  every channel (needed for the actuators), RS-485 port built in with TVS
-  protection (so no separate USB adapter), DIN-rail mountable. Powers the Pi
-  over the GPIO bus from its own 2-pin connector.
-- 5 V DIN-rail supply, 5 A min (Pi 3 A + 8 relays × 80 mA).
-- 75 VA 120→24 VAC Class 2 transformer for the actuators.
-- Eaton C25CNB130T contactor, 30 A 1-pole 24 V coil, for the blower.
-- Non-metallic NEMA 4X enclosure (metal would trigger NEC 680 bonding).
-
-### Relay map
-
-| Ch | Load | Contacts |
-|---|---|---|
-| 1 | Intake actuator | COM/NO/NC, 24 VAC |
-| 2 | Return actuator | COM/NO/NC, 24 VAC |
-| 3 | Heater bypass actuator | COM/NO/NC, 24 VAC |
-| 4 | Heater POOL | dry, to terminal 23 |
-| 5 | Heater SPA | dry, to terminal 24 |
-| 6 | Blower | NO → contactor coil |
-| 7 | Jandy Color light | NO, direct 120 V (LED, <1 A) |
-| 8 | Chlorinator gate | NO, 120 V — Path A only, see below |
-
-The light channel sees far more switching cycles than any other (Jandy color
-changes work by counting brief power interruptions). If a channel ever fails
-it will be that one; remap in software rather than replacing the board.
-
----
-
-## Heater control
-
-Raypak digital board, 3-wire remote: terminals 22 (COMMON), 23 (POOL),
-24 (SPA). Closing one contact calls for heat at that setpoint.
-
-**Use 3-wire, not 2-wire.** The heater keeps its own thermostat, its own
-sensor, and its own hard caps (95 °F pool, 104 °F spa). The scald limit is
-therefore enforced in the heater's firmware, not in our code. Do not move
-thermostat logic into software.
-
-Other heater facts:
-- Anti-short-cycle delay ~5 min after any shutdown. Expected, not a fault.
-- Defrost cutoff at ~42–48 °F ambient: compressor stops, fan runs. Expected
-  on a handful of Florida winter nights. Do not alert on it.
-- Requires 5 psi minimum; throws `FLo`/`FL3` on low flow.
-- Pool heating is a multi-day operation (~4 days typical from cold), not a
-  button. Model it as a target temperature with a maintenance schedule.
-
----
-
-## Chlorinator — Path A (ADR-6, resolved)
-
-Salt reading treated as expendable, which removed Path B's only reason to
-exist. Path B is kept below as the fallback if something unexpected turns up.
-
-**Path A — adopted.** Retire IntelliConnect entirely. njsPC decodes iChlor
-model, output % and water temperature; salt PPM is unproven and the owner has
-accepted losing it (the cell shows low salt on its own display, and salt
-drifts slowly). Relay-gate the power center in spa mode.
-
-**Path B** — IntelliConnect survives wired to nothing but the IntelliChlor
-Power Center. Keeps Pentair Home salt alerts and output control. Pump moves
-to the Pi. Under Path B, do NOT relay-gate the power center — cutting power
-to a device another controller owns invites confusing faults. Channel 8 goes
-unused.
-
-njsPC knows `ichlor-ic30` specifically, and its iChlor reverse engineering was
-done against an IntelliConnect — this site's current setup — so Phase 1
-sniffing reproduces the exact conditions that code was written for. **In Nixie
-mode njsPC feeds the iChlor's temperature probe into the body temperature**,
-which is where `waterTemp` comes from; there is no sensor in the BOM and does
-not need to be.
-
----
-
-## Sequencer design
-
-**All interlocks live server-side, never in this UI.** The app subscribes to
-state and sends intents (`setMode('spa')`). It never sends relay primitives.
-A phone loses signal; the state machine must hold regardless.
-
-See `docs/architecture.md` for the system view. Three decisions there are
-**proposed, not ratified** (ADR-10/11/12), and all three were revised in
-August 2026 after actually reading njsPC's source.
-
-**njsPC in Nixie mode is a full controller, not a bus library.**
-`controller/Lockouts.ts` already implements valve delays, heater cooldown with
-body switching, and `ManualPriorityDelay` — schedule override with an end
-time, which is our pump hold. `controller/nixie/` has bodies, valves,
-circuits, schedules, heaters and pumps. It drives circuits from its own
-timers, so it cannot be made passive.
-
-So we add a **supervisor**, not a sequencer: only the six things njsPC lacks —
-the heat-conditional pump floor, the bypass policy, PE24GVA travel modelling,
-targets-as-cutoffs, purge conditional on compressor idle, and spa auto-revert.
-njsPC keeps its scheduler.
-
-Forking njsPC is allowed and sometimes right (ADR-13), but as a tactic, not
-an architecture: route around it, else upstream a patch, else pin a local one.
-The likely fork case is ADR-6 iChlor decoding, which cannot be routed around.
-njsPC is **AGPL-3.0**, REM is GPL-3.0 — a separate-process supervisor keeps
-this repo MIT; folding our logic into njsPC would not.
-
-Two things to hold onto: **dashPanel bypasses whatever the supervisor adds** —
-diagnostic tool, not operator interface — and `sequences.js` needs re-reading
-against njsPC's body/circuit model, because some of its steps are probably
-configuration rather than code.
-
-`src/lib/sequences.js` is the executable spec. The server sequencer must
-implement the same steps in the same order. Five named sequences: `spa`,
-`pool`, `heatEngage`, `heatRelease`, `boot`.
-
-### Bypass policy
-
-The bypass follows the mode — **flow** in spa, **around** in pool — and
-swings back to flow whenever pool heat is called. Spa mode always heats, so
-one rule covers nearly every case; winter pool heating gets the explicit
-`heatEngage`/`heatRelease` pair instead of a special case inside the mode
-sequences.
-
-The valve is binary, so a heat call with the bypass around means **zero**
-flow through the exchanger. Both directions of the interlock are load-bearing.
-
-### Invariants — assert continuously, not just at transitions
-
-- `heaterCall !== 'off'` implies `pumpRpm >= HEATER_MIN_RPM`
-- `heaterCall !== 'off'` implies `valves.bypass === 'flow'`
-- `valves.bypass === 'around'` implies `heaterCall === 'off'`
-- Bypass may only move when heater is off and purge has elapsed
-- No valve command while another valve move is in flight
-- `mode !== 'spa'` implies `blower === false` (preference, not safety —
-  see the blower note below; relax the gate and drop this with it)
-- Spa mode auto-reverts to pool after timeout (prevents overnight spa mode)
-
-The two bypass implications are converses and both are needed. The first
-keeps a call from being made into a bypassed exchanger; the second keeps the
-valve from swinging away under a live call. Either alone leaves a hole.
-
-### Transitions cannot be cancelled
-
-`ABORTABLE` is false. Aborting mid-travel would leave a dead-reckoned valve
-at an unknown angle with no feedback to recover from, and aborting only at
-step boundaries buys little when the bound is a 45 sec move.
-
-### Target temperatures are cutoffs, not setpoints
-
-The 3-wire interface carries no temperature (ADR-4). The heater holds its own
-setpoint on its board; the app can neither read nor write it. `state.targets`
-tells the controller when to *stop* calling for heat, clamped to the heater's
-firmware caps (`HEATER_CAP`: 95 °F pool, 104 °F spa). The app can end a call
-early and can never ask for more heat than the heater allows.
-
-A cutoff needs a trusted water temperature. There is no sensor in the BOM
-yet — see open items.
-
-### Manual pump hold
-
-A speed set by hand is transient — it lasts until the next schedule window
-opens. `state.pumpHold` pins it instead: `{ rpm, startedAt, expiresAt }`,
-where `expiresAt` null means it holds until released.
-
-- The server owns and persists the hold. A phone cannot be the thing that
-  remembers the pump is pinned.
-- Any sequence clears it. A mode change or a heat change takes the pump.
-- Moving the slider under a hold retunes the hold rather than dropping back
-  to schedule control.
-- An open-ended hold pauses filtration, so it stays visible on screen until
-  released. Surfaced, not forbidden — the same call as the blower.
-
-### Pump speed under a live heat call
-
-The pump slider clamps at `HEATER_MIN_RPM` while any heat call is active,
-with the threshold marker carrying the reason. Spa mode owns the pump.
-Silently dropping the heat call because someone dragged a slider is a worse
-surprise than a slider that will not go lower.
-
-### Fail-safe states
-
-Choose relay NO/NC so de-energized gives: valves to pool, bypass to **flow**
-(a heater with flow and no call is harmless; a call with no flow is not),
-heater contacts open, blower off. Hardware watchdog drops relays if njsPC
-stops heartbeating.
-
-### Boot behaviour
-
-Valve position is dead-reckoned and persisted. On boot, unconditionally
-re-drive all valves to pool position to resynchronize.
-
-### Conditional purge
-
-Skip the purge step entirely if the compressor hasn't run in the last five
-minutes — the common case. Makes "Spa now" ~2 minutes instead of 5.
-
-Render a skipped step struck through rather than dropping it, so the short
-path and the long path look like the same sequence.
-
----
-
-## Product decisions worth preserving
-
-- **"Spa now" is the default, not scheduled preheat.** The owner starts the
-  spa and gets in immediately. Preheat is an option, not a mandate.
-- **The blower is not safety-gated.** The spa is always full, so it can never
-  run dry. It's gated to spa mode only as a preference (jets while spilling
-  dump heat and noise into the pool). Relax freely — but the `pool` sequence
-  must keep clearing it, or the gate strands it on and unreachable.
-- **A disabled control never renders an active state.** If it is on, its
-  toggle has to be actionable.
-- **Blower + heater roughly cancel.** Heat pump gains ~20–25 °F/hr on a
-  spa-sized volume in Florida winter air; a 115 CFM blower takes back most of
-  it. Surface this as a sentence in the UI, never as a lockout.
-- **Disabled controls show their reason.** Hiding teaches nothing.
-- **Show the water path, not a spinner.** Transitions take ~2 minutes.
-- **Pump power scales with the cube of speed.** Show watts and dollars, not
-  just rpm, or schedule decisions are made blind.
-
----
-
-## Open items
-
-**Blocked on the HAT (Phase 1):**
-- [ ] Sniff the bus; confirm the iChlor emits case 18 (salt). Path A is
-      already decided — this only determines whether salt is recoverable
-- [ ] Verify the decoders in `src/lib/rs485.js` against real traffic
-- [ ] Measure real `HEATER_MIN_RPM` and `CELL_MIN_RPM` (both placeholders)
-- [ ] Confirm the iChlor temp probe reading actually arrives (case 22)
-- [ ] Confirm spill stops when the return diverter goes full-spa
-- [ ] Re-measure thermals with the HAT fitted and the enclosure sealed —
-      the transformer shares that box and the bench figures don't cover it
-
-**Unblocked — laptop work, no hardware:**
-- [ ] Stand up njsPC + REM against the `anslq25` simulator. Answers the two
-      assumptions ADR-10 rests on: can njsPC be supervised, and does
-      `manualPriorityActive` survive a schedule boundary
-- [ ] Re-read `sequences.js` against njsPC's body/circuit model — some steps
-      are probably configuration rather than code
-- [ ] Build the supervisor: the six interlocks njsPC lacks (ADR-10)
-- [ ] Real connection state — `connected` is hardcoded `true` and nothing
-      clears it, so the LIVE indicator is decorative
-- [ ] Replace `useController` with real njsPC transport
-- [ ] Scheduled spa preheat — button is a stub
-- [ ] Render skipped sequence steps struck through
-- [ ] Spa auto-revert countdown — `SPA_TIMEOUT_MIN` has no surface yet
-- [ ] Daylight theme — this is used poolside in Florida sun
+DIY pool/spa controller replacing a Pentair IntelliConnect, built on
+nodejs-poolController.
+
+**Status:** UI prototype on mock data. The Pi 4 is up and thermally
+characterised; the relay HAT has not arrived, so no equipment is connected and
+neither njsPC nor REM is installed.
+
+**This file is the operating manual for working in this repo — nothing more.**
+The full record lives elsewhere and is deliberately not duplicated here:
+
+- `docs/prds/poolctl-v1.md` — requirements, thirteen ADRs with their rejected
+  alternatives, measurements, BOM, phasing, risks, open questions, backlog.
+- `docs/architecture.md` — components, state ownership, control flow, failure
+  modes.
+
+Read those before changing anything architectural. Four decisions were
+reversed once someone actually read njsPC's source, and the reasoning for each
+reversal is recorded there rather than here.
 
 ---
 
 ## Stack
 
-Vite + React 18, no router, no state library. Inline styles, no CSS
-framework. Design tokens in `src/theme.js`. Fonts: Archivo (UI), IBM Plex
-Mono (all numeric readouts — this is telemetry, not marketing).
+Vite + React 18, no router, no state library. Inline styles, no CSS framework.
+Design tokens in `src/theme.js`. Fonts: Archivo (UI), IBM Plex Mono (all
+numeric readouts — this is telemetry, not marketing).
+
+```
+src/
+  theme.js               design tokens
+  lib/sequences.js       transition spec + invariants — the server mirrors this
+  lib/pump.js            rpm/watts/schedule maths
+  lib/rs485.js           Pentair frame decoders — unverified against a real bus
+  lib/useController.js   mock equipment state — swap this for real transport
+  lib/useBus.js          mock RS-485 feed
+  components/            Schematic, Stat, Toggle, TargetTemp, ScheduleEditor
+  screens/               PoolSpaControl, HeatControl, PumpControl, BusMonitor
+```
+
+---
+
+## Rules that constrain code changes
+
+Easy to violate by accident. Each is argued at length in the PRD; the short
+form is here so it never gets skipped.
+
+- **The UI sends intents, never primitives.** `setMode('spa')`, never
+  `relay3.close()`. A phone loses signal; the state machine must hold
+  regardless. (ADR-7)
+- **Do not move thermostat logic into software.** The heater owns its
+  setpoint, its sensor and its hard caps — 95 °F pool, 104 °F spa. That is why
+  no bug in this repo can produce a scalding spa. (ADR-4)
+- **Targets are cutoffs, not setpoints.** The 3-wire interface carries no
+  temperature. `state.targets` says when to *stop* calling for heat. It can
+  end a call early; it can never ask for more than the heater allows.
+- **Disabled controls state their reason, and never render an active state.**
+  If a control is on, its toggle must be actionable. Reasons render as text,
+  never as `title` tooltips — phone-first, no hover. (PR-3)
+- **`src/lib/sequences.js` is the executable spec.** The server implements the
+  same steps in the same order. If they disagree, one of them is a bug.
+
+---
+
+## Invariants — assert continuously, not just at transitions
+
+```
+heaterCall !== 'off'       ⟹  pumpRpm >= HEATER_MIN_RPM
+heaterCall !== 'off'       ⟹  valves.bypass === 'flow'
+valves.bypass === 'around' ⟹  heaterCall === 'off'
+bypass moves only when heaterCall === 'off' and purge has elapsed
+no valve command while another valve move is in flight
+mode !== 'spa'             ⟹  blower === false
+spa mode auto-reverts to pool after SPA_TIMEOUT_MIN
+```
+
+The two bypass implications are converses and both are needed: one stops a
+call being made into a bypassed exchanger, the other stops the valve swinging
+away under a live call. The blower rule is preference, not safety — but its
+toggle is gated to spa mode, so without it a blower left running is both on
+and unreachable.
+
+**Bypass policy:** follows the mode — flow in spa, around in pool — and swings
+back to flow whenever pool heat is called. The valve is binary, so a heat call
+with the bypass around means *zero* flow through the exchanger. (ADR-9)
+
+**Transitions cannot be cancelled.** `ABORTABLE` is false: aborting mid-travel
+leaves a dead-reckoned valve at an unknown angle with no feedback to recover
+from.
+
+---
+
+## Architecture in one paragraph
+
+njsPC in Nixie mode **is** the controller, not a bus library.
+`controller/Lockouts.ts` already implements valve delays, heater cooldown with
+body switching, and `ManualPriorityDelay` — schedule override carrying an end
+time, which is our pump hold. It drives circuits from its own timers and
+cannot be made passive. So we add a **supervisor**, not a sequencer: only the
+six things njsPC lacks — heat-conditional pump floor, bypass policy, PE24GVA
+travel modelling, targets-as-cutoffs, purge conditional on compressor idle,
+spa auto-revert. njsPC keeps its scheduler. **dashPanel bypasses whatever the
+supervisor adds** — diagnostic tool, not operator interface. Forking njsPC is
+a legitimate tactic (ADR-13), but it is AGPL-3.0: keep the supervisor a
+separate process or this repo stops being MIT.
+
+---
+
+## Next up
+
+Full lists in PRD §10 (open questions) and §11 (backlog). Available without
+hardware, highest value first:
+
+1. **Stand njsPC + REM up against the `anslq25` simulator.** Tests the two
+   assumptions ADR-10 rests on — can njsPC be supervised, and does
+   `manualPriorityActive` survive a schedule boundary. Do this before writing
+   the supervisor.
+2. **Re-read `sequences.js` against njsPC's body/circuit model.** Some steps
+   are probably njsPC configuration rather than code; what survives that pass
+   is the supervisor's real scope.
+3. **Real connection state.** `connected` is hardcoded `true` and nothing ever
+   clears it, so the LIVE indicator is decorative.
+
+Blocked on the relay HAT: bus sniffing, the salt question (case 18), real
+`HEATER_MIN_RPM` / `CELL_MIN_RPM`, and thermals with the enclosure sealed.
+
+---
 
 ## Upstream
 
-- nodejs-poolController (njsPC): https://github.com/tagyoureit/nodejs-poolController
-- relayEquipmentManager (REM): https://github.com/rstrouse/relayEquipmentManager
-- njsPC runs in "Nixie" mode — it is the controller, there is no Pentair OCP.
+- nodejs-poolController (njsPC) — https://github.com/tagyoureit/nodejs-poolController (AGPL-3.0)
+- relayEquipmentManager (REM) — https://github.com/rstrouse/relayEquipmentManager (GPL-3.0)

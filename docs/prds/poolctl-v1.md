@@ -763,8 +763,10 @@ A speed set by hand is transient and lasts only until the next schedule
 window opens. A **manual hold** pins it instead — open-ended, or on an
 egg-timer. The server owns and persists the hold; a phone cannot be what
 remembers the pump is pinned. Any sequence clears it, since a mode or heat
-change takes the pump. An open-ended hold pauses filtration, so it stays
-visible until released rather than being forbidden or silently expiring.
+change takes the pump. Moving the slider under a hold retunes the hold rather
+than dropping back to schedule control. An open-ended hold pauses filtration,
+so it stays visible until released rather than being forbidden or silently
+expiring.
 
 ---
 
@@ -974,8 +976,20 @@ eyes on bonding.
 
 ## 11. Software backlog
 
+- [ ] Stand njsPC + REM up against the `anslq25` simulator. Tests the two
+      assumptions ADR-10 rests on — whether njsPC can be supervised, and
+      whether `manualPriorityActive` survives a schedule boundary. No hardware
+      needed; do this before writing the supervisor
+- [ ] Re-read `sequences.js` against njsPC's body/circuit model. Some steps
+      are likely njsPC configuration rather than code; what survives that pass
+      is the supervisor's actual scope
+- [ ] Build the supervisor — the six interlocks njsPC lacks (ADR-10), not a
+      sequencer that owns everything
 - [ ] Replace `useController` with real njsPC transport (MQTT or WebSocket)
-- [ ] Build the server-side sequencer service that owns all interlocks
+- [ ] Real connection state. `connected` is hardcoded `true` and nothing ever
+      clears it, so the LIVE indicator is decorative — a phone out of range
+      would show LIVE beside frozen state, which is exactly what ADR-7 says
+      cannot be trusted. Prerequisite for any PWA or installable client
 - [x] Schedule editor — add, edit, delete, day selection, overlap warning
 - [x] Target temperatures per body, clamped to the heater caps
 - [x] Pool heat on/off, driving heatEngage / heatRelease
