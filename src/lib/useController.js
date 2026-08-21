@@ -73,6 +73,11 @@ export function useController() {
        the 3-wire contacts carry no temperature (ADR-4), so these can only
        end a heat call early — never raise the heater's cap. */
     targets: { pool: 88, spa: 102 },
+    /* Manual hold. While set, the pump stays here and schedules are
+       suspended. `expiresAt` null means it holds until released — the
+       server must persist this, since a phone cannot be the thing that
+       remembers the pump is pinned. */
+    pumpHold: null,
     poolHeatDemand: false,
     blower: false,
     light: false,
@@ -123,6 +128,8 @@ export function useController() {
 
       setState((s) => ({
         ...s, ...seed, ...patch,
+        /* A sequence takes the pump, so any manual hold is over. */
+        pumpHold: null,
         target: landing, activeSequence: name, step, stepIndex: i,
       }));
 
@@ -152,7 +159,33 @@ export function useController() {
     else runSequence("heatRelease", { seed: { poolHeatDemand: false } });
   };
 
-  const setRpm = (rpm) => setState((s) => ({ ...s, pumpRpm: rpm }));
+  /* Invariant 1: a live heat call floors the pump at HEATER_MIN_RPM. The
+     slider clamps rather than dropping the call — silently stopping the
+     heat because someone dragged a control is the worse surprise. */
+  const setRpm = (rpm) =>
+    setState((s) => {
+      const next = s.heaterCall !== "off" ? Math.max(rpm, HEATER_MIN_RPM) : rpm;
+      return {
+        ...s,
+        pumpRpm: next,
+        /* Moving the slider under a hold retunes the hold, rather than
+           quietly dropping back to schedule control. */
+        pumpHold: s.pumpHold ? { ...s.pumpHold, rpm: next } : null,
+      };
+    });
+
+  /** Pin the current speed. `minutes` null holds until released. */
+  const holdPump = (minutes = null) =>
+    setState((s) => ({
+      ...s,
+      pumpHold: {
+        rpm: s.pumpRpm,
+        startedAt: Date.now(),
+        expiresAt: minutes ? Date.now() + minutes * 60000 : null,
+      },
+    }));
+
+  const releasePump = () => setState((s) => ({ ...s, pumpHold: null }));
 
   /* `next` may be a value or an updater. Steppers must pass an updater:
      tapping faster than React re-renders would otherwise compute every tap
@@ -184,12 +217,14 @@ export function useController() {
   useEffect(() => {
     const t = setInterval(() => {
       setState((s) => {
-        if (s.heaterCall === "off") return s;
+        const expired = s.pumpHold?.expiresAt && Date.now() >= s.pumpHold.expiresAt;
+        if (s.heaterCall === "off") return expired ? { ...s, pumpHold: null } : s;
+        const base = expired ? { ...s, pumpHold: null } : s;
         compressorAt.current = Date.now();
         /* Compressed for the mock. The blower figure is near zero because
            blower and heater roughly cancel — see PRD §Thermal reality. */
-        const rate = s.blower ? 0.004 : 0.09;
-        return { ...s, waterTemp: Math.min(s.waterTemp + rate, s.setpoint ?? s.targets.spa) };
+        const rate = base.blower ? 0.004 : 0.09;
+        return { ...base, waterTemp: Math.min(base.waterTemp + rate, base.setpoint ?? base.targets.spa) };
       });
     }, 1000);
     return () => clearInterval(t);
@@ -197,5 +232,5 @@ export function useController() {
 
   useEffect(() => () => clearTimeout(timer.current), []);
 
-  return { state, setMode, setRpm, setTarget, setPoolHeat, toggle };
+  return { state, setMode, setRpm, holdPump, releasePump, setTarget, setPoolHeat, toggle };
 }

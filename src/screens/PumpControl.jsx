@@ -1,7 +1,9 @@
 import React, { useState, useMemo } from "react";
 import { C, FONT_UI, FONT_DATA } from "../theme";
 import { HEATER_MIN_RPM, CELL_MIN_RPM } from "../lib/sequences";
-import { RPM_MIN, RPM_MAX, watts, daysLabel, hoursBetween } from "../lib/pump";
+import {
+  RPM_MIN, RPM_MAX, watts, daysLabel, hoursBetween, activeSchedule, clockAt,
+} from "../lib/pump";
 import ScheduleEditor from "../components/ScheduleEditor";
 
 const RATE = 0.15;        // $/kWh — set to your own utility rate
@@ -35,11 +37,22 @@ const blankSchedule = () => ({
   start: "09:00", end: "13:00", rpm: 1600, days: EVERY_DAY, on: true, isNew: true,
 });
 
+const HOLD_OPTIONS = [
+  { id: "open", label: "Until I stop it", minutes: null },
+  { id: "1h", label: "1 h", minutes: 60 },
+  { id: "4h", label: "4 h", minutes: 240 },
+];
+
 export default function PumpControl({ controller }) {
-  const { state, setRpm } = controller;
+  const { state, setRpm, holdPump, releasePump } = controller;
   const rpm = state.pumpRpm;
+  const { pumpHold, heaterCall, mode } = state;
   const [schedules, setSchedules] = useState(INITIAL);
   const [editing, setEditing] = useState(null);
+  const [holdFor, setHoldFor] = useState("open");
+
+  const scheduled = activeSchedule(schedules);
+  const spaOwnsPump = mode === "spa";
 
   const w = watts(rpm);
   const pct = ((rpm - RPM_MIN) / (RPM_MAX - RPM_MIN)) * 100;
@@ -121,7 +134,15 @@ export default function PumpControl({ controller }) {
           <span>{RPM_MIN}</span><span>{RPM_MAX}</span>
         </div>
 
-        {unmet.length > 0 && (
+        {heaterCall !== "off" && (
+          <div style={{ marginTop: 16, paddingTop: 14, borderTop: `1px solid ${C.line}`, fontSize: 12.5, color: C.heat, lineHeight: 1.55 }}>
+            Floored at {HEATER_MIN_RPM} rpm while the heater is calling.
+            Slower would starve the exchanger, so the slider stops here rather
+            than dropping the heat call.
+          </div>
+        )}
+
+        {heaterCall === "off" && unmet.length > 0 && (
           <div style={{ marginTop: 16, paddingTop: 14, borderTop: `1px solid ${C.line}`, fontSize: 12.5, color: C.muted, lineHeight: 1.55 }}>
             Below {unmet.map((u) => u.label.toLowerCase()).join(" and ")}.{" "}
             {unmet.some((u) => u.label === "Heater minimum")
@@ -130,6 +151,55 @@ export default function PumpControl({ controller }) {
           </div>
         )}
       </div>
+
+      {/* Manual hold. Without it a hand-set speed only survives to the next
+          schedule boundary, which is not what "run it until I say stop"
+          means. */}
+      {pumpHold ? (
+        <div style={{ background: C.surface, border: `1px solid ${C.heat}`, borderRadius: 14, padding: "14px 16px", marginBottom: 12, display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13.5, fontWeight: 600, color: C.heat }}>
+              Holding {pumpHold.rpm} rpm
+            </div>
+            <div style={{ fontFamily: FONT_DATA, fontSize: 10.5, color: C.muted, marginTop: 3, lineHeight: 1.45 }}>
+              Schedules paused ·{" "}
+              {pumpHold.expiresAt ? `until ${clockAt(pumpHold.expiresAt)}` : "until you release it"}
+            </div>
+          </div>
+          <button onClick={releasePump}
+            style={{ flexShrink: 0, padding: "11px 16px", borderRadius: 10, border: `1px solid ${C.heat}`, background: "transparent", color: C.heat, fontFamily: FONT_UI, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+            Release
+          </button>
+        </div>
+      ) : (
+        <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, padding: "14px 16px", marginBottom: 12 }}>
+          <div style={{ fontSize: 13.5, fontWeight: 500, marginBottom: 4 }}>Hold this speed</div>
+          <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5, marginBottom: 12 }}>
+            {spaOwnsPump
+              ? "Spa mode owns the pump. Available back in pool mode."
+              : scheduled
+                ? `Otherwise the ${scheduled.start}–${scheduled.end} schedule takes it back to ${scheduled.rpm} rpm.`
+                : "No schedule is running now, but the next one would take the pump back."}
+          </div>
+          <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+            {HOLD_OPTIONS.map((o) => {
+              const on = holdFor === o.id;
+              return (
+                <button key={o.id} onClick={() => setHoldFor(o.id)} aria-pressed={on}
+                  style={{ flex: 1, padding: "9px 4px", borderRadius: 8, border: `1px solid ${on ? C.water : C.line}`, background: on ? "rgba(79,191,180,0.12)" : "transparent", color: on ? C.water : C.muted, fontFamily: FONT_UI, fontSize: 12, fontWeight: 500, cursor: "pointer" }}>
+                  {o.label}
+                </button>
+              );
+            })}
+          </div>
+          <button
+            onClick={() => holdPump(HOLD_OPTIONS.find((o) => o.id === holdFor).minutes)}
+            disabled={spaOwnsPump}
+            style={{ width: "100%", padding: 13, borderRadius: 10, border: `1px solid ${spaOwnsPump ? C.line : C.water}`, background: spaOwnsPump ? "transparent" : C.water, color: spaOwnsPump ? C.faint : C.ground, fontFamily: FONT_UI, fontSize: 14, fontWeight: 600, cursor: spaOwnsPump ? "not-allowed" : "pointer", opacity: spaOwnsPump ? 0.6 : 1 }}>
+            Hold {rpm} rpm
+          </button>
+        </div>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 24 }}>
         {PRESETS.map((p) => {
@@ -197,8 +267,10 @@ export default function PumpControl({ controller }) {
       </div>
 
       <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.6, padding: "0 2px" }}>
-        Manual speed changes hold until the next schedule begins. Spa mode sets
-        its own speed and ignores schedules while active.
+        A speed set by hand lasts until the next schedule begins. Hold it to
+        keep it past that — an open-ended hold pauses filtration too, so it
+        stays on screen until you release it. Spa mode sets its own speed and
+        takes the pump back either way.
       </div>
 
       {editing && (

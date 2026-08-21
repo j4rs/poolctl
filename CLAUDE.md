@@ -173,6 +173,20 @@ early and can never ask for more heat than the heater allows.
 A cutoff needs a trusted water temperature. There is no sensor in the BOM
 yet — see open items.
 
+### Manual pump hold
+
+A speed set by hand is transient — it lasts until the next schedule window
+opens. `state.pumpHold` pins it instead: `{ rpm, startedAt, expiresAt }`,
+where `expiresAt` null means it holds until released.
+
+- The server owns and persists the hold. A phone cannot be the thing that
+  remembers the pump is pinned.
+- Any sequence clears it. A mode change or a heat change takes the pump.
+- Moving the slider under a hold retunes the hold rather than dropping back
+  to schedule control.
+- An open-ended hold pauses filtration, so it stays visible on screen until
+  released. Surfaced, not forbidden — the same call as the blower.
+
 ### Pump speed under a live heat call
 
 The pump slider clamps at `HEATER_MIN_RPM` while any heat call is active,
@@ -232,7 +246,6 @@ path and the long path look like the same sequence.
 - [ ] Decide the water temperature source — target cutoffs and the preheat
       estimate both need one, and the BOM has no sensor
 - [ ] Scheduled spa preheat — button is a stub
-- [ ] Pump speed clamp at `HEATER_MIN_RPM` under a live heat call
 - [ ] Render skipped sequence steps struck through
 - [ ] Spa auto-revert countdown — `SPA_TIMEOUT_MIN` has no surface yet
 - [ ] Daylight theme — this is used poolside in Florida sun

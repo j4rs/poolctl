@@ -466,6 +466,13 @@ current rpm and energy consumption over RS-485.
 Spa mode owns the pump while active and overrides schedules. A schedule
 dropping the pump to 1400 rpm mid-soak would be a bad surprise.
 
+A speed set by hand is transient and lasts only until the next schedule
+window opens. A **manual hold** pins it instead — open-ended, or on an
+egg-timer. The server owns and persists the hold; a phone cannot be what
+remembers the pump is pinned. Any sequence clears it, since a mode or heat
+change takes the pump. An open-ended hold pauses filtration, so it stays
+visible until released rather than being forbidden or silently expiring.
+
 ---
 
 ## 6. Product requirements
@@ -647,7 +654,8 @@ eyes on bonding.
 - [x] Target temperatures per body, clamped to the heater caps
 - [x] Pool heat on/off, driving heatEngage / heatRelease
 - [ ] Scheduled spa preheat ("ready at 7:30") — button is a stub
-- [ ] Pump speed clamp at `HEATER_MIN_RPM` under a live heat call
+- [x] Pump speed clamp at `HEATER_MIN_RPM` under a live heat call
+- [x] Manual pump hold, open-ended or on an egg-timer
 - [ ] Render skipped sequence steps struck through
 - [ ] Spa auto-revert countdown — `SPA_TIMEOUT_MIN` has no surface yet
 - [ ] Daylight theme

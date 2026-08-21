@@ -61,3 +61,22 @@ export function overlaps(x, y) {
   if (!x.days.some((d) => y.days.includes(d))) return false;
   return spans(x).some(([a1, b1]) => spans(y).some(([a2, b2]) => a1 < b2 && a2 < b1));
 }
+
+/**
+ * The schedule that would be driving the pump right now, or null.
+ *
+ * Where windows overlap the later one wins, matching what the editor warns.
+ */
+export function activeSchedule(schedules, date = new Date()) {
+  const day = date.getDay();
+  const mins = date.getHours() * 60 + date.getMinutes();
+  const hits = schedules.filter(
+    (s) => s.on && s.days.includes(day) && spans(s).some(([a, b]) => mins >= a && mins < b));
+  return hits.length ? hits[hits.length - 1] : null;
+}
+
+/** 24h clock for a timestamp, matching the schedule fields. */
+export const clockAt = (ms) => {
+  const d = new Date(ms);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+};
