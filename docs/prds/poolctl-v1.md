@@ -534,8 +534,16 @@ pool and spa that spills, which is this site's topology.
 
 **Consequences:**
 
-- The supervisor is far smaller than the first draft assumed — six rules, not
-  a whole state machine.
+- **Open, and it decides the supervisor's size:** njsPC stops the pump for a
+  body switch (bench-verified — see the open questions). The owner's rule is
+  that valves move at `VALVE_RPM`, low flow, and njsPC cannot express that:
+  it offers zero flow with `pumpDelay` on, or full flow with it off. Either
+  the supervisor takes the wheel for the whole transition — hold 1000 rpm,
+  one valve at a time, hand back — or the low-flow requirement gives way to
+  njsPC's zero-flow behaviour, which is gentler on the actuator but costs a
+  pump stop/start and a priming cycle each time. Decide before building.
+- The supervisor is otherwise far smaller than the first draft assumed — six
+  rules, not a whole state machine.
 - **njsPC in Nixie mode is not passive and cannot be made passive.**
   `HeaterCooldownDelay` calls `setCircuitStateAsync` from its own timer. Any
   design that treats njsPC as a bus library will fight it.
@@ -1095,21 +1103,43 @@ eyes on bonding.
       Fallback if it does not: a REM temperature probe, which is the only
       option left, since the 3-wire heater interface reports nothing and the
       pump does not measure water. Settle before Phase 3.
-- [ ] **What does the pump do during an njsPC body switch?** Sharpened by the
-      `VALVE_RPM` decision above: the pass criterion is not "the pump is not at
-      full speed", it is **"the pump holds ~1000 rpm throughout"**. Three
-      possible outcomes and they have very different consequences:
-      *full speed* — unacceptable, water hammer and actuator stall;
-      *stopped* — safe but wrong, adds a stop/start and a priming cycle;
-      *held low* — what we want, and njsPC has no obvious way to express it.
-      njsPC implements `setPumpValveDelays` in `NixieBoard.ts`, but it is gated
-      on `sys.general.options.pumpDelay` (**default false**) and delays a pump
-      *start after* a valve change rather than holding speed *through* one.
-      **If the answer is "stopped", the supervisor cannot delegate the body
-      switch to njsPC** — it has to own the transition choreography itself:
-      pump to 1000, move valves one at a time, pump to target. That would pull
-      a meaningful piece of ADR-10 back toward the sequencer model.
-      Bench test: configure a pump, switch bodies, watch the rpm.
+- [x] **What does the pump do during an njsPC body switch?** *Answered on
+      the bench, and the answer is "neither of the two acceptable outcomes".*
+
+      Configured a VSF pump (Pool 1600, Spa 2800), set `pumpDelay = true` and
+      `valveDelayTime = 20`, then switched bodies. At t=0 both valves diverted
+      and a `pumpValveDelay` appeared, holding `pumpOnDelay = true` for the
+      full 20 sec. `nixie/pumps/Pump.ts` settles what that means:
+
+      ```js
+      let _newSpeed = 0;
+      if (!pState.pumpOnDelay) { /* …compute speed… */ }
+      ```
+
+      **The commanded speed is zero.** njsPC stops the pump for the valve
+      move and restarts it afterwards.
+
+      And turning `pumpDelay` off is worse, not better. Pool goes off and Spa
+      comes on in the same instant, so without the delay the commanded speed
+      steps straight from 1600 to 2800 *while the valves are travelling* —
+      full flow, the thing §5 exists to prevent.
+
+      **So njsPC offers zero flow or full flow through a valve move. The
+      1000 rpm the owner asked for is not expressible in its model.**
+
+      Consequences, all recorded against ADR-10:
+
+      - The supervisor **cannot delegate the body switch to njsPC**. It has to
+        own the choreography: hold the pump at `VALVE_RPM`, move one valve at
+        a time, then hand speed control back.
+      - Or the requirement changes. Zero flow is *safer* for the actuator —
+        no hydraulic load at all — and the reason to avoid it was the pump
+        stop/start and the IntelliFlo priming cycle, not safety. That is a
+        real trade to weigh, not an obvious loss.
+      - Either way this is a decision, not a detail: it is the difference
+        between a supervisor that watches njsPC and one that takes the wheel
+        for two minutes per transition.
+
 - [ ] **Valve travel time.** Bounded **under 60 sec** by the manual's 1-minute
       duty cycle, but not stated exactly. `sequences.js` assumes 45 sec per move
       and three of them dominate a transition. Never measured. Three things

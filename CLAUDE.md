@@ -139,13 +139,12 @@ is just something to respond to, which is why there is no state to sync.
 Full lists in PRD §10 (open questions) and §11 (backlog). Available without
 hardware, highest value first:
 
-1. **Bench whether valves move under full flow.** The safety question, still
-   open. `pumpDelay` defaults to false and njsPC delays a pump *start after* a
-   valve change rather than stopping it *before* one. Configure a pump, switch
-   bodies, watch the rpm. Water hammer and a stalled actuator are the failure
-   modes, so settle this before an actuator is wired. (njsPC runs on a laptop
-   with comms disabled — no hardware needed. `anslq25` is *not* the tool; it
-   only mocks an EasyTouch OCP.)
+1. **Decide who drives the pump through a transition.** Bench-verified:
+   njsPC *stops* the pump for a body switch (`pumpOnDelay` forces commanded
+   speed to 0), and turning the delay off gives full flow during valve travel
+   instead. The owner's `VALVE_RPM` = 1000 rule is not expressible in njsPC.
+   So either the supervisor owns the whole transition, or the low-flow rule
+   yields to zero flow. This sets how big the supervisor is — decide first.
 2. **Re-read `sequences.js` against njsPC's body/circuit model.** Some steps
    are probably njsPC configuration rather than code; what survives that pass
    is the supervisor's real scope.
