@@ -280,21 +280,30 @@ path and the long path look like the same sequence.
 
 ## Open items
 
-- [ ] Sniff RS-485 bus; decide chlorinator Path A vs B
-- [ ] Measure real `HEATER_MIN_RPM` and `CELL_MIN_RPM` (both are placeholders)
-- [ ] Confirm spill stops when return diverter goes full-spa
-- [ ] Replace `useController` with real njsPC transport
-- [ ] Build server-side sequencer service (owns all interlocks)
+**Blocked on the HAT (Phase 1):**
+- [ ] Sniff the bus; confirm the iChlor emits case 18 (salt). Path A is
+      already decided — this only determines whether salt is recoverable
+- [ ] Verify the decoders in `src/lib/rs485.js` against real traffic
+- [ ] Measure real `HEATER_MIN_RPM` and `CELL_MIN_RPM` (both placeholders)
+- [ ] Confirm the iChlor temp probe reading actually arrives (case 22)
+- [ ] Confirm spill stops when the return diverter goes full-spa
 - [ ] Re-measure thermals with the HAT fitted and the enclosure sealed —
       the transformer shares that box and the bench figures don't cover it
-- [ ] Decide the water temperature source — target cutoffs and the preheat
-      estimate both need one, and the BOM has no sensor
+
+**Unblocked — laptop work, no hardware:**
+- [ ] Stand up njsPC + REM against the `anslq25` simulator. Answers the two
+      assumptions ADR-10 rests on: can njsPC be supervised, and does
+      `manualPriorityActive` survive a schedule boundary
+- [ ] Re-read `sequences.js` against njsPC's body/circuit model — some steps
+      are probably configuration rather than code
+- [ ] Build the supervisor: the six interlocks njsPC lacks (ADR-10)
+- [ ] Real connection state — `connected` is hardcoded `true` and nothing
+      clears it, so the LIVE indicator is decorative
+- [ ] Replace `useController` with real njsPC transport
 - [ ] Scheduled spa preheat — button is a stub
 - [ ] Render skipped sequence steps struck through
 - [ ] Spa auto-revert countdown — `SPA_TIMEOUT_MIN` has no surface yet
 - [ ] Daylight theme — this is used poolside in Florida sun
-- [ ] Verify the RS-485 decoders in `src/lib/rs485.js` against the real bus —
-      they come from public reverse-engineering and are unconfirmed here
 
 ---
 
