@@ -93,17 +93,23 @@ from.
 
 ## Architecture in one paragraph
 
-njsPC in Nixie mode **is** the controller, not a bus library.
-`controller/Lockouts.ts` already implements valve delays, heater cooldown with
-body switching, and `ManualPriorityDelay` — schedule override carrying an end
-time, which is our pump hold. It drives circuits from its own timers and
-cannot be made passive. So we add a **supervisor**, not a sequencer: only the
-six things njsPC lacks — heat-conditional pump floor, bypass policy, PE24GVA
-travel modelling, targets-as-cutoffs, purge conditional on compressor idle,
-spa auto-revert. njsPC keeps its scheduler. **dashPanel bypasses whatever the
-supervisor adds** — diagnostic tool, not operator interface. Forking njsPC is
-a legitimate tactic (ADR-13), but it is AGPL-3.0: keep the supervisor a
+njsPC in Nixie mode **is** the controller, not a bus library. Its `nxps`
+shared-body model creates Pool/Spa bodies, Pool/Spa circuits and Intake/Return
+valves unprompted — this site, out of the box — and turning the Spa circuit on
+switches the body and diverts both valves by itself. It drives circuits from
+its own timers and cannot be made passive. So we add a **supervisor**, not a
+sequencer: only the six things njsPC lacks — heat-conditional pump floor,
+bypass policy, PE24GVA travel modelling (it diverts both valves at once,
+instantly), targets-as-cutoffs, purge conditional on compressor idle, and
+protecting a spa session from schedule takeover. **dashPanel bypasses whatever
+the supervisor adds** — diagnostic tool, not operator interface. Forking njsPC
+is a legitimate tactic (ADR-13), but it is AGPL-3.0: keep the supervisor a
 separate process or this repo stops being MIT.
+
+**Schedule ownership is unresolved (ADR-11)** and it is the next decision.
+A bench test showed a schedule taking the shared body at its start boundary
+and switching the spa off, with `manualPriority` enabled and ineffective.
+Do not assume njsPC's scheduler is safe to keep.
 
 ---
 
@@ -112,10 +118,12 @@ separate process or this repo stops being MIT.
 Full lists in PRD §10 (open questions) and §11 (backlog). Available without
 hardware, highest value first:
 
-1. **Stand njsPC + REM up against the `anslq25` simulator.** Tests the two
-   assumptions ADR-10 rests on — can njsPC be supervised, and does
-   `manualPriorityActive` survive a schedule boundary. Do this before writing
-   the supervisor.
+1. **Settle ADR-11 — schedule ownership.** Bench-tested and *open*: a schedule
+   at its start boundary took the shared body and switched the spa off, and
+   `manualPriority` did not prevent it. Three options in the ADR; pick one
+   before writing the supervisor, because it decides how big the supervisor is.
+   (njsPC runs on a laptop with comms disabled — no hardware needed. `anslq25`
+   is *not* the tool; it only mocks an EasyTouch OCP.)
 2. **Re-read `sequences.js` against njsPC's body/circuit model.** Some steps
    are probably njsPC configuration rather than code; what survives that pass
    is the supervisor's real scope.

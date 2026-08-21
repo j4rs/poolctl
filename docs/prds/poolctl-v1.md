@@ -416,6 +416,33 @@ mode sequences.
 - *Bypassing only inside scheduled filtration windows* — fewer coil-hours,
   more states to reason about, marginal gain.
 
+### Bench findings — njsPC on a laptop, August 2026
+
+njsPC 10.0.1 built and run with **no serial port and no REM**
+(`controller.comms.enabled = false`). It auto-selected Nixie mode when no OCP
+answered. `nixie/valves/Valve.ts` returns success without calling REM when a
+valve has no `deviceBinding`, so the whole control layer exercises in
+software. **The entire state machine can be developed and tested on a laptop**
+— worth knowing for Phase 2, which the PRD schedules as bench work.
+
+What the `nxps` shared-body model creates unprompted: bodies **Pool** and
+**Spa**, circuits **Pool** and **Spa**, valves **Intake** and **Return**. That
+is this site, out of the box.
+
+| Observed | Consequence |
+|---|---|
+| Turning the Spa circuit on switched the body **and diverted both valves** | Mode switching is njsPC's job, not ours |
+| Both valves diverted **simultaneously and instantly** | Travel time and one-at-a-time ordering are ours (ADR-10 item 3) |
+| Model provisions exactly 2 valves | The bypass is ours (ADR-10 item 2) |
+| Every circuit has `eggTimer`, default 720 min | Spa auto-revert is configuration, not code |
+| A schedule at its start boundary took the body and turned the spa off | See ADR-11 — the serious one |
+
+**A correction to an earlier recommendation:** `anslq25` is not the right tool
+for this. `MockBoardFactory` only implements `MockEasyTouch`; the other boards
+are commented out. It simulates a Pentair OCP for testing njsPC as a *client*,
+which is the opposite of this topology. Nixie with comms disabled is the way
+to bench this, and it works better than anslq25 would have.
+
 ### ADR-10 — The sequencer supervises njsPC; it does not replace it
 
 **Status: proposed.** Revised August 2026 after reading njsPC's source. The
@@ -447,14 +474,18 @@ pool and spa that spills, which is this site's topology.
 
 1. `heaterCall !== 'off' ⟹ pumpRpm >= HEATER_MIN_RPM`. `minSpeed`/`minFlow` in
    `nixie/pumps/Pump.ts` are pump-type limits, not a heat-conditional floor.
-2. The bypass policy of ADR-9. njsPC has no concept of a heater bypass valve.
-3. PE24GVA travel modelling. `nixie/valves/Valve.ts` is 170 lines and treats a
-   valve as a boolean `isDiverted` that pokes a REM relay with `latch: 10000`.
-   No 45-second travel, no one-at-a-time ordering, no dead reckoning.
+2. The bypass policy of ADR-9. Confirmed on the bench: the `nxps` model
+   provisions exactly **two** valves, Intake and Return. There is no third.
+3. PE24GVA travel modelling. Confirmed by observation: turning on the Spa
+   circuit diverted **both valves at once, instantly**. No 45-second travel,
+   no one-at-a-time ordering, no dead reckoning.
 4. Targets as cutoffs (ADR-4). njsPC assumes it owns heater setpoints; ours
    are held on the heater's own board and are unreadable.
 5. Purge conditional on compressor idle. njsPC's cooldown is duration-based.
-6. Spa auto-revert after `SPA_TIMEOUT_MIN`.
+6. **Protecting a spa session from schedule takeover** — see ADR-11. This
+   replaces "spa auto-revert", which turned out to be configuration: every
+   circuit has an `eggTimer`, defaulting to 720 minutes. Setting the Spa
+   circuit's to `SPA_TIMEOUT_MIN` is the whole feature.
 
 **Consequences:**
 
@@ -508,32 +539,55 @@ AGPL, taking the MIT licence with it. So keep forks surgical: fix njsPC's bugs
 inside njsPC, keep our interlocks in our own process. (Not legal advice —
 confirm before relying on it.)
 
-### ADR-11 — njsPC owns schedules
+### ADR-11 — Schedule ownership: unresolved, and njsPC alone is not safe
 
-**Status: proposed.** Reverses the first draft, which said the opposite.
+**Status: open.** Revised twice, and the second revision was wrong. This entry
+records what a live test actually showed rather than what the source implied.
 
-**Decision:** njsPC keeps its scheduler. The supervisor suspends it where
-needed using njsPC's own `ManualPriorityDelay`.
+**The test.** njsPC 10.0.1 in Nixie mode, `nxps` shared-body model, no serial
+port and no REM, `sys.general.options.manualPriority = true`. Spa circuit
+turned on manually. A schedule on the Pool circuit set to start two minutes
+later.
 
-**Rationale:** the first draft argued the sequencer must own scheduling
-because a schedule firing from njsPC could not be checked against
-`heaterCall`. That reasoning assumed njsPC had no override mechanism. It has
-one, purpose-built: `delayMgr.setManualPriorityDelay(cs)` sets
-`manualPriorityActive` on a circuit with an end time, and schedules honour it
-until it expires or is cancelled. That is the mechanism the first draft
-proposed to reinvent, and it is the same shape as the pump hold already in
-the UI.
+**The result: at the schedule boundary the Pool circuit came on and the spa
+went off.** `manualPriorityActive` was never set. Someone in the spa would
+have had the water switched out from under them.
 
-Schedules also carry `isActive`, so individual ones can be disabled without
-disabling the scheduler.
+A control run — holding the *same* circuit the schedule targets — behaved no
+better: the circuit stayed on, but flipped to `priority: 'scheduled'` and its
+end time was replaced by the schedule's. `manualPriorityActive` again never
+set.
 
-Reimplementing windows, day masks, DST and overlap resolution would have been
-gratuitous — and directly contrary to ADR-2, which chose njsPC precisely so
-this project would not rebuild what it provides. The first draft of ADR-11
-contradicted ADR-2 and nobody noticed for one commit.
+**So the second revision of this ADR was wrong.** It read `ManualPriorityDelay`
+in `Lockouts.ts`, saw *"will override future schedules until expired/cancelled"*,
+and concluded njsPC already had the override we needed. Reading the scheduler
+more carefully afterwards, `manualPriorityActive` is set only on a narrow path
+— a schedule that has already been *triggered* and whose circuit is then
+manually turned back on, which keeps the egg timer in charge instead of the
+schedule's end time. It is not protection against a schedule *taking* a
+circuit at its start. (That reading is tentative; the observed behaviour is
+not.)
 
-**Open:** whether `manualPriorityActive` reliably survives a schedule boundary
-in practice. Test in Phase 2.
+This matters here specifically because pool and spa are one shared body: a
+schedule on the pool circuit is not merely a pump-speed change, it is a body
+switch. And in njsPC pump speeds derive from circuits, so filtration
+scheduling *is* body-circuit scheduling. The PRD's own warning — *"a schedule
+dropping the pump to 1400 rpm mid-soak would be a bad surprise"* — is real and
+njsPC does not prevent it.
+
+**Options, none yet chosen:**
+
+1. **Supervisor owns schedules** — the original first draft, now partly
+   vindicated. Total control; we pay for windows, day masks, DST, overlap.
+2. **Supervisor disables body-circuit schedules while spa mode is active**
+   using njsPC's per-schedule `isActive` flag, restoring them on exit. Cheap,
+   but it is soft state across two processes: a supervisor crash mid-soak
+   leaves schedules disabled until something restores them. Boot resync would
+   have to cover it.
+3. **Keep schedules off body circuits entirely** and drive filtration some
+   other way. Needs investigation — it may not be expressible in njsPC's model.
+
+**Decide before writing the supervisor, not after.**
 
 ### ADR-12 — Watchdog health spans both processes
 
