@@ -20,7 +20,7 @@ const countdown = (ms) => {
   return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m} min`;
 };
 
-export default function PoolSpaControl({ controller, onOpenHeat }) {
+export default function PoolSpaControl({ controller, themeControl, onOpenHeat }) {
   const { state, setMode, toggle, extendSpa, schedulePreheat, cancelPreheat,
     simulateOutage } = controller;
   const {
@@ -50,7 +50,7 @@ export default function PoolSpaControl({ controller, onOpenHeat }) {
 
   return (
     <div style={{ padding: "20px 16px 32px", fontFamily: FONT_UI, color: C.stone }}>
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 22 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 22 }}>
         <div>
           {/* Keyed off `target`, not `busy`: a heat sequence runs without
               changing mode, and there is no mode to name for it. */}
@@ -61,6 +61,7 @@ export default function PoolSpaControl({ controller, onOpenHeat }) {
             {MODES.find((m) => m.id === (target || mode)).label}
           </div>
         </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
         {/* Tapping simulates a transport outage. Mock-only affordance, but
             the offline path it exposes is the real one. */}
         <button onClick={simulateOutage}
@@ -84,6 +85,8 @@ export default function PoolSpaControl({ controller, onOpenHeat }) {
             )}
           </span>
         </button>
+        {themeControl}
+        </div>
       </div>
 
       {stale && (

@@ -14,7 +14,38 @@ const TABS = [
   { id: "bus", label: "Bus", Screen: BusMonitor },
 ];
 
-const THEME_LABEL = { auto: "Auto", dark: "Dark", light: "Day" };
+const THEME_LABEL = { auto: "Auto", dark: "Night", light: "Day" };
+
+/** Sun, moon, or half-and-half for auto. Drawn rather than an emoji so it
+    inherits currentColor and stays crisp at any density. */
+function ThemeIcon({ theme }) {
+  const common = { width: 15, height: 15, viewBox: "0 0 16 16", "aria-hidden": true };
+  if (theme === "light") {
+    return (
+      <svg {...common} style={{ display: "block" }}>
+        <circle cx="8" cy="8" r="3.4" style={{ fill: "currentColor" }} />
+        {[0, 45, 90, 135, 180, 225, 270, 315].map((deg) => (
+          <line key={deg} x1="8" y1="1.2" x2="8" y2="3" transform={`rotate(${deg} 8 8)`}
+            style={{ stroke: "currentColor", strokeWidth: 1.4, strokeLinecap: "round" }} />
+        ))}
+      </svg>
+    );
+  }
+  if (theme === "dark") {
+    return (
+      <svg {...common} style={{ display: "block" }}>
+        <path d="M13 9.8A5.6 5.6 0 0 1 6.2 3a5.8 5.8 0 1 0 6.8 6.8Z"
+          style={{ fill: "currentColor" }} />
+      </svg>
+    );
+  }
+  return (
+    <svg {...common} style={{ display: "block" }}>
+      <circle cx="8" cy="8" r="5.4" style={{ fill: "none", stroke: "currentColor", strokeWidth: 1.4 }} />
+      <path d="M8 2.6a5.4 5.4 0 0 1 0 10.8Z" style={{ fill: "currentColor" }} />
+    </svg>
+  );
+}
 
 export default function App() {
   const [tab, setTab] = useState("water");
@@ -35,6 +66,24 @@ export default function App() {
   const controller = useController();
   const { Screen } = TABS.find((t) => t.id === tab);
 
+  /* Rendered by each screen in its header, beside the status badge. It lives
+     up here so there is exactly one of it, and top-right on every screen so
+     the reason to reach for it — walking into the sun — is one tap away
+     wherever you happen to be. */
+  const themeControl = (
+    <button onClick={cycleTheme}
+      aria-label={`Appearance: ${THEME_LABEL[theme]}. Tap to change.`}
+      title={`Appearance: ${THEME_LABEL[theme]}`}
+      style={{
+        display: "flex", alignItems: "center", justifyContent: "center",
+        width: 34, height: 34, flexShrink: 0, borderRadius: 999,
+        border: `1px solid ${C.line}`, background: C.surface,
+        color: C.muted, cursor: "pointer", padding: 0,
+      }}>
+      <ThemeIcon theme={theme} />
+    </button>
+  );
+
   if (pushed === "heat") {
     return (
       <div style={{ background: C.ground, minHeight: "100vh", maxWidth: 460, margin: "0 auto" }}>
@@ -45,7 +94,7 @@ export default function App() {
 
   return (
     <div style={{ background: C.ground, minHeight: "100vh", maxWidth: 460, margin: "0 auto", paddingBottom: 92 }}>
-      <Screen controller={controller} onOpenHeat={() => setPushed("heat")} />
+      <Screen controller={controller} themeControl={themeControl} onOpenHeat={() => setPushed("heat")} />
 
       {/* The mock badge lives inside the nav so it sits on an opaque surface.
           Floating it over the page put it on top of whatever happened to
@@ -55,19 +104,8 @@ export default function App() {
         background: C.surface, borderTop: `1px solid ${C.line}`,
         paddingBottom: "env(safe-area-inset-bottom)",
       }}>
-        <div style={{
-          display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-          fontSize: 9, color: C.faint, letterSpacing: 1, padding: "7px 0 8px",
-        }}>
-          <span>MOCK DATA</span>
-          <button onClick={cycleTheme} aria-label={`Theme: ${THEME_LABEL[theme]}. Tap to change.`}
-            style={{
-              background: "transparent", border: `1px solid ${C.line}`, borderRadius: 999,
-              color: C.muted, fontFamily: FONT_DATA, fontSize: 9, letterSpacing: 1,
-              padding: "2px 8px", cursor: "pointer", textTransform: "uppercase",
-            }}>
-            {THEME_LABEL[theme]}
-          </button>
+        <div style={{ textAlign: "center", fontFamily: FONT_DATA, fontSize: 9, color: C.faint, letterSpacing: 1, padding: "7px 0 8px" }}>
+          MOCK DATA
         </div>
         <div style={{ display: "flex" }}>
           {TABS.map((t) => (

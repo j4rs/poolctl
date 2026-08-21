@@ -29,7 +29,7 @@ const KIND_TONE = {
  * dropped. A monitor that quietly hid what it could not parse would be
  * actively misleading for this decision.
  */
-export default function BusMonitor() {
+export default function BusMonitor({ themeControl }) {
   const { frames, stats, paused, setPaused, clear } = useBus();
   const [filter, setFilter] = useState("all");
   const [openId, setOpenId] = useState(null);
@@ -42,19 +42,22 @@ export default function BusMonitor() {
 
   return (
     <div style={{ padding: "20px 16px 32px", fontFamily: FONT_UI, color: C.stone }}>
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 22 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 22 }}>
         <div>
           <div style={{ fontSize: 11, letterSpacing: 2, color: C.muted, fontFamily: FONT_DATA, textTransform: "uppercase" }}>
             RS-485
           </div>
           <div style={{ fontSize: 30, fontWeight: 600, letterSpacing: -0.5, lineHeight: 1.2 }}>Bus</div>
         </div>
-        <div style={{
-          fontFamily: FONT_DATA, fontSize: 10, letterSpacing: 1, textTransform: "uppercase",
-          color: paused ? C.heat : C.water, border: `1px solid ${paused ? C.heat : C.water}`,
-          borderRadius: 999, padding: "4px 9px",
-        }}>
-          {paused ? "Paused" : "Sniffing"}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+          <div style={{
+            fontFamily: FONT_DATA, fontSize: 10, letterSpacing: 1, textTransform: "uppercase",
+            color: paused ? C.heat : C.water, border: `1px solid ${paused ? C.heat : C.water}`,
+            borderRadius: 999, padding: "4px 9px",
+          }}>
+            {paused ? "Paused" : "Sniffing"}
+          </div>
+          {themeControl}
         </div>
       </div>
 

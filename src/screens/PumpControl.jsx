@@ -46,7 +46,7 @@ const HOLD_OPTIONS = [
   { id: "4h", label: "4 h", minutes: 240 },
 ];
 
-export default function PumpControl({ controller }) {
+export default function PumpControl({ controller, themeControl }) {
   const { state, setRpm, holdPump, releasePump } = controller;
   const rpm = state.pumpRpm;
   const { pumpHold, heaterCall, mode } = state;
@@ -100,17 +100,20 @@ export default function PumpControl({ controller }) {
       {/* Who is driving the pump. Without this the screen asserts things
           like "spa mode owns the pump" while showing no sign anywhere that
           spa mode is even on. */}
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 22 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 22 }}>
         <div>
           <div style={{ fontSize: 11, letterSpacing: 2, color: C.muted, fontFamily: FONT_DATA, textTransform: "uppercase" }}>Pump</div>
           <div style={{ fontSize: 30, fontWeight: 600, letterSpacing: -0.5, lineHeight: 1.2 }}>Speed</div>
         </div>
-        <div style={{
-          fontFamily: FONT_DATA, fontSize: 10, letterSpacing: 1, textTransform: "uppercase",
-          color: owner.tone, border: `1px solid ${owner.tone}`, borderRadius: 999,
-          padding: "4px 9px", opacity: 0.9,
-        }}>
-          {owner.label}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+          <div style={{
+            fontFamily: FONT_DATA, fontSize: 10, letterSpacing: 1, textTransform: "uppercase",
+            color: owner.tone, border: `1px solid ${owner.tone}`, borderRadius: 999,
+            padding: "4px 9px", opacity: 0.9,
+          }}>
+            {owner.label}
+          </div>
+          {themeControl}
         </div>
       </div>
 
