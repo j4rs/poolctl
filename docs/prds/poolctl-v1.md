@@ -250,7 +250,35 @@ exchanger.** The interlock is therefore load-bearing in both directions:
 
 The heater's water pressure switch is a backstop, not the primary control.
 
-### ADR-6 — Chlorinator: decision deferred to bus sniffing
+### ADR-6 — Chlorinator: Path A, salt reading treated as expendable
+
+**Resolved August 2026.** Owner's call: *"I can live without the salt."* Path B
+existed solely to preserve Pentair Home's salt alerts, so with salt expendable
+it has no remaining justification and **Path A is adopted**. The IntelliConnect
+is retired entirely.
+
+This is not much of a sacrifice, for three reasons:
+
+- **Chlorination is never at risk.** The iChlor has its own display and buttons
+  and the IntelliChlor Power Center supplies it, so the cell runs standalone
+  regardless. The loss is monitoring, not sanitation.
+- **The cell shows low salt on its own display.** So the actual cost is that
+  the warning requires a walk to the pad instead of appearing on a phone.
+- **Salt drifts slowly.** It leaves only through splash-out, backwash and rain
+  overflow. A test strip every month or two is genuinely adequate; the salt
+  trend line Path A promised was a nice-to-have.
+
+And it may not be permanent. If case 18 turns out not to arrive from an
+iChlor, that is a textbook ADR-13 case — `src/lib/rs485.js` already carries
+IC-framing decoders that could seed an upstream patch.
+
+**Still worth confirming during Phase 1**, since it costs nothing while the
+bus is being sniffed anyway. Output %, model identification and water
+temperature all decode already; salt is the only open reading.
+
+Original analysis follows.
+
+### ADR-6 (original) — decision deferred to bus sniffing
 
 The owner values two things Pentair Home provides today: low-salt
 notifications and visible output percentage. Two paths, chosen by evidence
@@ -273,9 +301,38 @@ device another controller believes it owns invites confusing faults. Suppress
 spa-mode chlorination by setting a low output percentage instead, or accept
 it, since a short soak barely moves the needle.
 
-**Deciding evidence:** njsPC's iChlor 30 support is less mature than its
-IntelliChlor support and has known rough edges in Nixie mode. Phase 1
-sniffing shows definitively whether chlorinator frames decode.
+**Deciding evidence — sharpened August 2026 by reading the source.** "iChlor
+support is less mature" was too vague to act on. What njsPC actually has, in
+`controller/comms/messages/status/ChlorinatorStateMessage.ts`:
+
+| Reading | Status in njsPC | Case |
+|---|---|---|
+| Model identification | **Yes**, `ichlor-ic30` is an enumerated model (30k capacity, 1.0 lb/day). iChlor does not report a model, so it is inferred from a name beginning `iChlor` | 3 |
+| Output % | **Yes** | 17, 21, 22 |
+| Water temperature | **Yes**, and in Nixie mode it is assigned to the current body | 22 |
+| Keep-alive | Recognised, payload unknown — comment says *"perhaps simply a keep alive"* | 19 |
+| **Salt PPM** | **Unproven for iChlor.** Salt is decoded in case 18, the generic IntelliChlor status response, which is not marked iChlor-specific | 18 |
+
+So the real ADR-6 question is narrower than "do the frames decode": **it is
+whether an iChlor 30 emits the case-18 salt message.** Everything else already
+works. Salt alerts are the one thing the owner values that Path B would
+preserve, so that single message decides the path.
+
+Encouragingly, the iChlor clearly participates in the shared protocol — it
+answers Get Model — so case 18 probably arrives. Probably is what Phase 1 is
+for.
+
+**The reverse engineering was done against an IntelliConnect.** Case 22 is
+commented *"temp and output as seen from IntelliConnect"* (issue #157), and
+case 21 notes the packet "coming through differently on the IntelliConnect."
+That is this site's current configuration, so Phase 1 sniffing with the
+IntelliConnect still live reproduces exactly the conditions this code was
+written for.
+
+**Before the HAT arrives:** njsPC ships an equipment simulator at `anslq25/`
+with a `MockChlorinator`. It covers cases 0, 17, 19 and 20 — but *not* 18 or
+22, the two that matter here. Useful for standing njsPC up and exercising the
+plumbing on a laptop; it cannot answer the salt question.
 
 **Note:** the iChlor has its own buttons and display, and the separate
 IntelliChlor Power Center supplies it. So even in the worst case the cell
@@ -897,10 +954,16 @@ eyes on bonding.
 - [ ] **Does `manualPriorityActive` survive a schedule boundary?** ADR-11
       depends on it. Set an override, let a schedule window roll over it,
       watch the pump.
-- [ ] **Water temperature source.** The BOM has no water temp sensor, and the
-      3-wire heater interface reports nothing. Target cutoffs and the preheat
-      estimate both need a trusted reading — from the pump bus, a REM probe,
-      or elsewhere. Settle before Phase 3.
+- [x] **Water temperature source.** *Likely answered.* njsPC case 22 assigns
+      the iChlor's own temperature probe to the current body when running in
+      Nixie mode, so the BOM needs no sensor. Caveats: one byte, so 1 °F
+      resolution; a sanity floor of 40 °F; it reads at the cell on the return
+      line rather than in the pool; and it arrives only in iChlor case-22
+      messages. Adequate for heat cutoffs and the preheat estimate, not a
+      precision instrument. Confirm the reading appears in Phase 1.
+      Fallback if it does not: a REM temperature probe, which is the only
+      option left, since the 3-wire heater interface reports nothing and the
+      pump does not measure water. Settle before Phase 3.
 - [ ] **Spa volume.** Never measured. All preheat estimates assume ~500 gal.
 - [ ] **Spa jet rpm.** 2800 is a guess. Tune empirically once speed is
       settable from a phone.

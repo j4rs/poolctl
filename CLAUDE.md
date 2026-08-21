@@ -110,14 +110,15 @@ Other heater facts:
 
 ---
 
-## Chlorinator — two paths, undecided
+## Chlorinator — Path A (ADR-6, resolved)
 
-Decision blocked on Phase 1 bus sniffing.
+Salt reading treated as expendable, which removed Path B's only reason to
+exist. Path B is kept below as the fallback if something unexpected turns up.
 
-**Path A** — retire IntelliConnect entirely. njsPC reads salt PPM and output
-% off the bus, publishes to MQTT, Home Assistant handles alerts with custom
-thresholds plus a salt trend line over months. Relay-gate the power center in
-spa mode. Preferred if iChlor 30 frames decode cleanly.
+**Path A — adopted.** Retire IntelliConnect entirely. njsPC decodes iChlor
+model, output % and water temperature; salt PPM is unproven and the owner has
+accepted losing it (the cell shows low salt on its own display, and salt
+drifts slowly). Relay-gate the power center in spa mode.
 
 **Path B** — IntelliConnect survives wired to nothing but the IntelliChlor
 Power Center. Keeps Pentair Home salt alerts and output control. Pump moves
@@ -125,7 +126,12 @@ to the Pi. Under Path B, do NOT relay-gate the power center — cutting power
 to a device another controller owns invites confusing faults. Channel 8 goes
 unused.
 
-njsPC's iChlor 30 support is less mature than its IntelliChlor support.
+njsPC knows `ichlor-ic30` specifically, and its iChlor reverse engineering was
+done against an IntelliConnect — this site's current setup — so Phase 1
+sniffing reproduces the exact conditions that code was written for. **In Nixie
+mode njsPC feeds the iChlor's temperature probe into the body temperature**,
+which is where `waterTemp` comes from; there is no sensor in the BOM and does
+not need to be.
 
 ---
 
