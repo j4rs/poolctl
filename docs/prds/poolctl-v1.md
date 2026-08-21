@@ -749,8 +749,22 @@ split → intake to pool drain → bypass around → pump to pool rpm.
 carries no skip conditions — every valve is re-driven unconditionally,
 which is the whole point of it.
 
-Valves move one at a time, at low pump rpm. Never divert against full flow —
-water hammer, and the actuator can stall. Three sequential 45 sec moves
+**Valves move one at a time, at low flow — not at speed, and not at zero.**
+`VALVE_RPM` is 1000. Owner's decision, August 2026, and the reasoning is worth
+keeping:
+
+- Never at speed. Water hammer, and the actuator has to fight hydraulic force
+  on the diverter. At 1000 rpm the pump is at roughly 8% of full pressure
+  (pressure scales with rpm²) and 2% of full power, so both problems mostly
+  disappear.
+- Not at zero either. Stopping the pump for every transition adds a stop/start
+  cycle and an IntelliFlo priming cycle to a sequence that already takes
+  minutes, for no benefit — these are three-way diverters, not shutoffs, so
+  mid-travel both ports are partially open and there is no deadhead to avoid.
+
+The consequence is that **the pump must be held at low speed across the whole
+transition**, which is a stronger requirement than "don't divert at full
+flow" and may not be expressible by delegating the body switch to njsPC. Three sequential 45 sec moves
 dominate the wall clock of a mode change.
 
 The blower is cleared explicitly on the way out of spa mode. Its toggle is
@@ -1081,16 +1095,21 @@ eyes on bonding.
       Fallback if it does not: a REM temperature probe, which is the only
       option left, since the 3-wire heater interface reports nothing and the
       pump does not measure water. Settle before Phase 3.
-- [ ] **Do valves move under full flow?** The safety question the schedule test
-      did not answer, because no pump was configured. njsPC *does* implement
-      `setPumpValveDelays` in `NixieBoard.ts`, but it is gated on
-      `sys.general.options.pumpDelay`, which **defaults to false**, and it
-      delays a pump *start after* a valve change rather than stopping the pump
-      *before* one. Whether a body switch drops the pump first is untested.
-      This is the one bench test that matters before an actuator is wired:
-      configure a pump, enable `pumpDelay`, switch bodies, watch the rpm
-      through the transition. Water hammer and a stalled actuator are the
-      failure modes.
+- [ ] **What does the pump do during an njsPC body switch?** Sharpened by the
+      `VALVE_RPM` decision above: the pass criterion is not "the pump is not at
+      full speed", it is **"the pump holds ~1000 rpm throughout"**. Three
+      possible outcomes and they have very different consequences:
+      *full speed* — unacceptable, water hammer and actuator stall;
+      *stopped* — safe but wrong, adds a stop/start and a priming cycle;
+      *held low* — what we want, and njsPC has no obvious way to express it.
+      njsPC implements `setPumpValveDelays` in `NixieBoard.ts`, but it is gated
+      on `sys.general.options.pumpDelay` (**default false**) and delays a pump
+      *start after* a valve change rather than holding speed *through* one.
+      **If the answer is "stopped", the supervisor cannot delegate the body
+      switch to njsPC** — it has to own the transition choreography itself:
+      pump to 1000, move valves one at a time, pump to target. That would pull
+      a meaningful piece of ADR-10 back toward the sequencer model.
+      Bench test: configure a pump, switch bodies, watch the rpm.
 - [ ] **Valve travel time.** Bounded **under 60 sec** by the manual's 1-minute
       duty cycle, but not stated exactly. `sequences.js` assumes 45 sec per move
       and three of them dominate a transition. Never measured. Three things

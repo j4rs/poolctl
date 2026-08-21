@@ -26,8 +26,14 @@
  * is binary, so a heat call with the bypass around means zero flow through
  * the exchanger. The interlock is load-bearing in both directions.
  *
- * Valve moves are strictly sequential and always at low rpm. Never divert
- * against full flow: water hammer, and the actuator can stall.
+ * Valve moves are strictly sequential and happen at VALVE_RPM — low flow,
+ * not full speed and not zero. At full speed you get water hammer and the
+ * actuator fights hydraulic force on the diverter; at zero you buy a pump
+ * stop/start and a priming cycle for nothing, since these are three-way
+ * diverters and mid-travel both ports are partially open. So the pump must be
+ * held low across the whole transition, which is a stronger requirement than
+ * "don't divert at full flow" — see the open question about what njsPC's own
+ * body switch does to the pump.
  */
 
 /** Flow thresholds. Placeholders. Measure on the real system and correct. */
@@ -66,6 +72,7 @@ export const SPA_HEAT_RATE = 20;
 /** Resting speeds. Spa jet rpm is a guess — tune once settable from a phone. */
 export const POOL_RPM = 1600;
 export const SPA_RPM = 2800;
+/* Held across every valve move. Owner's decision: low flow, not zero. */
 export const VALVE_RPM = 1000;
 
 /**

@@ -100,7 +100,13 @@ with the bypass around means *zero* flow through the exchanger. (ADR-9)
 
 **Transitions cannot be cancelled.** `ABORTABLE` is false: aborting mid-travel
 leaves a dead-reckoned valve at an unknown angle with no feedback to recover
-from.
+from. (That argument assumes 45 sec travel, which is unmeasured — revisit if
+it turns out to be much shorter.)
+
+**Valves move at low flow, one at a time.** `VALVE_RPM` is 1000: not full
+speed (water hammer, actuator stall) and not zero (a pointless pump stop/start
+and priming cycle). The pump is held low across the *whole* transition, which
+njsPC may not be able to express — open question.
 
 ---
 
