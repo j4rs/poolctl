@@ -135,16 +135,26 @@ njsPC's iChlor 30 support is less mature than its IntelliChlor support.
 state and sends intents (`setMode('spa')`). It never sends relay primitives.
 A phone loses signal; the state machine must hold regardless.
 
-See `docs/architecture.md` for the system view — components, state ownership,
-and failure modes. Three decisions there are **proposed, not ratified**: the
-sequencer is a separate service and the only writer (ADR-10), it owns
-schedules with njsPC's scheduler disabled (ADR-11), and the watchdog watches
-the sequencer rather than njsPC (ADR-12).
+See `docs/architecture.md` for the system view. Three decisions there are
+**proposed, not ratified** (ADR-10/11/12), and all three were revised in
+August 2026 after actually reading njsPC's source.
 
-Two consequences worth holding onto: **dashPanel bypasses every interlock in
-this system** — it is a diagnostic tool, not an operator interface — and
-everything `useController` currently holds (mode, valves, targets, pumpHold,
-schedules) is sequencer state living temporarily in the client.
+**njsPC in Nixie mode is a full controller, not a bus library.**
+`controller/Lockouts.ts` already implements valve delays, heater cooldown with
+body switching, and `ManualPriorityDelay` — schedule override with an end
+time, which is our pump hold. `controller/nixie/` has bodies, valves,
+circuits, schedules, heaters and pumps. It drives circuits from its own
+timers, so it cannot be made passive.
+
+So we add a **supervisor**, not a sequencer: only the six things njsPC lacks —
+the heat-conditional pump floor, the bypass policy, PE24GVA travel modelling,
+targets-as-cutoffs, purge conditional on compressor idle, and spa auto-revert.
+njsPC keeps its scheduler.
+
+Two things to hold onto: **dashPanel bypasses whatever the supervisor adds** —
+diagnostic tool, not operator interface — and `sequences.js` needs re-reading
+against njsPC's body/circuit model, because some of its steps are probably
+configuration rather than code.
 
 `src/lib/sequences.js` is the executable spec. The server sequencer must
 implement the same steps in the same order. Five named sequences: `spa`,

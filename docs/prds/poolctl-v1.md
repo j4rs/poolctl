@@ -125,6 +125,32 @@ OCP is required.
   requires writing the protocol stack. Reasonable if the protocol work is
   the point of the exercise; it isn't here.
 
+**Revisited, August 2026.** The alternatives were re-surveyed and the source
+read. ADR-2 stands, and is on firmer ground than when it was written.
+
+The discriminator is that this site will have **no Pentair OCP** — the
+IntelliConnect is being retired and there is no IntelliCenter, EasyTouch,
+IntelliTouch, SunTouch or ScreenLogic gateway. Almost every open-source
+Pentair project is a *client of* an existing controller, not a replacement
+for one:
+
+| Project | Why it does not fit |
+|---|---|
+| openHAB Pentair binding | Listens on the bus alongside an existing control system; does not replace it |
+| OPNpool (ESP32) | Integrates an existing controller into a smart home; tested against a SunTouch |
+| Home Assistant ScreenLogic | Requires a ScreenLogic gateway |
+| njsPC **Nixie mode** | Explicitly supports *no controller at all* |
+
+So njsPC is not merely the best of several options. In the "be the controller"
+category it is the only mature one.
+
+Two corrections to how this ADR describes it:
+
+- **njsPC in Nixie mode is a full controller, not a protocol library.** It has
+  its own delay and interlock manager, body switching, and scheduling. This
+  matters enormously for how anything is layered on top — see ADR-10.
+- It requires **Node.js 22+**.
+
 ### ADR-3 — Pi 4 (2GB) over Pi 5
 
 **Decision:** Pi 4 Model B, 2GB.
@@ -314,88 +340,111 @@ mode sequences.
 - *Bypassing only inside scheduled filtration windows* — fewer coil-hours,
   more states to reason about, marginal gain.
 
-### ADR-10 — The sequencer is a separate service, and the only writer
+### ADR-10 — The sequencer supervises njsPC; it does not replace it
 
-**Status: proposed.** Not yet ratified.
+**Status: proposed.** Revised August 2026 after reading njsPC's source. The
+first draft of this ADR is preserved at the bottom because it was wrong in an
+instructive way.
 
-**Decision:** a standalone Node service on the Pi, alongside njsPC and REM. It
-owns modes, the five sequences, every interlock and invariant, valve
-dead-reckoning, targets, the pump hold, and schedules. It drives equipment
-through njsPC (pump, bus) and REM (relays). **No other process commands
-equipment.**
+**Decision:** configure njsPC's Nixie control panel to own bodies, circuits,
+valves, pumps, schedules and its delay manager. Add a **small supervisor
+service** implementing only the interlocks njsPC does not have. The supervisor
+is the only external writer.
 
-**Rationale:** ADR-2 chose njsPC precisely so this project would not own a
-reverse-engineered protocol stack. Forking it to add interlocks gives that
-burden straight back. REM is an I/O driver and interlock logic does not belong
-there. ADR-7 already rules out the client. That leaves a service of our own,
-which has the further advantage of being testable on a bench with no hardware
-attached — which is exactly what Phase 2 is.
+**Evidence.** `controller/Lockouts.ts` (549 lines) is a delay and interlock
+manager that already implements much of what the first draft proposed to
+build:
+
+| njsPC already has | Maps to |
+|---|---|
+| `PumpValveDelay` — pump start waits `valveDelayTime` | "never divert against full flow" |
+| `HeaterCooldownDelay(bodyOff, bodyOn)` — switches bodies with a cooldown between | our spa→pool purge step, almost exactly |
+| `HeaterStartupDelay` | anti-short-cycle handling |
+| `ManualPriorityDelay` — *"will override future schedules until expired/cancelled"*, with an `endTime` | `state.pumpHold`, including the `expiresAt` semantics |
+
+`controller/nixie/` carries `bodies/`, `valves/`, `circuits/`, `schedules/`,
+`heaters/`, `pumps/` and `chemistry/`. `SystemBoard.ts` has `spillway` and
+`spadrain` circuit functions gated on `sys.equipment.shared` — a shared-equipment
+pool and spa that spills, which is this site's topology.
+
+**What njsPC does not have, and the supervisor therefore owns:**
+
+1. `heaterCall !== 'off' ⟹ pumpRpm >= HEATER_MIN_RPM`. `minSpeed`/`minFlow` in
+   `nixie/pumps/Pump.ts` are pump-type limits, not a heat-conditional floor.
+2. The bypass policy of ADR-9. njsPC has no concept of a heater bypass valve.
+3. PE24GVA travel modelling. `nixie/valves/Valve.ts` is 170 lines and treats a
+   valve as a boolean `isDiverted` that pokes a REM relay with `latch: 10000`.
+   No 45-second travel, no one-at-a-time ordering, no dead reckoning.
+4. Targets as cutoffs (ADR-4). njsPC assumes it owns heater setpoints; ours
+   are held on the heater's own board and are unreadable.
+5. Purge conditional on compressor idle. njsPC's cooldown is duration-based.
+6. Spa auto-revert after `SPA_TIMEOUT_MIN`.
 
 **Consequences:**
 
-- **dashPanel is a diagnostic tool, not an operator interface.** It can command
-  equipment directly, bypassing every interlock in this system. Do not put it
-  on a phone home screen, and consider not exposing it at all once the
-  sequencer is running.
-- njsPC's own scheduler must be off — see ADR-11.
-- Clients talk to the sequencer, never to njsPC. One source of truth, one shape.
-- `src/lib/sequences.js` is the spec this service implements. Disagreement
-  between them is a bug in one of them.
+- The supervisor is far smaller than the first draft assumed — six rules, not
+  a whole state machine.
+- **njsPC in Nixie mode is not passive and cannot be made passive.**
+  `HeaterCooldownDelay` calls `setCircuitStateAsync` from its own timer. Any
+  design that treats njsPC as a bus library will fight it.
+- **dashPanel remains a diagnostic tool, not an operator interface.** It
+  commands equipment directly and bypasses whatever the supervisor adds.
+- `src/lib/sequences.js` needs re-reading against njsPC's body/circuit model
+  before the supervisor is written. Some of its steps may already be njsPC
+  configuration rather than code we write.
 
-**Rejected:** forking njsPC or writing a plugin (hands back the maintenance
-ADR-2 avoided); logic in REM (wrong layer); logic in the client (ADR-7).
+**Rejected:** the first draft — a standalone sequencer owning modes,
+sequences, valve reckoning, targets, hold and schedules, driving njsPC and REM
+as dumb outputs. It would have duplicated a large tested subsystem and then
+fought it for control. It was written before anyone had read njsPC, which is
+the actual lesson.
 
-### ADR-11 — The sequencer owns schedules; njsPC's scheduler is off
+### ADR-11 — njsPC owns schedules
 
-**Status: proposed.** Not yet ratified.
+**Status: proposed.** Reverses the first draft, which said the opposite.
 
-**Decision:** disable njsPC's scheduler entirely. The sequencer owns schedule
-definitions, evaluation, and the resulting pump commands.
+**Decision:** njsPC keeps its scheduler. The supervisor suspends it where
+needed using njsPC's own `ManualPriorityDelay`.
 
-**Rationale:** ADR-1 rejected two masters on the RS-485 bus, and named the
-failure concretely — *valves in spa position while the other controller runs a
-schedule that stops the pump.* Two schedulers on the Pi is that same failure
-moved indoors. It is worse, not better, for being inside one box: the pieces
-look cooperative.
+**Rationale:** the first draft argued the sequencer must own scheduling
+because a schedule firing from njsPC could not be checked against
+`heaterCall`. That reasoning assumed njsPC had no override mechanism. It has
+one, purpose-built: `delayMgr.setManualPriorityDelay(cs)` sets
+`manualPriorityActive` on a circuit with an end time, and schedules honour it
+until it expires or is cancelled. That is the mechanism the first draft
+proposed to reinvent, and it is the same shape as the pump hold already in
+the UI.
 
-The alternative — njsPC keeps schedules, the sequencer suspends them during
-modes and holds — is a distributed lock between two processes with no shared
-state. A schedule firing from njsPC cannot be checked against
-`heaterCall !== 'off' ⟹ pumpRpm >= HEATER_MIN_RPM` at the instant it fires,
-because njsPC does not know what `heaterCall` is.
+Schedules also carry `isActive`, so individual ones can be disabled without
+disabling the scheduler.
 
-One owner means every equipment command passes one place that can assert the
-invariants before issuing it. That is the whole design.
+Reimplementing windows, day masks, DST and overlap resolution would have been
+gratuitous — and directly contrary to ADR-2, which chose njsPC precisely so
+this project would not rebuild what it provides. The first draft of ADR-11
+contradicted ADR-2 and nobody noticed for one commit.
 
-**Cost, stated plainly:** we reimplement schedule evaluation — windows, day
-masks, DST, overlap resolution. Bounded, and the data model already exists in
-`src/lib/pump.js`, but it is real work that would otherwise have been free.
+**Open:** whether `manualPriorityActive` reliably survives a schedule boundary
+in practice. Test in Phase 2.
 
-**Consequence:** njsPC is demoted to what ADR-2 actually wanted from it — a bus
-master and telemetry source with an excellent pump driver.
+### ADR-12 — Watchdog health spans both processes
 
-### ADR-12 — The watchdog watches the sequencer, and health is conditional
+**Status: proposed.** Revised alongside ADR-10.
 
-**Status: proposed.** Not yet ratified.
+**Decision:** the hardware watchdog is fed only while **both** njsPC and the
+supervisor are alive and the supervisor's invariant check passes. Feeding is
+conditional on health, never on mere liveness.
 
-**Decision:** the hardware watchdog is fed by the **sequencer**, not njsPC.
-Feeding is conditional on a health check — invariants currently hold, no valve
-move orphaned, njsPC and REM both answering — and not merely on the process
-being alive.
-
-**Rationale:** §5 originally specified the watchdog against njsPC, which was
-right when njsPC was going to be the whole controller. Under ADR-10 it is not.
-The dangerous state is *the interlock owner is dead*: a valve mid-travel with
-nothing left to finish the sequence, or a heat call standing with nothing left
-to check flow against. If njsPC dies instead, the sequencer notices its calls
-failing and can drive to fail-safe deliberately.
+**Rationale:** the first draft moved the watchdog from njsPC to the sequencer
+on the theory that the sequencer held all the interlocks. Under the revised
+ADR-10 the interlocks are split — njsPC holds the delays and body logic, the
+supervisor holds the six rules above — so either process dying is dangerous
+and neither alone is the right thing to watch.
 
 A liveness ping from a wedged process is worse than no watchdog, because it
-buys false confidence. Tie the heartbeat to the thing the watchdog exists to
-protect.
+buys false confidence. Tie the heartbeat to the invariants actually holding.
 
-**Consequence:** killing the sequencer must be part of the Phase 2 bench test,
-alongside killing njsPC. Both should end with every relay de-energised.
+**Consequence:** Phase 2 bench testing kills each process in turn. Both cases
+must end with every relay de-energised.
 
 ---
 
@@ -779,6 +828,20 @@ eyes on bonding.
       sharing air with the Pi; add a conduction path from the SoC heatsink
       to a plate through the wall — checking first that it raises no NEC 680
       bonding question, which is why the box is non-metallic to begin with.
+- [ ] **Does njsPC's shared-equipment model fit this plumbing?**
+      `SystemBoard.ts` has `spillway` and `spadrain` circuit functions gated on
+      `sys.equipment.shared`. If that models a shared pool+spa that spills,
+      "mode" may be njsPC body selection rather than anything we write, and
+      much of `sequences.js` becomes configuration. Test in Phase 2.
+- [ ] **REM latch semantics against the PE24GVA.** `nixie/valves/Valve.ts`
+      drives a valve as `{ isOn, latch: 10000 }`. The PE24GVA is an SPDT
+      selector that must stay energised to hold position B, and takes 45 sec
+      to travel. If `latch` means "de-energise after 10 s" the valve returns
+      to position A on its own, which would be silently wrong. Confirm what
+      REM does with `latch` before wiring an actuator.
+- [ ] **Does `manualPriorityActive` survive a schedule boundary?** ADR-11
+      depends on it. Set an override, let a schedule window roll over it,
+      watch the pump.
 - [ ] **Water temperature source.** The BOM has no water temp sensor, and the
       3-wire heater interface reports nothing. Target cutoffs and the preheat
       estimate both need a trusted reading — from the pump bus, a REM probe,
