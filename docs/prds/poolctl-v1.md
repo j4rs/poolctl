@@ -1136,10 +1136,12 @@ eyes on bonding.
       with no source. Get it from the Raypak spec sheet. If it is low
       single-digit psi, that half of ADR-5 falls away.
 - [~] **Spa volume — estimated ~340 gal, was assumed 500.** Round spa, 5 ft
-      diameter, ~3 ft at the footwell (owner, August 2026). At 5 ft the
-      geometry gives 147 gal per foot of *average* depth, and a bench at
-      roughly half the plan area and half the depth puts the average near
-      2.3 ft:
+      diameter, ~3 ft at the footwell, **seats confirmed present** (owner,
+      August 2026). At 5 ft the geometry gives 147 gal per foot of *average*
+      depth. The bench's share of the plan area is the one part still
+      estimated — at roughly half the area and half the depth the average
+      lands near 2.3 ft, and the table shows how little the answer moves
+      across a plausible range:
 
       | Bench share of area | Avg depth | Volume |
       |---|---|---|
