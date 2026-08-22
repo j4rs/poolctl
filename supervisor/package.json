@@ -1,0 +1,19 @@
+{
+  "name": "poolctl-supervisor",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Supervises njsPC with the six interlocks it lacks, and serves the UI",
+  "license": "MIT",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "socket.io-client": "^4.8.1",
+    "ws": "^8.18.0"
+  }
+}

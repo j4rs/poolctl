@@ -194,12 +194,27 @@ No fork required, and njsPC's model stays coherent.
    the compressor has been idle is ours.
 6. **Boot re-drive.**
 
-~~Spa auto-revert~~ — **njsPC covers it.** Every circuit has an `eggTimer`
-(minutes), defaulting to **720**, with `dontStop` as the 1440 sentinel. Setting
-the Spa circuit to 120 gives `SPA_TIMEOUT_MIN` natively, and njsPC's
-`setEndTime` exposes the countdown the UI already renders. Six jobs, not seven
-— and one more line on the commissioning checklist, because the 720 default is
-a twelve-hour spa session if nobody changes it.
+~~Spa auto-revert~~ — **njsPC covers it, verified on the bench.** Every circuit
+has an `eggTimer` in minutes, defaulting to **720**, with `dontStop` as the
+1440 sentinel. Setting the Spa circuit to 120 gives `SPA_TIMEOUT_MIN` natively
+and `endTime` feeds the countdown the UI already renders.
+
+Tested three ways, because this is the safety property the PRD calls "not
+optional":
+
+| Scenario | Result |
+|---|---|
+| Expiry while njsPC is running | fired at 60 s on a 1 min timer |
+| njsPC restarted mid-timer | re-armed and fired at 193 s on a 3 min timer |
+| njsPC down *across* the expiry | caught up and switched off on restart |
+
+**One unexplained observation, recorded rather than buried:** earlier in the
+same session a Spa circuit was found `isOn` with an `endTime` nearly four hours
+past. It could not be reproduced by any of the three tests above and was most
+likely an artifact of repeatedly restarting and reconfiguring njsPC during
+bench work. Since the state was seen once, a cheap supervisor guard is worth
+having anyway — on connect, if a circuit is on with an `endTime` in the past,
+turn it off. That is a few lines, not a seventh job.
 
 Everything else in `sequences.js` is njsPC configuration rather than code —
 which is the answer this re-read was looking for.
