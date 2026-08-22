@@ -1215,58 +1215,43 @@ eyes on bonding.
 - [ ] **Exchanger pressure drop.** ADR-5's energy justification cites 9–11 psi
       with no source. Get it from the Raypak spec sheet. If it is low
       single-digit psi, that half of ADR-5 falls away.
-- [~] **Spa volume — estimated ~340 gal, was assumed 500.** Round spa, 5 ft
-      diameter, ~3 ft at the footwell, **seats confirmed present** (owner,
-      August 2026). At 5 ft the geometry gives 147 gal per foot of *average*
-      depth. The bench's share of the plan area is the one part still
-      estimated — at roughly half the area and half the depth the average
-      lands near 2.3 ft, and the table shows how little the answer moves
-      across a plausible range:
+- [x] **Spa volume — measured, ~458 gal.** Owner's tape, August 2026: **6 ft**
+      diameter, 3 ft at the footwell, 1.5 ft over the seats, seat a 1 ft ring
+      all the way round. That is enough to compute it directly rather than
+      estimate a bench fraction:
 
-      | Bench share of area | Avg depth | Volume |
+      | Region | Geometry | Volume |
       |---|---|---|
-      | 40% | 2.44 ft | 358 gal |
-      | 50% | 2.30 ft | **338 gal** |
-      | 60% | 2.16 ft | 317 gal |
+      | Footwell | r < 2 ft × 3.0 ft | 282 gal |
+      | Seat ring | r 2–3 ft × 1.5 ft | 176 gal |
+      | **Total** | avg depth 2.17 ft | **458 gal** |
 
-      So **~340 gal, about a third less than assumed.** The old 500 gal would
-      have required 3.4 ft of average depth — a 5 ft tub that deep throughout,
-      with no seats.
+      Add perhaps 10–20 gal of plumbing, so effective thermal mass runs a
+      little above the geometric figure.
 
-      **This makes the heating rate an explicit, checkable claim.** At 340 gal
-      the nameplate 140k BTU/hr would give 49 °F/hr with no losses. For the
-      PRD's 20–25 °F/hr to hold, the heater must be delivering **41–51% of
-      nameplate** — heavy, though not implausible once winter air derating and
-      evaporative loss off 100 °F water are counted.
+      **This corroborates the thermal numbers rather than upsetting them.** The
+      old ~500 gal assumption was 9% high — close enough that nothing
+      downstream moves. And 458 gal against the heater's 140,000 BTU/hr
+      nameplate gives 36.6 °F/hr at full output, so the PRD's 20–25 °F/hr
+      implies **55–68% effective output**: a plausible derate for winter air
+      plus evaporative loss off 100 °F water, and a far easier claim to accept
+      than the 41–51% implied by the earlier estimate. Preheat 80→102 °F lands
+      at 53–66 min, inside the stated 45–75.
 
-      `SPA_HEAT_RATE` is deliberately **left at 20** rather than recomputed.
-      Rebuilding it on a geometric volume and an invented derate factor would
-      swap one honest guess for a formula that merely looks rigorous, which is
-      the failure this document has been correcting all week. Twenty is the
-      conservative end, and erring slow means the spa is ready sooner than
-      promised rather than later.
+      `SPA_HEAT_RATE` stays at **20**, the conservative end, so the spa is
+      ready sooner than the app promises rather than later.
 
-      Still open, and the calibration run closes it properly: one heating run
-      against the iChlor probe gives effective thermal mass directly —
-      plumbing, losses and all — and settles both the volume and the rate at
-      once.
+      **Correction.** The previous version of this entry put the spa at ~340 gal
+      and called the 500 gal assumption "about a third less than assumed". That
+      was computed from a provisional 5 ft diameter before anyone had measured;
+      the real 6 ft makes the volume 35% larger, because area scales with the
+      square. Over-correcting a suspect number using another unverified number
+      is the same failure in the opposite direction, and is left recorded here
+      rather than quietly deleted.
 
-      Original method, for reference:
-
-      `gallons ≈ 5.9 × diameter² × average depth` (feet)
-
-      Measure the diameter at the waterline and the depth at the footwell.
-      Seats matter — a perimeter bench typically occupies a third to a half of
-      the plan area at roughly half depth, so the *average* depth is well
-      below the footwell figure. Getting that wrong by 20% is fine; the
-      estimate is order-of-magnitude sensitive, not percent sensitive.
-
-      **Better, once the system runs:** back out the *effective thermal mass*
-      from a real heating run — `BTU delivered = gallons × 8.34 × ΔT` — using
-      the iChlor temperature probe. That is strictly better than geometry
-      because it captures plumbing volume and standing losses too, which is
-      what the preheat estimate actually needs. Geometry now, calibration
-      later.
+      The calibration run still improves on this: one heating run against the
+      iChlor probe gives effective thermal mass directly, plumbing and standing
+      losses included.
 - [ ] **Spa jet rpm.** 2800 is a guess. Tune empirically once speed is
       settable from a phone.
 - [ ] **Contactor inrush VA.** Still unread — the Eaton datasheet did not

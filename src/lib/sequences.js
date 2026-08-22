@@ -26,14 +26,14 @@
  * is binary, so a heat call with the bypass around means zero flow through
  * the exchanger. The interlock is load-bearing in both directions.
  *
- * Valve moves are strictly sequential and happen at VALVE_RPM — low flow,
- * not full speed and not zero. At full speed you get water hammer and the
- * actuator fights hydraulic force on the diverter; at zero you buy a pump
- * stop/start and a priming cycle for nothing, since these are three-way
- * diverters and mid-travel both ports are partially open. So the pump must be
- * held low across the whole transition, which is a stronger requirement than
- * "don't divert at full flow" — see the open question about what njsPC's own
- * body switch does to the pump.
+ * Valve moves are strictly sequential and happen at ZERO flow. Settled
+ * against the IntelliFlo manual: with priming enabled the pump ramps to
+ * 1800 RPM for 3 sec on every restart and ignores automation commands while
+ * it does, so a 1000 rpm floor across a restart is unenforceable by anyone.
+ * With priming disabled at the pump (a commissioning step), njsPC's
+ * stop-move-start costs only ramp time, and zero flow is gentler on the
+ * actuator than turning against hydraulic load. `VALVE_RPM` therefore applies
+ * only to moves that involve no pump restart.
  */
 
 /** Flow thresholds. Placeholders. Measure on the real system and correct. */
@@ -65,9 +65,9 @@ export const TARGET_MIN = { pool: 70, spa: 80 };
 /**
  * Spa heating rate, °F/hr. The conservative end of the PRD's 20–25 range.
  *
- * Deliberately NOT derived from volume. The spa is now estimated at ~340 gal
- * (5 ft diameter, ~2.3 ft average depth), where nameplate 140k BTU/hr would
- * give 49 °F/hr before losses — so 20 implies the heater delivers ~41% of
+ * Deliberately NOT derived from volume. The spa is now *measured* at ~458 gal
+ * (6 ft diameter, 2.17 ft average depth), where nameplate 140k BTU/hr would
+ * give 36.6 °F/hr before losses — so 20 implies the heater delivers ~55% of
  * nameplate. That is plausible for winter air plus evaporative loss, but
  * computing the rate from a geometric volume and a guessed derate factor
  * would look rigorous while resting on two assumptions instead of one.
