@@ -157,8 +157,10 @@ hardware, highest value first:
 3. **Commissioning checklist.** Several settings must be changed on the
    equipment itself, not in software, and forgetting one is a silent fault:
    disable priming at the pump keypad, leave Thermal Mode enabled, set
-   `valveDelayTime` above real valve travel, and size the transformer at
-   100 VA.
+   `valveDelayTime` above real valve travel, size the transformer at 100 VA,
+   set the Spa circuit `eggTimer` to 120 (njsPC defaults to 720 — a
+   twelve-hour spa session), and configure njsPC's valves with **no device
+   binding** so the supervisor drives the relays instead of REM's latch.
 
 Blocked on the relay HAT: bus sniffing, the salt question (case 18), real
 `HEATER_MIN_RPM` / `CELL_MIN_RPM`, and thermals with the enclosure sealed.

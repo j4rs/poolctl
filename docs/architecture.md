@@ -183,7 +183,7 @@ No fork required, and njsPC's model stays coherent.
 | `pump-min` | **supervisor** | The heat-conditional pump floor |
 | `boot` re-drive | **supervisor** | njsPC has no unconditional-resync concept |
 
-### What survives as the supervisor
+### What survives as the supervisor (six jobs)
 
 1. **Drive the three valve relays** — travel timing, one at a time, no latch,
    honouring `ACTUATOR_COOLDOWN_MIN`. njsPC's valves are left unbound.
@@ -192,9 +192,14 @@ No fork required, and njsPC's model stays coherent.
 4. **Targets as cutoffs** — end a heat call early; never raise the heater cap.
 5. **Conditional purge** — njsPC's cooldown is unconditional; skipping it when
    the compressor has been idle is ours.
-6. **Spa auto-revert** — check whether njsPC's circuit `eggTimer` covers this
-   before building it.
-7. **Boot re-drive.**
+6. **Boot re-drive.**
+
+~~Spa auto-revert~~ — **njsPC covers it.** Every circuit has an `eggTimer`
+(minutes), defaulting to **720**, with `dontStop` as the 1440 sentinel. Setting
+the Spa circuit to 120 gives `SPA_TIMEOUT_MIN` natively, and njsPC's
+`setEndTime` exposes the countdown the UI already renders. Six jobs, not seven
+— and one more line on the commissioning checklist, because the 720 default is
+a twelve-hour spa session if nobody changes it.
 
 Everything else in `sequences.js` is njsPC configuration rather than code —
 which is the answer this re-read was looking for.
