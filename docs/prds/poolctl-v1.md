@@ -254,8 +254,23 @@ filtration hour. Bypassing in summer is real energy savings on a VSF.
 > decision does not necessarily reverse. But the energy argument should not be
 > repeated until the Raypak spec sheet confirms it.
 >
-> Found the same way as the fabricated pool-heating figure: by asking where a
-> number came from and finding no answer.
+> Found the same way as the pool-heating figure: by asking where a number came
+> from and finding no answer. (That one turned out to have a source after all —
+> Raypak's manual. This one still does not.)
+
+> **⚠ And a second caution, from the Raypak manual's Summer Shutdown section:**
+> *"Leave the valves set the way they are unless additional circulation is
+> required. **DO NOT stop all flow through the heat pump pool heater.**"*
+>
+> That is written about seasonal shutdown, not daily operation, and the concern
+> is presumably stagnant water in the exchanger rather than damage from
+> bypassing per se — the exchanger is titanium. But ADR-9's policy parks the
+> bypass *around* the heater for the whole of pool mode, which is most of the
+> time, and that is closer to "stopping all flow" than the manual seems to
+> contemplate. Worth a question to Raypak before commissioning, because the
+> answer could reasonably flip ADR-9 to resting in *flow* — which would also
+> make the de-energised state and the resting state the same, and take relay 3
+> off duty entirely.
 
 **Because the bypass is binary — full flow or full bypass, not a partial
 split — a heater call with the valve in bypass means zero flow through the
@@ -861,7 +876,15 @@ five, almost all of it valve travel.
 
 ### Heater behaviour to model, not alert on
 
-- Anti-short-cycle delay ~5 min after any shutdown.
+*All confirmed against the Raypak Installation & Operation manual, August 2026,
+unless noted.*
+
+- Anti-short-cycle delay after any shutdown. **The manual gives two figures:**
+  the Delay Timer description says *"approximately 5 minutes"*, while the
+  Compressor Delay Active lamp is described as *"the fan will run but the
+  compressor will be OFF for 6 to 8 minutes"*. `PURGE_SKIP_AFTER_MIN` is 5,
+  which is the optimistic reading — 8 would be the safe one. Time it on the
+  real unit before trusting the short path.
 - Defrost cutoff at ~42–48 °F ambient: compressor stops, fan continues.
   Happens a handful of nights per year locally. Normal, not a fault.
 - `FLo` / `FL3` fault codes indicate low flow.
@@ -874,17 +897,23 @@ five, almost all of it valve travel.
 - Spa preheat from ~80 °F to 102 °F: **45–75 minutes**.
 - A 115 CFM blower moving ambient air through 100 °F water takes back most
   of the heater's output. Blower + heater is roughly break-even.
-- Pool heating is slow — **order of days, not hours** — and most efficient
-  during warm daylight hours. Model it as a target temperature with a
-  maintenance schedule, not a button.
+- Pool heating is slow — **about 4 days from cold, up to a week in cold
+  weather** — and most efficient during warm daylight hours. Model it as a
+  target temperature with a maintenance schedule, not a button. Raypak also
+  gives the steady-state figure: once at temperature, **8–10 hours per day**
+  of operation maintains it.
 
-  An earlier draft said "~4 days typical from cold". **That figure was
-  invented.** It had no source and should never have been written down. The
-  qualitative claim survives on physics — a 140k BTU heat pump against a
-  pool-sized volume raises temperature roughly an order of magnitude slower
-  than it does the spa, and overnight losses eat into each day's gain — but
-  the design consequence rests on "slow", not on any particular number. Pool
-  volume has never been measured either, so nobody can currently compute it.
+  *Source, and a correction.* This was struck from the document as fabricated,
+  on the basis that nobody could say where it came from. It turns out to be
+  Raypak's own: the Installation & Operation manual, Troubleshooting, p.14 —
+  *"During initial pool heating in cold weather, it may require a week to
+  elevate the water temperature to a comfortable level. Normally, it takes
+  about 4 days."* Restored with its citation.
+
+  The lesson cuts the other way from the one recorded below. "Where did this
+  number come from" is the right question, but *absence of a remembered source
+  is not evidence of fabrication* — the manual had it all along, and ten
+  minutes of reading would have found it before anything was deleted.
 
 ### Pump
 
@@ -1213,8 +1242,12 @@ eyes on bonding.
       before winter pool-heating can be modelled as anything more precise
       than "slow".
 - [ ] **Exchanger pressure drop.** ADR-5's energy justification cites 9–11 psi
-      with no source. Get it from the Raypak spec sheet. If it is low
-      single-digit psi, that half of ADR-5 falls away.
+      with no source. **Checked the Raypak Installation & Operation manual —
+      it is not there.** The manual gives min/max flow (30/60 GPM from the
+      spec page) and a 5 psi minimum pressure switch, but no pressure-drop
+      table or curve. Next: the model-specific submittal/spec sheet from
+      Raypak's document library, or their technical support. If it comes back
+      low single-digit psi, that half of ADR-5 falls away.
 - [x] **Spa volume — measured, ~458 gal.** Owner's tape, August 2026: **6 ft**
       diameter, 3 ft at the footwell, 1.5 ft over the seats, seat a 1 ft ring
       all the way round. That is enough to compute it directly rather than
@@ -1304,7 +1337,7 @@ treated as fiction until it can.
 | ADR-9 — pool heat costs "one 45 sec valve move" | 45 sec travel | How expensive engaging pool heat feels |
 | PR-4 — blower and heater "roughly cancel" | 115 CFM, 20–25 °F/hr | The estimate copy, and whether the advice is right |
 | Spa preheat 45–75 min | 20–25 °F/hr, ~500 gal | Every preheat estimate, and scheduled preheat later |
-| ~~Pool heating ~4 days from cold~~ | **nothing — invented** | Removed. The qualitative "order of days" survives on physics |
+| Pool heating ~4 days from cold | **Raypak I&O manual p.14** | Restored — was wrongly struck as invented before the manual was read |
 | ADR-5(b) — exchanger drop "9–11 psi, 20+ ft head" | **no source, and looks high** | The energy case for automating the bypass. ADR-5(a) is independent and holds |
 | Watts and dollars shown in the UI | `WATTS_MAX = 2400` | Every cost figure — though njsPC replaces it with real telemetry |
 
