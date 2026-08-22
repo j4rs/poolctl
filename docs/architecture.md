@@ -216,14 +216,32 @@ devDependencies, no source tree to keep in sync.
 |---|---|---|
 | React app | laptop — `npm run build` | copy `dist/` (≈62 KB gzipped) |
 | supervisor | laptop | copy the runnable output |
-| njsPC | **on the Pi** | `npm install` there — unavoidable |
+| njsPC | **on the Pi** | `npm install` there — stay on the upstream path |
 | REM | **on the Pi** | same |
 
-The exception is not negotiable and is worth understanding. njsPC depends on
-`serialport`, which pulls `@serialport/bindings-cpp` — a **native** module
-whose binaries are platform-specific. A `node_modules` built on macOS is
-`darwin-arm64` and will not run on the Pi. REM's I2C libraries are the same.
-So those two install and build on the Pi; everything we write does not.
+**Why the split, since it is not what it first looks like.** The obvious
+reason — that njsPC's native modules force a build on the Pi — is wrong.
+`serialport` ships a `linux-arm64` prebuild, so `npm install` downloads a
+binary rather than compiling one, and njsPC's `dist/app.js` is plain
+platform-independent JavaScript that could perfectly well be built on the
+laptop. Its devDeps (`typescript`, `eslint`, `grunt`, `vitest`) are not
+technically required on the Pi at all.
+
+The real reason is that njsPC is a third-party project we do not control.
+Following its documented install path exactly — `git clone && npm install &&
+npm start` — is worth more than the ~80 MB it would save, because when it
+misbehaves you want to be on the path its maintainer assumes. Hand-building
+its `dist/` elsewhere adds a step nobody must ever forget and a stale-artifact
+failure that presents as a bug.
+
+Our code is the opposite case: 42 MB of Vite and React devDeps on the Pi buys
+nothing for a 62 KB output, and the build is entirely ours to define. So the
+rule is the same one — avoid dependencies that are not needed — applied to two
+situations where "needed" resolves differently.
+
+SD wear does not decide this either way: an occasional build is trivial next to
+what journald was doing before it moved to RAM, on a 128 GB card with 111 GB
+free.
 
 **One design constraint falls out of this:** the supervisor must be runnable
 without a build step on the Pi. Plain JavaScript, or TypeScript compiled on the
