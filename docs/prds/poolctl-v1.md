@@ -258,29 +258,6 @@ filtration hour. Bypassing in summer is real energy savings on a VSF.
 > from and finding no answer. (That one turned out to have a source after all —
 > Raypak's manual. This one still does not.)
 
-> **⚠ And a second caution, from the Raypak manual's Summer Shutdown section:**
-> *"Leave the valves set the way they are unless additional circulation is
-> required. **DO NOT stop all flow through the heat pump pool heater.**"*
->
-> That is written about seasonal shutdown, not daily operation, and the concern
-> is presumably stagnant water in the exchanger rather than damage from
-> bypassing per se — the exchanger is titanium. But ADR-9's policy parks the
-> bypass *around* the heater for the whole of pool mode, which is most of the
-> time, and that is closer to "stopping all flow" than the manual seems to
-> contemplate. Worth a question to Raypak before commissioning, because the
-> answer could reasonably flip ADR-9 to resting in *flow* — which would also
-> make the de-energised state and the resting state the same, and take relay 3
-> off duty entirely.
-
-**Because the bypass is binary — full flow or full bypass, not a partial
-split — a heater call with the valve in bypass means zero flow through the
-exchanger.** The interlock is therefore load-bearing in both directions:
-
-- Heater contacts stay open unless bypass is confirmed in flow position.
-- Bypass does not move until the heater is off and any purge has elapsed.
-
-The heater's water pressure switch is a backstop, not the primary control.
-
 ### ADR-6 — Chlorinator: Path A, salt reading treated as expendable
 
 **Resolved August 2026.** Owner's call: *"I can live without the salt."* Path B
