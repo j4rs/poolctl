@@ -150,11 +150,14 @@ hardware, highest value first:
 1. **Re-read `sequences.js` against njsPC's body/circuit model.** Some steps
    are probably njsPC configuration rather than code; what survives that pass
    is the supervisor's real scope.
-2. **Re-read `sequences.js` against njsPC's body/circuit model.** Some steps
-   are probably njsPC configuration rather than code; what survives that pass
-   is the supervisor's real scope.
-3. **Real connection state.** `connected` is hardcoded `true` and nothing ever
-   clears it, so the LIVE indicator is decorative.
+2. **Build the supervisor** — the six interlocks njsPC lacks (ADR-10). Now
+   unblocked: the transition-ownership question is settled (zero flow, priming
+   disabled at the pump), so its scope is no longer in doubt.
+3. **Commissioning checklist.** Several settings must be changed on the
+   equipment itself, not in software, and forgetting one is a silent fault:
+   disable priming at the pump keypad, decide on Thermal Mode, set
+   `valveDelayTime` above real valve travel, and size the transformer at
+   100 VA.
 
 Blocked on the relay HAT: bus sniffing, the salt question (case 18), real
 `HEATER_MIN_RPM` / `CELL_MIN_RPM`, and thermals with the enclosure sealed.
