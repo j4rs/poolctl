@@ -112,9 +112,10 @@ pump itself, not just in automation); a restart then costs only ramp time, and
 njsPC's stop-move-start is both cheap and gentler on the actuator than turning
 under load. `VALVE_RPM` survives only for moves with no pump restart.
 
-**Thermal Mode is on by default** and starts the pump at 1000 RPM at 40 °F,
-outside njsPC's control. Not a fault — a legitimate cause of unexplained pump
-activity on a cold night.
+**Thermal Mode stays enabled.** It starts the pump at 1000 RPM at 40 °F to
+protect the drive — not the pool, and not related to anyone using it. So an
+uncommanded pump start is expected a few nights a year: never treat "pump
+running, nobody asked" as a fault.
 
 ---
 
@@ -155,7 +156,7 @@ hardware, highest value first:
    disabled at the pump), so its scope is no longer in doubt.
 3. **Commissioning checklist.** Several settings must be changed on the
    equipment itself, not in software, and forgetting one is a silent fault:
-   disable priming at the pump keypad, decide on Thermal Mode, set
+   disable priming at the pump keypad, leave Thermal Mode enabled, set
    `valveDelayTime` above real valve travel, and size the transformer at
    100 VA.
 

@@ -1175,13 +1175,20 @@ eyes on bonding.
       **Do this at commissioning.** The cost is that genuine air — after filter
       service — needs a manual prime instead of a self-heal.
 
-- [ ] **Thermal Mode.** Also enabled by default, and also outside njsPC's
-      control: at **40 °F** the pump starts itself at **1000 RPM** to protect
-      the drive. Florida winter nights reach the 40s, and the PRD already
-      notes heater defrost at 42–48 °F. A pump that starts on its own moves
-      water through whatever valve positions happen to be set. Decide whether
-      to leave it enabled — and if so, record it as a legitimate cause of
-      unexplained pump activity rather than a fault.
+- [x] **Thermal Mode.** *Decided: leave it enabled.* It is on by default and
+      starts the pump at **1000 RPM at 40 °F**, outside njsPC's control. It is
+      not a comfort feature and has nothing to do with whether anyone is using
+      the pool — the sensor is in the drive on top of the motor and the manual
+      is explicit that it *"is for protection of the pump. Do not depend on
+      the Thermal Mode feature for freeze protection of the pool."* Disabling
+      it to keep the state model tidy would trade a pump for neatness.
+
+      **The consequence the software must absorb:** on a handful of winter
+      nights the pump starts with nothing having commanded it. Harmless in
+      itself — pool mode already has the valves settled and the bypass around
+      the heater — but any "pump running unexpectedly" check must treat this
+      as normal, or it will cry wolf every cold snap. Pool freeze protection
+      is a separate concern and is deliberately out of scope for v1.
 
 - [ ] **Valve travel time.** Bounded **under 60 sec** by the manual's 1-minute
       duty cycle, but not stated exactly. `sequences.js` assumes 45 sec per move
