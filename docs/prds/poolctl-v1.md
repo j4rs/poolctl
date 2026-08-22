@@ -534,14 +534,18 @@ pool and spa that spills, which is this site's topology.
 
 **Consequences:**
 
-- **Open, and it decides the supervisor's size:** njsPC stops the pump for a
-  body switch (bench-verified — see the open questions). The owner's rule is
-  that valves move at `VALVE_RPM`, low flow, and njsPC cannot express that:
-  it offers zero flow with `pumpDelay` on, or full flow with it off. Either
-  the supervisor takes the wheel for the whole transition — hold 1000 rpm,
-  one valve at a time, hand back — or the low-flow requirement gives way to
-  njsPC's zero-flow behaviour, which is gentler on the actuator but costs a
-  pump stop/start and a priming cycle each time. Decide before building.
+- **Resolved, and it keeps the supervisor small.** njsPC stops the pump for a
+  body switch (bench-verified), which conflicts with the owner's `VALVE_RPM`
+  rule. The priming spec settles it: with priming enabled the pump runs
+  1800 RPM for three seconds on every restart *and ignores automation
+  commands while it does*, so low flow through a restart is not achievable by
+  anyone — not njsPC, not a supervisor. With priming disabled at the pump
+  (Pentair's documented procedure), a restart costs only ramp time, which
+  makes njsPC's zero-flow behaviour cheap and gentler on the actuator than
+  moving under load. **So: accept zero flow during valve travel, disable
+  priming at commissioning, and the supervisor does not need to own the
+  transition.** The `VALVE_RPM` constant survives only for moves the
+  supervisor makes without a pump restart.
 - The supervisor is otherwise far smaller than the first draft assumed — six
   rules, not a whole state machine.
 - **njsPC in Nixie mode is not passive and cannot be made passive.**
@@ -1139,6 +1143,45 @@ eyes on bonding.
       - Either way this is a decision, not a detail: it is the difference
         between a supervisor that watches njsPC and one that takes the wheel
         for two minutes per transition.
+
+- [x] **IntelliFlo priming across a pump restart.** *Answered from the
+      IntelliFlo VSF Installation and User's Guide, pp. 17–19.* Defaults:
+
+      | Setting | Default |
+      |---|---|
+      | Priming | **Enabled** |
+      | Startup check | ramp to **1800 RPM, pause 3 sec** |
+      | Priming Speed (if prime not detected) | **3450 RPM** |
+      | Priming Delay | **20 seconds** |
+      | Max Priming Duration | **11 minutes** |
+      | Loss of Prime | Enabled — 1 min pause, then re-prime |
+
+      The 3-second check runs on *every* start; the 3450 RPM cycle only when
+      prime is not detected, which is why it looks intermittent.
+
+      **The decisive line, p.19:** *"the priming feature on the pump cannot be
+      disabled by the external automation control system only. It must also be
+      disabled on the pump itself"*, because *"if priming is enabled on start
+      up, the pump responds to its internal settings **before** responding to
+      commands from an automation control system."*
+
+      So across any pump restart the pump runs 1800 RPM for three seconds
+      regardless of what njsPC commands — **above `VALVE_RPM` (1000)**. With
+      priming enabled the low-flow rule is unenforceable through a restart,
+      whoever owns the choreography.
+
+      Pentair documents the fix (p.19): disable priming on the automation
+      system, disconnect RS-485, disable priming at the pump keypad, reconnect.
+      **Do this at commissioning.** The cost is that genuine air — after filter
+      service — needs a manual prime instead of a self-heal.
+
+- [ ] **Thermal Mode.** Also enabled by default, and also outside njsPC's
+      control: at **40 °F** the pump starts itself at **1000 RPM** to protect
+      the drive. Florida winter nights reach the 40s, and the PRD already
+      notes heater defrost at 42–48 °F. A pump that starts on its own moves
+      water through whatever valve positions happen to be set. Decide whether
+      to leave it enabled — and if so, record it as a legitimate cause of
+      unexplained pump activity rather than a fault.
 
 - [ ] **Valve travel time.** Bounded **under 60 sec** by the manual's 1-minute
       duty cycle, but not stated exactly. `sequences.js` assumes 45 sec per move

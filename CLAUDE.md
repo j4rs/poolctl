@@ -103,10 +103,18 @@ leaves a dead-reckoned valve at an unknown angle with no feedback to recover
 from. (That argument assumes 45 sec travel, which is unmeasured — revisit if
 it turns out to be much shorter.)
 
-**Valves move at low flow, one at a time.** `VALVE_RPM` is 1000: not full
-speed (water hammer, actuator stall) and not zero (a pointless pump stop/start
-and priming cycle). The pump is held low across the *whole* transition, which
-njsPC may not be able to express — open question.
+**Valves move at zero flow, one at a time.** Settled against the IntelliFlo
+manual: with priming enabled the pump runs 1800 RPM for 3 sec on every restart
+and *ignores automation commands while priming*, so a 1000 rpm floor through a
+restart is unenforceable by anyone. Disable priming at the pump during
+commissioning (Pentair documents the procedure — it must be disabled on the
+pump itself, not just in automation); a restart then costs only ramp time, and
+njsPC's stop-move-start is both cheap and gentler on the actuator than turning
+under load. `VALVE_RPM` survives only for moves with no pump restart.
+
+**Thermal Mode is on by default** and starts the pump at 1000 RPM at 40 °F,
+outside njsPC's control. Not a fault — a legitimate cause of unexplained pump
+activity on a cold night.
 
 ---
 
@@ -139,12 +147,9 @@ is just something to respond to, which is why there is no state to sync.
 Full lists in PRD §10 (open questions) and §11 (backlog). Available without
 hardware, highest value first:
 
-1. **Decide who drives the pump through a transition.** Bench-verified:
-   njsPC *stops* the pump for a body switch (`pumpOnDelay` forces commanded
-   speed to 0), and turning the delay off gives full flow during valve travel
-   instead. The owner's `VALVE_RPM` = 1000 rule is not expressible in njsPC.
-   So either the supervisor owns the whole transition, or the low-flow rule
-   yields to zero flow. This sets how big the supervisor is — decide first.
+1. **Re-read `sequences.js` against njsPC's body/circuit model.** Some steps
+   are probably njsPC configuration rather than code; what survives that pass
+   is the supervisor's real scope.
 2. **Re-read `sequences.js` against njsPC's body/circuit model.** Some steps
    are probably njsPC configuration rather than code; what survives that pass
    is the supervisor's real scope.
