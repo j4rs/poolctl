@@ -1260,12 +1260,17 @@ prototype's invented schedule data. Everything below is a statement in this
 document that depends on a number nobody has measured, and should not be
 cited as fact until the corresponding open question above is closed.
 
-Two of them turned out to be worse than unmeasured — they were **invented**,
-with no source at all: "pool heating ~4 days from cold", now removed, and
-ADR-5's "9–11 psi" exchanger drop, since withdrawn — the decision it appeared
-to support turned out to rest on an owner preference instead, so the number was
-never needed. Both were found by the same simple test: ask where the number
-came from. Any figure in this document that cannot answer that should be
+Two were challenged for having no source, and they ended differently, which is
+the more useful lesson. **"Pool heating ~4 days from cold"** was struck as
+invented — then found verbatim in Raypak's manual, and restored. **ADR-5's
+"9–11 psi"** genuinely had no source, and was withdrawn rather than chased,
+because the decision it appeared to support turned out to rest on an owner
+preference that needs no figure at all.
+
+So the test — ask where the number came from — is right, but it has two
+failure modes, not one. A number with no *remembered* source may still have a
+real one, and deleting on suspicion destroys facts. A number nobody relies on
+does not need investigating at all. Any figure in this document that cannot answer that should be
 treated as fiction until it can.
 
 | Claim | Rests on | Would change if wrong |
@@ -1275,7 +1280,7 @@ treated as fiction until it can.
 | Conditional purge — "two minutes instead of five" | 45 sec travel + 3 min purge | The payoff that justifies the skip logic |
 | ADR-9 — pool heat costs "one 45 sec valve move" | 45 sec travel | How expensive engaging pool heat feels |
 | PR-4 — blower and heater "roughly cancel" | 115 CFM, 20–25 °F/hr | The estimate copy, and whether the advice is right |
-| Spa preheat 45–75 min | 20–25 °F/hr, ~500 gal | Every preheat estimate, and scheduled preheat later |
+| Spa preheat 45–75 min | 20–25 °F/hr; volume now **measured** at 458 gal | Every preheat estimate, and scheduled preheat later |
 | Pool heating ~4 days from cold | **Raypak I&O manual p.14** | Restored — was wrongly struck as invented before the manual was read |
 | ~~ADR-5(b) — exchanger drop "9–11 psi"~~ | **no source** | Withdrawn. ADR-5 now rests on the owner's stated preference, which needs no figure |
 | Watts and dollars shown in the UI | `WATTS_MAX = 2400` | Every cost figure — though njsPC replaces it with real telemetry |
