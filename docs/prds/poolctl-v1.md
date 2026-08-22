@@ -235,28 +235,30 @@ migrate thermostat logic into software later.
 
 **Decision:** third actuator on the bypass diverter.
 
-**Rationale:** originally scoped as manual, since a heat pump costs nothing
-when water passes through an idle exchanger. Two reasons changed it:
-(a) the owner wants full remote control, and (b) pressure drop across the
-exchanger is roughly 9–11 psi — 20+ feet of head the pump pays for on every
-filtration hour. Bypassing in summer is real energy savings on a VSF.
+**Rationale (owner, August 2026):** *"I don't want water flowing through the
+heater if I am not using it."* That is the whole reason — a preference about
+the equipment, not a calculation, and it does not need one.
 
-> **⚠ Reason (b) is unsourced and may be wrong.** The 9–11 psi figure has no
-> citation, and it is high for a heat-pump exchanger — published drops for
-> this class are commonly quoted in low single-digit psi at typical flow. If
-> the real figure is 1–2 psi, the head the pump pays is a few feet rather than
-> twenty, the summer saving is marginal, and **reason (b) does not survive**.
->
-> That matters because a great deal was built on it: a third actuator and its
-> relay channel, the whole of ADR-9, two of the seven invariants, and one of
-> the supervisor's six responsibilities. Reason (a) — the owner wants remote
-> control of every valve — is independent and still stands on its own, so the
-> decision does not necessarily reverse. But the energy argument should not be
-> repeated until the Raypak spec sheet confirms it.
->
-> Found the same way as the pool-heating figure: by asking where a number came
-> from and finding no answer. (That one turned out to have a source after all —
-> Raypak's manual. This one still does not.)
+An earlier draft justified this on energy: "pressure drop across the exchanger
+is roughly 9–11 psi, 20+ feet of head". That figure had no source and looked
+high for a heat-pump exchanger. **The argument is withdrawn** — not disproved,
+just never the real reason. Chasing a number to defend a decision already made
+on other grounds is how this document got over-complicated.
+
+**Behaviour, in the owner's words:** pressing Spa or Heat Pool moves the
+actuator to flow; when the heater stops, it moves back. That is exactly what
+the `spa`, `heatEngage`, `heatRelease` and `pool` sequences already do — the
+retraction is the `bypass-around` step, gated behind the purge so hot water
+is not left standing in a dead exchanger.
+
+**Because the bypass is binary — full flow or full bypass, not a partial
+split — a heater call with the valve in bypass means zero flow through the
+exchanger.** The interlock is therefore load-bearing in both directions:
+
+- Heater contacts stay open unless bypass is confirmed in flow position.
+- Bypass does not move until the heater is off and any purge has elapsed.
+
+The heater's water pressure switch is a backstop, not the primary control.
 
 ### ADR-6 — Chlorinator: Path A, salt reading treated as expendable
 
@@ -428,8 +430,8 @@ spare covering any failure.
 pool mode. Calling for pool heat from the app swings it back to flow for the
 duration of the call.
 
-**Rationale:** ADR-5 automated the bypass to recover the 9–11 psi drop across
-the exchanger on every filtration hour. Spa mode always heats, so tying the
+**Rationale:** ADR-5 automates the bypass so water does not pass through an
+idle heater. Spa mode always heats, so tying the
 valve to the mode captures nearly all of that benefit with a single rule.
 Winter pool heating is the one case where pool mode needs flow, and it gets
 an explicit engage/release pair rather than a conditional buried inside the
@@ -1218,50 +1220,9 @@ eyes on bonding.
 - [ ] **Pool volume.** Never measured, and not previously listed. Needed
       before winter pool-heating can be modelled as anything more precise
       than "slow".
-- [ ] **Exchanger pressure drop.** ADR-5's energy justification cites 9–11 psi
-      with no source. **Checked the Raypak Installation & Operation manual —
-      it is not there.** The manual gives min/max flow (30/60 GPM from the
-      spec page) and a 5 psi minimum pressure switch, but no pressure-drop
-      table or curve. Next: the model-specific submittal/spec sheet from
-      Raypak's document library, or their technical support. If it comes back
-      low single-digit psi, that half of ADR-5 falls away.
-- [x] **Spa volume — measured, ~458 gal.** Owner's tape, August 2026: **6 ft**
-      diameter, 3 ft at the footwell, 1.5 ft over the seats, seat a 1 ft ring
-      all the way round. That is enough to compute it directly rather than
-      estimate a bench fraction:
-
-      | Region | Geometry | Volume |
-      |---|---|---|
-      | Footwell | r < 2 ft × 3.0 ft | 282 gal |
-      | Seat ring | r 2–3 ft × 1.5 ft | 176 gal |
-      | **Total** | avg depth 2.17 ft | **458 gal** |
-
-      Add perhaps 10–20 gal of plumbing, so effective thermal mass runs a
-      little above the geometric figure.
-
-      **This corroborates the thermal numbers rather than upsetting them.** The
-      old ~500 gal assumption was 9% high — close enough that nothing
-      downstream moves. And 458 gal against the heater's 140,000 BTU/hr
-      nameplate gives 36.6 °F/hr at full output, so the PRD's 20–25 °F/hr
-      implies **55–68% effective output**: a plausible derate for winter air
-      plus evaporative loss off 100 °F water, and a far easier claim to accept
-      than the 41–51% implied by the earlier estimate. Preheat 80→102 °F lands
-      at 53–66 min, inside the stated 45–75.
-
-      `SPA_HEAT_RATE` stays at **20**, the conservative end, so the spa is
-      ready sooner than the app promises rather than later.
-
-      **Correction.** The previous version of this entry put the spa at ~340 gal
-      and called the 500 gal assumption "about a third less than assumed". That
-      was computed from a provisional 5 ft diameter before anyone had measured;
-      the real 6 ft makes the volume 35% larger, because area scales with the
-      square. Over-correcting a suspect number using another unverified number
-      is the same failure in the opposite direction, and is left recorded here
-      rather than quietly deleted.
-
-      The calibration run still improves on this: one heating run against the
-      iChlor probe gives effective thermal mass directly, plumbing and standing
-      losses included.
+- [x] **Exchanger pressure drop.** *Closed — not decision-bearing.* It existed
+      only to test ADR-5's energy justification, which is withdrawn. Nice to
+      know, never needed.
 - [ ] **Spa jet rpm.** 2800 is a guess. Tune empirically once speed is
       settable from a phone.
 - [ ] **Contactor inrush VA.** Still unread — the Eaton datasheet did not
@@ -1301,8 +1262,9 @@ cited as fact until the corresponding open question above is closed.
 
 Two of them turned out to be worse than unmeasured — they were **invented**,
 with no source at all: "pool heating ~4 days from cold", now removed, and
-ADR-5's "9–11 psi" exchanger drop, now flagged in place because a decision
-rests on it. Both were found by the same simple test: ask where the number
+ADR-5's "9–11 psi" exchanger drop, since withdrawn — the decision it appeared
+to support turned out to rest on an owner preference instead, so the number was
+never needed. Both were found by the same simple test: ask where the number
 came from. Any figure in this document that cannot answer that should be
 treated as fiction until it can.
 
@@ -1315,7 +1277,7 @@ treated as fiction until it can.
 | PR-4 — blower and heater "roughly cancel" | 115 CFM, 20–25 °F/hr | The estimate copy, and whether the advice is right |
 | Spa preheat 45–75 min | 20–25 °F/hr, ~500 gal | Every preheat estimate, and scheduled preheat later |
 | Pool heating ~4 days from cold | **Raypak I&O manual p.14** | Restored — was wrongly struck as invented before the manual was read |
-| ADR-5(b) — exchanger drop "9–11 psi, 20+ ft head" | **no source, and looks high** | The energy case for automating the bypass. ADR-5(a) is independent and holds |
+| ~~ADR-5(b) — exchanger drop "9–11 psi"~~ | **no source** | Withdrawn. ADR-5 now rests on the owner's stated preference, which needs no figure |
 | Watts and dollars shown in the UI | `WATTS_MAX = 2400` | Every cost figure — though njsPC replaces it with real telemetry |
 
 **Verified, for contrast** — these look like assumptions and are not:
