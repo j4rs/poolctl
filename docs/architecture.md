@@ -145,6 +145,62 @@ A heater with flow and no call is harmless; a call with no flow is not.
 
 ---
 
+## `sequences.js` against njsPC — what the supervisor actually does
+
+Re-read step by step, August 2026. The conclusion is a cleaner split than
+either earlier draft: **njsPC owns the logical model, the supervisor owns the
+three valve relays.**
+
+### The unbinding trick
+
+`nixie/valves/Valve.ts:112` drives a diverting valve as
+`{ isOn: true, latch: 10000 }`, and REM's latch *inverts* the relay when it
+expires. Against an SPDT selector feeding a 3-wire actuator that is simply
+wrong — the valve reverses after 10 sec of a 45 sec travel — and it applies to
+**every** valve njsPC drives, intake and return included, not just the bypass.
+
+But `Valve.ts:107` returns early when `connectionId` or `deviceBinding` is
+empty, recording `isDiverted` without calling REM. So a valve can be
+configured in njsPC **with no hardware binding**: njsPC keeps the logical
+position, which is what its body model, `valveMode` and pump delays all read,
+while the supervisor drives the actual relay through REM with correct timing,
+one valve at a time, and no latch.
+
+No fork required, and njsPC's model stays coherent.
+
+### Step-by-step
+
+| Step | Who | Notes |
+|---|---|---|
+| `heater-off` | **njsPC** | Body switch turns the heater off natively |
+| `purge` | **njsPC** (config) | This is `HeaterCooldownDelay` — it holds the circuit on after the heat call stops, then shuts it. Duration is configurable |
+| `pump-low` | **njsPC** (accepted deviation) | njsPC gives zero flow, not `VALVE_RPM`. Settled by the priming spec — see ADR-10 |
+| `bypass-flow` / `bypass-around` | **supervisor** | njsPC has no bypass concept at all (ADR-9) |
+| `intake-*`, `returns-*` | **split** | njsPC decides *whether* diverted; supervisor drives the relay with travel timing and ordering |
+| `pump-spa`, `pump-pool` | **njsPC** (config) | Pump circuit speeds |
+| `heat-spa`, `heat-pool` | **njsPC**, with a supervisor rule | njsPC owns the heater; targets-as-cutoffs is ours (ADR-4) |
+| `blower-off` | **njsPC** circuit, **supervisor** rule | njsPC can switch it; the "off outside spa mode" gate is ours |
+| `pump-min` | **supervisor** | The heat-conditional pump floor |
+| `boot` re-drive | **supervisor** | njsPC has no unconditional-resync concept |
+
+### What survives as the supervisor
+
+1. **Drive the three valve relays** — travel timing, one at a time, no latch,
+   honouring `ACTUATOR_COOLDOWN_MIN`. njsPC's valves are left unbound.
+2. **Bypass policy** — position follows mode, with the pool-heat override.
+3. **Heat-conditional pump floor** — `HEATER_MIN_RPM` whenever heat is called.
+4. **Targets as cutoffs** — end a heat call early; never raise the heater cap.
+5. **Conditional purge** — njsPC's cooldown is unconditional; skipping it when
+   the compressor has been idle is ours.
+6. **Spa auto-revert** — check whether njsPC's circuit `eggTimer` covers this
+   before building it.
+7. **Boot re-drive.**
+
+Everything else in `sequences.js` is njsPC configuration rather than code —
+which is the answer this re-read was looking for.
+
+---
+
 ## What exists today
 
 Built: the client UI in full — water path, mode transitions, heat targets,
