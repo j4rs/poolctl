@@ -206,6 +206,50 @@ which is the answer this re-read was looking for.
 
 ---
 
+## Deployment
+
+**The Pi runs artifacts. It does not build our code.** Owner's rule, and the
+right one for a sealed box on an endurance SD card: no build toolchain, no
+devDependencies, no source tree to keep in sync.
+
+| Component | Built where | Shipped how |
+|---|---|---|
+| React app | laptop — `npm run build` | copy `dist/` (≈62 KB gzipped) |
+| supervisor | laptop | copy the runnable output |
+| njsPC | **on the Pi** | `npm install` there — unavoidable |
+| REM | **on the Pi** | same |
+
+The exception is not negotiable and is worth understanding. njsPC depends on
+`serialport`, which pulls `@serialport/bindings-cpp` — a **native** module
+whose binaries are platform-specific. A `node_modules` built on macOS is
+`darwin-arm64` and will not run on the Pi. REM's I2C libraries are the same.
+So those two install and build on the Pi; everything we write does not.
+
+**One design constraint falls out of this:** the supervisor must be runnable
+without a build step on the Pi. Plain JavaScript, or TypeScript compiled on the
+laptop and shipped as JS — but never `tsc` at boot on the Pi.
+
+The Pi still needs Node, since it runs all three processes. What it avoids is
+every toolchain above that.
+
+### Serving
+
+The supervisor serves the React app as static files from its own process, on
+the same origin as the WebSocket the app talks to. That follows from ADR-10 —
+the client talks only to the supervisor — and it avoids CORS, a second port,
+and a separate web server to keep alive in a box nobody can reach. It is also
+what a service worker will require if the PWA item is ever picked up.
+
+| Process | Port |
+|---|---|
+| njsPC | 4200 |
+| REM | 8080 |
+| supervisor + UI | 4300 → `http://poolctl.local:4300` |
+
+Deploy is `rsync` over SSH; key auth is already configured.
+
+---
+
 ## What exists today
 
 Built: the client UI in full — water path, mode transitions, heat targets,
