@@ -6,7 +6,7 @@ nodejs-poolController.
 **Status:** the UI runs live against njsPC through the supervisor. Pi 4 is up,
 Lite, thermally characterised. The relay HAT has not arrived, so no equipment
 is connected — njsPC runs on a laptop with no serial port, which is enough to
-have settled most of the design questions. 336 tests; `npm test`.
+have settled most of the design questions. 340 tests; `npm test`.
 
 **This file is the operating manual for working in this repo — nothing more.**
 The full record lives elsewhere and is deliberately not duplicated here:
@@ -87,6 +87,15 @@ form is here so it never gets skipped.
   extend spa, schedule/cancel preheat, and both deletes. Mode changes keep
   `HoldButton` instead — two minutes of uncancellable valve travel earns a
   five-second hold rather than a second tap.
+
+  **`HoldButton` must never cancel on `pointerleave`.** It did, which quietly
+  undid the pointer capture meant to tolerate drift: pressing harder spreads
+  the contact patch and moves the centroid the browser reports, so a firmer
+  thumb slid a pixel past the edge and the hold died. It read as the button
+  being pressure-sensitive. The release is watched on the `window` — letting
+  go anywhere ends the hold, so leaving the button is not an event it cares
+  about. `pointercancel` still ends it: that one means the finger is gone
+  with no `pointerup` coming.
 
   Not guarded, and each for a reason: the **light** (no actuator, no flow, and
   the next tap undoes it), **target steppers** (a cutoff is not a call, the
