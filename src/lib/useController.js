@@ -352,5 +352,8 @@ export function useController() {
   return {
     state, setMode, setRpm, holdPump, releasePump, setTarget, setPoolHeat, toggle,
     extendSpa, schedulePreheat, cancelPreheat, simulateOutage,
+    /* The mock never refuses anything, but App renders the same Toast either
+       way rather than caring which hook it was handed. */
+    problem: null, dismissProblem: () => {},
   };
 }

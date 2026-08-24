@@ -27,6 +27,21 @@ import { useState, useEffect, useRef, useCallback } from "react";
 const HEARTBEAT_MS = 5000;
 const STALE_MS = HEARTBEAT_MS * 3;
 
+/* Human names for intents, so a refusal reads as something the operator did
+   rather than something the code called. */
+const INTENT_LABEL = {
+  setMode: "Change mode",
+  setTarget: "Set target",
+  setRpm: "Set pump speed",
+  setPoolHeat: "Pool heat",
+  toggle: "Switch",
+  holdPump: "Hold pump",
+  releasePump: "Release pump",
+  extendSpa: "Extend spa",
+  schedulePreheat: "Schedule preheat",
+  cancelPreheat: "Cancel preheat",
+};
+
 /** Same origin when served by the supervisor; overridable for `vite dev`. */
 function socketUrl() {
   const override = import.meta.env?.VITE_SUPERVISOR;
@@ -38,6 +53,12 @@ function socketUrl() {
 export function useSupervisor() {
   const [state, setState] = useState(null);
   const [link, setLink] = useState({ up: false, lastMessage: null, error: null });
+
+  /* The last refused intent. Every control here is a request that can be
+     turned down — by an interlock, by a lost link, or because the supervisor
+     has not learned it yet. A refusal that is not shown is indistinguishable
+     from a dead button. */
+  const [problem, setProblem] = useState(null);
 
   const ws = useRef(null);
   const seq = useRef(0);
@@ -136,8 +157,12 @@ export function useSupervisor() {
   const intent = useCallback(
     (name, args) =>
       send(name, args).catch((err) => {
-        setLink((l) => ({ ...l, error: `${name}: ${err.message}` }));
-        throw err;
+        /* The supervisor phrases refusals as "intent 'setPoolHeat' not
+           implemented in v0" — fine in a log, redundant beside a label. */
+        const why = err.message.replace(/^intent '[^']+' /, "");
+        setProblem({ text: `${INTENT_LABEL[name] ?? name} — ${why}`, at: Date.now() });
+        /* Swallowed deliberately: the refusal is now on screen, and rethrowing
+           would make every call site handle something already handled. */
       }),
     [send],
   );
@@ -145,6 +170,8 @@ export function useSupervisor() {
   return {
     state: state ? { ...state, connected, offlineReason: reason } : null,
     linkError: link.error,
+    problem,
+    dismissProblem: () => setProblem(null),
 
     setMode: (mode) => intent("setMode", { mode }),
     setTarget: (body, degrees) => intent("setTarget", { body, degrees }),

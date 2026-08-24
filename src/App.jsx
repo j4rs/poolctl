@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { C, FONT_UI, FONT_DATA, THEMES, readTheme, applyTheme } from "./theme";
 import { useController } from "./lib/useController";
 import { useSupervisor } from "./lib/useSupervisor";
+import Toast from "./components/Toast";
 import PoolSpaControl from "./screens/PoolSpaControl";
 import PumpControl from "./screens/PumpControl";
 import HeatControl from "./screens/HeatControl";
@@ -124,6 +125,7 @@ export default function App() {
   if (pushed === "heat") {
     return (
       <div style={{ background: C.ground, minHeight: "100vh", maxWidth: 460, margin: "0 auto" }}>
+        <Toast problem={controller.problem} onDismiss={controller.dismissProblem} />
         <HeatControl controller={controller} onBack={() => setPushed(null)} />
       </div>
     );
@@ -131,6 +133,7 @@ export default function App() {
 
   return (
     <div style={{ background: C.ground, minHeight: "100vh", maxWidth: 460, margin: "0 auto", paddingBottom: 92 }}>
+      <Toast problem={controller.problem} onDismiss={controller.dismissProblem} />
       <Screen controller={controller} themeControl={themeControl} onOpenHeat={() => setPushed("heat")} />
 
       {/* The mock badge lives inside the nav so it sits on an opaque surface.
