@@ -6,7 +6,7 @@ nodejs-poolController.
 **Status:** the UI runs live against njsPC through the supervisor. Pi 4 is up,
 Lite, thermally characterised. The relay HAT has not arrived, so no equipment
 is connected — njsPC runs on a laptop with no serial port, which is enough to
-have settled most of the design questions. 343 tests; `npm test`.
+have settled most of the design questions. 364 tests; `npm test`.
 
 **This file is the operating manual for working in this repo — nothing more.**
 The full record lives elsewhere and is deliberately not duplicated here:
@@ -46,6 +46,7 @@ supervisor/              runs on the Pi; plain JS, no build step
   index.js               njsPC link, intents, WebSocket, serves dist/
   map.js                 njsPC state -> the shape the UI speaks
   interlocks.js          the rules njsPC lacks — pure, tested
+  commissioning.js       njsPC's own settings, checked against what we believe
   binding.js             program -> njsPC circuit + pump speed — pure, tested
   targets.js             ADR-4 clamping
   store.js               durable preferences (not positions)
@@ -220,7 +221,14 @@ Full lists in PRD §10 (open questions) and §11 (backlog). Available without
 hardware, highest value first:
 
 1. **Commissioning checklist.** Several settings must be changed on the
-   equipment itself, not in software, and forgetting one is a silent fault:
+   equipment itself, not in software, and forgetting one is a silent fault —
+   `supervisor/commissioning.js` now makes some of them audible, comparing
+   what njsPC reports against what this repo believes and surfacing the
+   difference on the Water screen. It checks, it never corrects: njsPC owns
+   these, dashPanel edits them, and a process that quietly reverted a
+   deliberate change would be worse than one that says what it found. Only
+   the Spa egg timer is covered so far; the rest of this list is still on
+   you:
    disable priming at the pump keypad, leave Thermal Mode enabled, set
    `valveDelayTime` above real valve travel, size the transformer at 100 VA,
    set the Spa circuit `eggTimer` to 120 (njsPC defaults to 720 — a

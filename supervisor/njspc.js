@@ -12,10 +12,13 @@ import { io } from "socket.io-client";
  * Refetching is debounced, so a burst of events costs one request.
  */
 export class NjsPC {
-  constructor({ url = "http://localhost:4200", onState, onLink } = {}) {
+  constructor({ url = "http://localhost:4200", onState, onLink, onEvent } = {}) {
     this.url = url;
     this.onState = onState || (() => {});
     this.onLink = onLink || (() => {});
+    /* Raw notification that njsPC changed something. State is refetched
+       regardless; this exists for the things that are not in `/state/all`. */
+    this.onEvent = onEvent || (() => {});
     this.socket = null;
     this._timer = null;
     this._inFlight = false;
@@ -31,7 +34,10 @@ export class NjsPC {
     this.socket.on("connect_error", () => this.onLink(false));
 
     /* Any event at all means something moved; go and read the truth. */
-    this.socket.onAny(() => this.schedule());
+    this.socket.onAny((event) => {
+      this.schedule();
+      this.onEvent(event);
+    });
 
     /* Belt and braces: njsPC can change state on its own timers, and a missed
        socket event would otherwise leave the UI stale indefinitely. */
@@ -116,6 +122,14 @@ export class NjsPC {
    */
   pumpOptions() {
     return this.get("/config/options/pumps");
+  }
+
+  /**
+   * One circuit's configuration. `eggTimer` lives here and not in
+   * `/state/all`, which is why the commissioning check needs its own read.
+   */
+  circuitConfig(id) {
+    return this.get(`/config/circuit/${id}`);
   }
 
   /** Add or update a circuit. `id: 0` asks njsPC to allocate one. */

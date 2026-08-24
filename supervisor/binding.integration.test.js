@@ -113,7 +113,11 @@ function fakeNjspc() {
     const chunks = [];
     for await (const chunk of req) chunks.push(chunk);
     const body = chunks.length ? JSON.parse(Buffer.concat(chunks)) : {};
-    const route = routes[`${req.method} ${path}`];
+    let route = routes[`${req.method} ${path}`];
+    /* `/config/circuit/:id` — where eggTimer lives. It is not in
+       `/state/all`, which is why the commissioning check reads it. */
+    const one = req.method === "GET" && path.match(/^\/config\/circuit\/(\d+)$/);
+    if (one) route = () => circuits.find((c) => c.id === Number(one[1])) ?? {};
     if (!route) {
       res.writeHead(404).end("not found");
       return;
@@ -147,6 +151,10 @@ function fakeNjspc() {
        refetches when it hears. A test that reaches in and edits state has to
        say so, or it is waiting on the 15 s poll and calling that a race. */
     touch: () => io.emit("circuit", {}),
+    setSpaEggTimer: (minutes) => {
+      circuits.find((c) => c.id === 1).eggTimer = minutes;
+      io.emit("circuit", {});
+    },
     fillPump: () => {
       pumpCircuits = Array.from({ length: 8 }, (_, i) => ({ id: i + 1, circuit: 20 + i, speed: 1000 }));
       io.emit("pump", {});
@@ -435,5 +443,49 @@ describe("when binding cannot happen", () => {
     const ack = await client.intent("bindProgram", { id: "skimming" });
     expect(ack.ok).toBe(false);
     expect(ack.error).toMatch(/8/);
+  });
+});
+
+describe("settings njsPC owns", () => {
+  /* A Spa circuit left at `eggTimer: 1` produced a one-minute spa session,
+     and the screen reported the countdown perfectly accurately without ever
+     suggesting the configuration was wrong. Being right about the wrong
+     configuration is not much use at the side of a pool. */
+
+  it("says nothing when njsPC agrees with us", async () => {
+    expect((await now()).commissioning).toEqual([]);
+  });
+
+  it("notices a spa session too short to be one", async () => {
+    njspc.setSpaEggTimer(1);
+    const state = await settles((s) => s.commissioning.length > 0, 10000);
+    expect(state.commissioning[0].id).toBe("spa-egg-tiny");
+    expect(state.commissioning[0].what).toMatch(/Spa sessions end after 1 minute/);
+  });
+
+  it("clears itself once the setting is put right", async () => {
+    /* The direction that matters most. A complaint still on screen after the
+       operator has fixed the thing it names is how a warning system teaches
+       people to ignore it. */
+    njspc.setSpaEggTimer(1);
+    await settles((s) => s.commissioning.length > 0, 10000);
+
+    njspc.setSpaEggTimer(120);
+    const state = await settles((s) => s.commissioning.length === 0, 10000);
+    expect(state.commissioning).toEqual([]);
+  });
+
+  it("notices njsPC's twelve-hour default", async () => {
+    njspc.setSpaEggTimer(720);
+    const state = await settles((s) => s.commissioning.length > 0, 10000);
+    expect(state.commissioning[0].id).toBe("spa-egg-default");
+  });
+
+  it("does not stop the spa being used while it complains", async () => {
+    /* A notice is not a lockout: the spa works with a short egg timer, it
+       just does not last. */
+    njspc.setSpaEggTimer(1);
+    await settles((s) => s.commissioning.length > 0, 10000);
+    expect((await client.intent("setMode", { mode: "spa" })).ok).toBe(true);
   });
 });

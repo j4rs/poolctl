@@ -14,6 +14,7 @@ import {
 import {
   circuitConfig, withPumpCircuit, withoutPumpCircuit, whyNotBindable, pumpLimits,
 } from "./binding.js";
+import { checkCommissioning } from "./commissioning.js";
 
 /**
  * poolctl supervisor — v0.
@@ -40,6 +41,24 @@ const NJSPC_URL = process.env.NJSPC_URL || "http://localhost:4200";
  * missed beats before crying offline — see STALE_MS in useSupervisor.js. Do
  * not lengthen this without lengthening that. */
 const HEARTBEAT_MS = 5000;
+
+/* How often the settings njsPC owns are re-read.
+ *
+ * Not on the state path: these change at commissioning and then effectively
+ * never. But dashPanel can change them at any time, and a notice that
+ * persists after the operator has just fixed the thing it names is worse
+ * than no notice — so it cannot only be checked when the link comes up. */
+const COMMISSIONING_MS = 5 * 60 * 1000;
+
+/* Shortest gap between checks prompted by njsPC saying something changed.
+ *
+ * It is one small GET, so the floor only exists to stop a burst of events
+ * during a transition turning into a burst of requests. Deliberately the
+ * same in both directions: a complaint still on screen after the operator
+ * has fixed the thing it names is how a warning system teaches people to
+ * ignore it, and that is the direction that would suffer from a longer
+ * window. */
+const REVIEW_FLOOR_MS = 3000;
 const STATE_FILE = process.env.STATE_FILE
   || fileURLToPath(new URL("./state.json", import.meta.url));
 const WEB_ROOT = fileURLToPath(new URL("../dist", import.meta.url));
@@ -58,6 +77,9 @@ const own = {
      it describes njsPC's condition a moment ago, not a preference, and a
      stale reason is worse than none. */
   bindErrors: {},
+  /* Settings that live on njsPC and disagree with what we believe. Re-read
+     whenever the link comes up, because dashPanel can change them under us. */
+  commissioning: [],
   panelMode: "auto",
   targets: { pool: 88, spa: 102 },
   poolHeatDemand: false,
@@ -87,9 +109,12 @@ const njs = new NjsPC({
     own.lastSeen = Date.now();
     publish();
   },
+  onEvent: () => reviewCommissioningSoon(),
   onLink: (up, why) => {
     if (own.connected !== up) {
       console.log(up ? "njsPC link up" : `njsPC link down${why ? `: ${why}` : ""}`);
+      /* Only on a transition, not on every failed reconnect. */
+      if (up) reviewCommissioning();
     }
     own.connected = up;
     publish();
@@ -104,6 +129,62 @@ function publish() {
   const msg = JSON.stringify({ type: "state", state: ui });
   for (const client of wss.clients) {
     if (client.readyState === 1) client.send(msg);
+  }
+}
+
+/* ---- commissioning ----------------------------------------------------- */
+
+/**
+ * Compare the settings njsPC owns against what this repo believes, and say
+ * so rather than correcting them.
+ *
+ * Prompted by a spa that reverted after one minute: the egg timer had been
+ * left at a test value, and the UI reported the resulting countdown
+ * perfectly accurately without ever suggesting the configuration was wrong.
+ */
+let lastReview = 0;
+let reviewTimer = null;
+
+/**
+ * Throttled re-check, driven by njsPC saying something changed.
+ *
+ * The five-minute sweep alone is not enough: the operator fixes the setting
+ * in dashPanel, comes back, and the notice naming it is still there. A stale
+ * complaint about something already dealt with is how a warning system
+ * teaches people to ignore it.
+ */
+function reviewCommissioningSoon() {
+  /* Trailing edge, not leading. Dropping an event that arrives inside the
+     window would lose the only notification we get: njsPC speaks once per
+     change, so a setting edited in dashPanel a second after some other event
+     would go unnoticed until the five-minute sweep — including the case that
+     matters most, the operator fixing the thing we are complaining about and
+     watching the complaint stay put. Coalescing instead means a burst costs
+     one check and the last change is never the one that is missed. */
+  if (reviewTimer) return;
+  const wait = Math.max(0, REVIEW_FLOOR_MS - (Date.now() - lastReview));
+  reviewTimer = setTimeout(() => {
+    reviewTimer = null;
+    reviewCommissioning();
+  }, wait);
+  reviewTimer.unref?.();
+}
+
+async function reviewCommissioning() {
+  lastReview = Date.now();
+  try {
+    const spaCircuit = await njs.circuitConfig(SPA_CIRCUIT);
+    const findings = checkCommissioning({ spaCircuit });
+    const changed = JSON.stringify(findings) !== JSON.stringify(own.commissioning);
+    own.commissioning = findings;
+    if (changed) {
+      for (const f of findings) console.warn(`commissioning: ${f.what} — ${f.detail}`);
+      publish();
+    }
+  } catch (err) {
+    /* Not being able to check is not a finding. Reporting "misconfigured"
+       because a request failed would be worse than reporting nothing. */
+    console.warn(`commissioning: could not read njsPC config: ${err.message}`);
   }
 }
 
@@ -473,6 +554,7 @@ njs.start();
    indistinguishable from a dead one over a socket. This makes silence
    meaningful: a client that stops hearing from us really has lost the link. */
 const heartbeat = setInterval(publish, HEARTBEAT_MS);
+const recheck = setInterval(reviewCommissioning, COMMISSIONING_MS);
 
 server.listen(PORT, () => {
   console.log(`supervisor v0 on http://localhost:${PORT}  ->  njsPC at ${NJSPC_URL}`);
@@ -483,6 +565,8 @@ server.listen(PORT, () => {
 for (const sig of ["SIGINT", "SIGTERM"]) {
   process.on(sig, async () => {
     clearInterval(heartbeat);
+    clearInterval(recheck);
+    clearTimeout(reviewTimer);
     njs.stop();
     /* Flush synchronously enough to beat the exit: a debounced write in
        flight would otherwise be lost on every restart. */

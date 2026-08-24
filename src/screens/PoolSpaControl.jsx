@@ -138,6 +138,34 @@ export default function PoolSpaControl({ controller, themeControl, onOpenHeat })
         </div>
       )}
 
+      {/* Settings njsPC owns that disagree with what this app believes.
+          Normally absent. A spa that reverts after one minute is not a bug
+          this code can fix — but it is one it can stop hiding. */}
+      {(state.commissioning ?? []).map((f) => (
+        <div key={f.id} style={{
+          border: `1px solid ${f.severity === "warn" ? C.heat : C.line}`,
+          background: C.surface, borderRadius: 12,
+          padding: "11px 14px", marginBottom: 10,
+        }}>
+          {/* The eyebrow is load-bearing. Without it "Spa sessions end after
+              1 minute" reads as live status — and reading it while sitting
+              in pool mode is baffling. This is a statement about a setting,
+              and it has to say so before it says anything else. */}
+          <div style={{
+            fontFamily: FONT_DATA, fontSize: 9.5, letterSpacing: "0.09em",
+            color: C.faint, marginBottom: 5,
+          }}>
+            NJSPC SETTING
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: f.severity === "warn" ? C.heat : C.stone }}>
+            {f.what}
+          </div>
+          <div style={{ fontSize: 11.5, color: C.muted, marginTop: 3, lineHeight: 1.45 }}>
+            {f.detail}
+          </div>
+        </div>
+      ))}
+
       {/* Hold to switch. A tap commits ~2 min of valve travel that nobody can
           cancel (ABORTABLE is false), so the gesture is made deliberate. */}
       <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>

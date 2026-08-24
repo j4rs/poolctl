@@ -105,6 +105,7 @@ supervisor/                runs on the Pi; plain JS, no build step
   index.js                 njsPC link, intents, WebSocket, serves dist/
   map.js                   njsPC state -> the shape the UI speaks
   interlocks.js            the rules njsPC lacks — pure, tested
+  commissioning.js         njsPC settings checked against what we believe
   binding.js               program -> njsPC circuit + pump speed
   targets.js               ADR-4 clamping
   store.js                 durable preferences

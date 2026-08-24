@@ -140,6 +140,10 @@ export function toUiState(njs, own) {
     /* What the pump will accept, straight from njsPC. Null until a pump is
        configured, which is the honest answer before commissioning. */
     pumpLimits: pumpLimits(njs),
+
+    /* Settings on njsPC that disagree with what this repo believes. Empty is
+       the normal case; anything here is a silent fault made audible. */
+    commissioning: own.commissioning ?? [],
     /* Whether the pump circuit is on at all, distinct from its speed. */
     pumpRunning: Boolean(poolCircuit?.isOn || spaCircuit?.isOn),
     /* njsPC panel mode: 'service' stands the schedules down. */

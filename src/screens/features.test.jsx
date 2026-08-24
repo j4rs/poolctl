@@ -123,6 +123,63 @@ describe("Water — offline", () => {
   });
 });
 
+describe("Water — commissioning findings", () => {
+  /* Settings njsPC owns that disagree with what this app believes. The spa
+     that reverted after a minute was reported perfectly accurately and still
+     looked like a bug in this repo; being right about the wrong
+     configuration is not much use at the side of a pool. */
+
+  it("shows nothing when njsPC agrees with us", () => {
+    const { container } = water(makeController());
+    expect(container.textContent).not.toMatch(/egg timer/i);
+  });
+
+  it("names the setting and what to change it to", () => {
+    const { container } = water(makeController({
+      commissioning: [{
+        id: "spa-egg-tiny", severity: "warn",
+        what: "Spa sessions end after 1 minute",
+        detail: "njsPC will switch back to pool that soon after the spa starts. Set the Spa circuit egg timer to 120.",
+      }],
+    }));
+    expect(container.textContent).toMatch(/Spa sessions end after 1 minute/);
+    expect(container.textContent).toMatch(/Set the Spa circuit egg timer to 120/);
+    /* Labelled as configuration, so it is not read as a live countdown for
+       something nobody started. */
+    expect(container.textContent).toMatch(/NJSPC SETTING/);
+  });
+
+  it("renders it as text, not as a hover", () => {
+    /* PR-3: phone-first, so a reason nobody can hover over is no reason. */
+    const { container } = water(makeController({
+      commissioning: [{ id: "x", severity: "warn", what: "Something", detail: "Do this" }],
+    }));
+    expect(container.querySelector("[title]")).toBeNull();
+    expect(container.textContent).toMatch(/Do this/);
+  });
+
+  it("shows every finding, not just the first", () => {
+    const { container } = water(makeController({
+      commissioning: [
+        { id: "a", severity: "warn", what: "First thing", detail: "one" },
+        { id: "b", severity: "note", what: "Second thing", detail: "two" },
+      ],
+    }));
+    expect(container.textContent).toMatch(/First thing/);
+    expect(container.textContent).toMatch(/Second thing/);
+  });
+
+  it("does not block the mode switch it is warning about", () => {
+    /* A notice is not a lockout. The spa still works with a short egg
+       timer; it just does not last. */
+    const c = makeController({
+      commissioning: [{ id: "x", severity: "warn", what: "Something", detail: "Do this" }],
+    });
+    water(c);
+    expect(screen.getByLabelText("Hold to switch to Spa").disabled).toBe(false);
+  });
+});
+
 describe("Water — spa auto-revert", () => {
   it("shows a countdown and offers an extension", () => {
     const c = makeController({ mode: "spa", spaExpiresAt: Date.now() + 20 * 60000 });
