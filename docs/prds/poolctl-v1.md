@@ -502,7 +502,7 @@ build:
 | `PumpValveDelay` — pump start waits `valveDelayTime` | "never divert against full flow" |
 | `HeaterCooldownDelay(bodyOff, bodyOn)` — switches bodies with a cooldown between | our spa→pool purge step, almost exactly |
 | `HeaterStartupDelay` | anti-short-cycle handling |
-| `ManualPriorityDelay` — *"will override future schedules until expired/cancelled"*, with an `endTime` | `state.pumpHold`, including the `expiresAt` semantics |
+| `ManualPriorityDelay` — *"will override future schedules until expired/cancelled"*, with an `endTime` | ~~`state.pumpHold`~~, now a running program's expiry |
 
 `controller/nixie/` carries `bodies/`, `valves/`, `circuits/`, `schedules/`,
 `heaters/`, `pumps/` and `chemistry/`. `SystemBoard.ts` has `spillway` and
@@ -836,10 +836,15 @@ temperature sensor. Resolve the source before Phase 3 — see open questions.
 
 ### Pump speed under a live heat call
 
-The pump slider clamps at `HEATER_MIN_RPM` whenever a heat call is active,
-with the threshold marker carrying the reason. Spa mode owns the pump.
-Silently dropping the heat call because someone dragged a slider is a worse
-surprise than a slider that will not go lower.
+A heat call floors the pump at `HEATER_MIN_RPM`. Clamp rather than dropping
+the call: silently stopping the heat to honour a speed is the worse surprise,
+and the heater's own flow switch is a backstop rather than the primary
+control.
+
+*Superseded in the UI.* This originally described a live speed slider, which
+has been removed — see the pump-speed open question. The floor now applies to
+whatever speed a program or schedule asks for, and lives in
+`supervisor/interlocks.js` as `floorRpm`.
 
 ### Position tracking
 
@@ -903,14 +908,24 @@ current rpm and energy consumption over RS-485.
 Spa mode owns the pump while active and overrides schedules. A schedule
 dropping the pump to 1400 rpm mid-soak would be a bad surprise.
 
-A speed set by hand is transient and lasts only until the next schedule
-window opens. A **manual hold** pins it instead — open-ended, or on an
-egg-timer. The server owns and persists the hold; a phone cannot be what
-remembers the pump is pinned. Any sequence clears it, since a mode or heat
-change takes the pump. Moving the slider under a hold retunes the hold rather
-than dropping back to schedule control. An open-ended hold pauses filtration,
-so it stays visible until released rather than being forbidden or silently
-expiring.
+**Speed is never set by hand.** It belongs to a schedule (a window plus a
+speed), to a **manual program** (a name, a speed and a required expiry), or to
+spa mode. njsPC has no runtime pump-speed endpoint precisely because this is
+how pool controllers model the pump, and Pentair's own app has no slider for
+the same reason.
+
+A manual program overrides the schedule while it runs, via njsPC's
+`ManualPriorityDelay`, and stops on its own — the expiry is mandatory, since
+njsPC's default egg timer is 720 minutes and a manual run you walk away from
+is what it exists to prevent.
+
+Two coarser controls sit above all of this: **run/stop** for the pump itself,
+and **service mode**, njsPC's panel mode, which stands every schedule down at
+once without disabling them one by one.
+
+*Superseded.* An earlier draft described a transient hand-set speed pinned by
+a "manual hold". Both went with the slider — see the pump-speed open question
+for why the absence of an endpoint was the domain model rather than a gap.
 
 ---
 

@@ -1,7 +1,8 @@
 # poolctl-ui
 
-Controller UI for a DIY pool/spa automation system replacing a Pentair
-IntelliConnect. Runs on mock data — no hardware required.
+Controller UI and supervisor for a DIY pool/spa automation system replacing a
+Pentair IntelliConnect, built on nodejs-poolController. Runs against real
+njsPC, or standalone on mock data with no hardware at all.
 
 > ### ⚠️ Safety
 >
@@ -24,19 +25,42 @@ IntelliConnect. Runs on mock data — no hardware required.
 
 ## Status
 
-UI prototype on mock data. No hardware is connected yet; Phase 1 (Raspberry
-Pi + RS-485 bus sniffing) is in progress. The server-side sequencer that will
-own every interlock does not exist yet.
+The UI runs live against njsPC through the supervisor. The Raspberry Pi is
+up and thermally characterised. **No equipment is connected** — the relay HAT
+has not arrived, so njsPC runs with no serial port and no pump answers on the
+bus. That has still been enough to settle most of the design.
+
+Implemented in the supervisor: mode changes, heat targets with server-side
+clamping, blower and light, pool heat with the bypass interlock, pump
+run/stop, service mode, and manual programs. Not yet: valve relay driving,
+scheduled preheat, and anything needing a water temperature.
 
 ## Run
 
+Standalone, on mock data — no backend needed:
+
 ```bash
-npm install
-npm run dev
+npm install && npm run dev
 ```
 
-Open the printed URL. `--host` is on, so you can also load it on a phone from
-the same network — worth doing, since this is a phone-first UI.
+Against a real njsPC, with the supervisor serving the built app:
+
+```bash
+npm run build && cd supervisor && npm install && npm start
+```
+
+Then open `http://localhost:4300`. `--host` is on in dev, so you can load it
+on a phone from the same network — worth doing, since this is a phone-first UI.
+
+## Tests
+
+```bash
+npm test
+```
+
+Covers the client, the supervisor's pure logic, the njsPC translation layer,
+and every screen rendered against state where nothing is known — which is the
+case real hardware produces and a mock never does.
 
 ## Screens
 
@@ -45,8 +69,10 @@ the same network — worth doing, since this is a phone-first UI.
 - **Heat** — target temperature per body and pool heat on/off. Reached by
   tapping the heater. Targets are cutoffs clamped to the heater's own caps,
   never setpoints — see ADR-4.
-- **Pump** — speed with flow-constraint markers, presets, and schedules with
-  add/edit/delete and real energy cost.
+- **Pump** — run/stop, manual programs (a name, a speed and a required
+  expiry), service mode to stand the schedules down, and schedules with
+  add/edit/delete and real energy cost. No speed slider: njsPC drives the pump
+  from circuits, and an arbitrary rpm has neither a user nor a lifetime.
 - **Bus** — RS-485 frame monitor for Phase 1 sniffing. Decode rate, per-frame
   hex and checksum, and undecoded frames surfaced rather than hidden, since
   those are what decide the chlorinator path (ADR-6).
@@ -55,17 +81,33 @@ the same network — worth doing, since this is a phone-first UI.
 
 ```
 src/
-  theme.js                 design tokens
-  lib/sequences.js         transition spec + invariants — mirrors the server
-  lib/useController.js     mock state — THE ONLY FILE TO SWAP for real data
-  components/              Schematic, Stat, Toggle
-  screens/                 PoolSpaControl, PumpControl
+  theme.js / theme.css     design tokens, light and dark
+  lib/sequences.js         transition spec + invariants — the supervisor mirrors it
+  lib/programs.js          manual pump programs
+  lib/pump.js              rpm/watts/schedule maths
+  lib/rs485.js             Pentair frame decoders — unverified against a real bus
+  lib/useController.js     mock state, for running standalone
+  lib/useSupervisor.js     live transport — same surface as the mock
+  components/              Schematic, Stat, Toggle, TargetTemp, HoldButton,
+                           Sheet, ScheduleEditor, ProgramEditor, PreheatSheet, Toast
+  screens/                 PoolSpaControl, HeatControl, PumpControl, BusMonitor
+supervisor/                runs on the Pi; plain JS, no build step
+  index.js                 njsPC link, intents, WebSocket, serves dist/
+  map.js                   njsPC state -> the shape the UI speaks
+  interlocks.js            the rules njsPC lacks — pure, tested
+  targets.js               ADR-4 clamping
+  store.js                 durable preferences
 docs/architecture.md       system view, state ownership, failure modes
 docs/prds/poolctl-v1.md    full requirements, ADRs, and open questions
 CLAUDE.md                  compressed operating context for agents
 ```
 
+Tests sit beside what they cover as `*.test.js[x]` and never reach `dist/`.
+
 ## Wiring to real hardware
+
+`useSupervisor` already does this; `useController` remains so the app runs
+standalone. The original note follows, and still describes the contract:
 
 Replace `useController` with a hook that subscribes to njsPC over MQTT or its
 WebSocket, maps payloads into the same state shape, and posts intents.

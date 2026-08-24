@@ -6,7 +6,7 @@ nodejs-poolController.
 **Status:** the UI runs live against njsPC through the supervisor. Pi 4 is up,
 Lite, thermally characterised. The relay HAT has not arrived, so no equipment
 is connected — njsPC runs on a laptop with no serial port, which is enough to
-have settled most of the design questions. 133 tests; `npm test`.
+have settled most of the design questions. 158 tests; `npm test`.
 
 **This file is the operating manual for working in this repo — nothing more.**
 The full record lives elsewhere and is deliberately not duplicated here:
@@ -33,17 +33,18 @@ src/
   theme.js               design tokens
   lib/sequences.js       transition spec + invariants — the server mirrors this
   lib/pump.js            rpm/watts/schedule maths
+  lib/programs.js        manual pump programs — name, speed, required expiry
   lib/rs485.js           Pentair frame decoders — unverified against a real bus
   lib/useController.js   mock equipment state — swap this for real transport
   lib/useBus.js          mock RS-485 feed
   lib/useSupervisor.js   live transport — same surface as useController
-  components/            Schematic, Stat, Toggle, TargetTemp, ScheduleEditor,
-                         HoldButton, PreheatSheet, Toast
+  components/            Schematic, Stat, Toggle, TargetTemp, HoldButton, Sheet,
+                         ScheduleEditor, ProgramEditor, PreheatSheet, Toast
   screens/               PoolSpaControl, HeatControl, PumpControl, BusMonitor
 supervisor/              runs on the Pi; plain JS, no build step
   index.js               njsPC link, intents, WebSocket, serves dist/
   map.js                 njsPC state -> the shape the UI speaks
-  interlocks.js          the six rules njsPC lacks — pure, tested
+  interlocks.js          the rules njsPC lacks — pure, tested
   targets.js             ADR-4 clamping
   store.js               durable preferences (not positions)
 ```
@@ -115,6 +116,12 @@ leaves a dead-reckoned valve at an unknown angle with no feedback to recover
 from. (That argument assumes 45 sec travel, which is unmeasured — revisit if
 it turns out to be much shorter.)
 
+**Pump speed is never set by hand.** It belongs to a schedule, a manual
+program (name, speed, required expiry) or spa mode. njsPC has no runtime
+pump-speed endpoint because that is how pool controllers model the pump —
+the absence was the domain model, not a gap. Run/stop and service mode sit
+above all of it.
+
 **Valves move at zero flow, one at a time.** Settled against the IntelliFlo
 manual: with priming enabled the pump runs 1800 RPM for 3 sec on every restart
 and *ignores automation commands while priming*, so a 1000 rpm floor through a
@@ -160,10 +167,12 @@ is just something to respond to, which is why there is no state to sync.
 Full lists in PRD §10 (open questions) and §11 (backlog). Available without
 hardware, highest value first:
 
-1. **Wire the program intents.** `setMode`, `setTarget`, `toggle`,
-   `setPoolHeat` are live. `setPumpRunning`, `setPanelMode` and the program
-   CRUD run against the mock only; `extendSpa` and preheat are unimplemented.
-   Every refusal surfaces in the UI rather than being swallowed.
+1. **Bind programs to njsPC circuits.** Every intent is wired —
+   `setMode`, `setTarget`, `toggle`, `setPoolHeat`, `setPumpRunning`,
+   `setPanelMode` and the program CRUD. But a program's `circuit` is null
+   until commissioning creates one, so running it refuses with that reason.
+   `extendSpa` and preheat remain unimplemented. Every refusal surfaces in
+   the UI rather than being swallowed.
 2. **Integration tests for the socket layer.** The suite covers the client and
    the supervisor's pure logic, not reconnection or the njsPC link — which is
    exactly where the heartbeat bug lived.

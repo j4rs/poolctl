@@ -4,10 +4,11 @@ How the pieces fit, who owns what state, and what happens when each piece
 dies. Companion to `poolctl-v1.md`, which carries the requirements and the
 ADRs; this file is the system view.
 
-> **Status:** revised August 2026 after reading njsPC's source. The earlier
-> draft described a sequencer that owned everything; njsPC turned out to
-> already implement most of it. The supervisor described here does not exist
-> yet. Sections below mark what is real today.
+> **Status:** revised August 2026 after reading njsPC's source, and again as
+> the supervisor was built. The earlier draft described a sequencer that owned
+> everything; njsPC turned out to already implement most of it. **The
+> supervisor now exists** — transport, translation, persistence and the
+> interlocks that need no hardware. What remains unbuilt is marked below.
 
 ---
 
@@ -22,7 +23,7 @@ flowchart TB
   end
 
   subgraph pi["Raspberry Pi 4 — sealed NEMA 4X enclosure"]
-    SEQ["supervisor<br/>heat/pump floor · bypass policy<br/>valve travel · cutoffs · auto-revert<br/>NOT BUILT"]
+    SEQ["supervisor<br/>heat/pump floor · bypass policy · cutoffs<br/>programs · service mode · persistence<br/>valve travel NOT BUILT"]
     NJS["njsPC in Nixie mode (the controller)<br/>bodies · circuits · valves · schedules<br/>delays/lockouts · RS-485 · telemetry"]
     REM["relayEquipmentManager<br/>GPIO / relay driver"]
     WD["hardware watchdog<br/>both processes healthy"]
@@ -64,7 +65,7 @@ flowchart TB
 |---|---|---|
 | **poolctl-ui** | Renders state, sends intents (`setMode('spa')`). Holds no authority. | Built, on mock data |
 | **njsPC (Nixie)** | The controller. Bodies, circuits, valves, pumps, schedules, and the delay/interlock manager in `Lockouts.ts`. RS-485 master, chlorinator telemetry, MQTT/REST/WebSocket. | Not installed |
-| **supervisor** | Only the six interlocks njsPC lacks — heat-conditional pump floor, bypass policy, PE24GVA travel, targets-as-cutoffs, conditional purge, spa auto-revert. The only external writer. | **Not built** |
+| **supervisor** | The interlocks njsPC lacks, plus translation, intents and durable preferences. The only external writer. | Built; valve travel and preheat outstanding |
 | **REM** | GPIO and relay I/O for the HAT. | Not installed |
 | **watchdog** | De-energises every relay unless njsPC and the supervisor are both healthy. | Not built |
 
@@ -94,7 +95,9 @@ wearing a disguise. This is where each piece belongs.
 | sequence progress | supervisor | the step list the UI renders |
 | `valves.*` position | njsPC `ValveState.isDiverted` | boolean only |
 | valve travel timing and ordering | supervisor | 45 s, one at a time; njsPC has no travel model |
-| `pumpHold` | njsPC `ManualPriorityDelay` | already carries an `endTime` — ADR-11 |
+| manual programs | supervisor, becoming njsPC circuits | each is a name, speed and required expiry; `circuit` is null until commissioning |
+| running program | njsPC circuit `eggTimer` | expires itself, so no second copy is kept |
+| panel mode (auto/service) | njsPC | `toggleServiceMode`; stands the schedules down |
 | schedules | njsPC | ADR-11 |
 | `targets.pool/spa` | supervisor | cutoffs clamped to `HEATER_CAP`; njsPC assumes it owns setpoints (ADR-4) |
 | `heaterCall` | njsPC heaters | supervisor enforces the pump floor and bypass around it |
@@ -121,8 +124,10 @@ never read njsPC directly — one source of truth, one shape.
 
 **Rejection path.** An intent that would violate an invariant is refused with
 a reason, and the reason is rendered. The UI already assumes this: the pump
-slider's floor, the blower's gate, and the disabled-with-reason pattern all
-expect the server to explain itself rather than silently clamp.
+blower's gate, the program that has no circuit yet, and the
+disabled-with-reason pattern all expect the server to explain itself. A
+refusal that is not shown is indistinguishable from a dead button, so the
+client surfaces every one.
 
 ---
 
@@ -295,8 +300,12 @@ body and circuit model** — some of its steps are likely njsPC configuration
 rather than code anyone writes. What survives that pass is the supervisor's
 job.
 
-Not built: the supervisor, the transport, and real connection state — the
-client's `connected` flag is hardcoded `true` and nothing ever clears it.
+Built since: the supervisor and its transport, real connection state with a
+heartbeat, durable preferences, the pure interlocks, and 158 tests.
 
-Not installed: njsPC, REM, Node itself. Deliberate — njsPC in Nixie mode wants
-its serial port and relay configuration, which arrive with the HAT.
+Not built: valve relay driving through REM, scheduled preheat, and the
+`extendSpa` intent. All three want hardware or a water temperature.
+
+Not installed **on the Pi**: njsPC, REM, Node. Deliberate — njsPC in Nixie
+mode wants its serial port and relay configuration, which arrive with the HAT.
+It runs on a laptop meanwhile, which has been enough to settle the design.
