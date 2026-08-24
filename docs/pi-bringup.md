@@ -3,10 +3,10 @@
 What has to happen on the box, in order, to go from a flashed card to a
 controller the phones can use.
 
-Written while the Pi is still bare: it has an OS, a hostname and an SSH key,
-and nothing else. Node, njsPC and REM are all uninstalled, deliberately —
-njsPC in Nixie mode wants its serial port and relay configuration, which
-arrive with the HAT.
+Written against a Pi 4 (2 GB, aarch64) running Pi OS Lite on Debian 13
+trixie, bare: an OS, a hostname and an SSH key, and nothing else. Node,
+njsPC and REM are all uninstalled, deliberately — njsPC in Nixie mode wants
+its serial port and relay configuration, which arrive with the HAT.
 
 Two things this file is **not**. It is not the equipment checklist: the
 settings that live on the pump keypad and inside njsPC are in `CLAUDE.md`
@@ -33,16 +33,21 @@ out, throws nothing, and looks perfectly healthy on screen — the filtration
 window simply happens at the wrong time of day. This is the single easiest
 way to make the whole system quietly wrong.
 
-**Check the clock is actually right**, because a Pi has no battery-backed
-RTC and takes its time from the network at boot:
+The timezone may already be right — recent Pi OS images ask during imaging.
+Check rather than assume.
+
+**Then check the clock itself**, because a Pi has no battery-backed RTC:
 
 ```bash
 timedatectl
 ```
 
-`System clock synchronized: yes` and a sensible local time. If the wifi is
-down at boot the Pi starts somewhere in 1970, and egg timers and schedules
-both derive from that clock.
+Want `System clock synchronized: yes` and a sensible local time. Observed on
+this box: seconds after boot it reported a time **two days behind**, restored
+from the last timestamp written to the filesystem, and corrected itself about
+thirty seconds later once NTP answered. Nothing warns you about that window —
+which is why the service unit in section 3 waits for `time-sync.target`
+rather than merely for the network.
 
 **Give it a fixed address.** A DHCP reservation on the router is better than
 static configuration on the Pi — it survives a reflash. The phones need to
@@ -53,14 +58,26 @@ less so elsewhere.
 
 ## 2. Node
 
-Pi OS Bookworm packages Node 18, which is below the supervisor's `>=20`.
-Use NodeSource and match what the test suite runs against:
+Debian 13 (trixie), which current Pi OS images are built on, packages Node
+20. That satisfies the supervisor's `>=20`, so no third-party repository is
+needed:
 
 ```bash
-curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
-sudo apt install -y nodejs
+sudo apt update && sudo apt install -y nodejs npm
 node -v
 ```
+
+Prefer this over NodeSource. It is Debian-maintained, it gets security
+updates with everything else on the box, and it keeps the Pi on the upstream
+path — the same reasoning that puts njsPC and REM here rather than in a
+container.
+
+**The test suite needs Node 22 and the Pi does not.** Vitest's bundler calls
+`styleText` with an array, which is Node 22+, so `npm test` will not run on
+20. That is a development toolchain requirement, not a runtime one: the Pi
+never runs the tests. Verified by running the supervisor itself on 20.12.2 —
+njsPC link, state, schedules, commissioning checks and `passwd.js` all
+behave.
 
 Node is the only runtime dependency this repo adds to the Pi. The supervisor
 is plain JavaScript with no build step, which is why the Pi never needs a
@@ -109,8 +126,15 @@ WebSocket clients explicitly and exits promptly rather than waiting on them.
 # /etc/systemd/system/poolctl.service
 [Unit]
 Description=poolctl supervisor
-After=network-online.target
-Wants=network-online.target
+# time-sync.target is not decoration. A Pi has no battery-backed clock, so
+# it boots with whatever timestamp was last written to the filesystem and
+# corrects itself once NTP answers. Measured on this box: it came up
+# believing it was two days earlier and jumped forward about thirty seconds
+# later. Schedules are minutes past midnight and egg timers are wall-clock
+# deadlines, so a supervisor started inside that window is reasoning about
+# the wrong day.
+After=network-online.target time-sync.target
+Wants=network-online.target time-sync.target
 
 [Service]
 Type=simple
