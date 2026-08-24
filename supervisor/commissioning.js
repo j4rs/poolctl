@@ -29,8 +29,42 @@ export const NJSPC_DEFAULT_EGG_TIMER = 720;
  * `/config/circuit/:id`. Missing entries produce no findings: not knowing is
  * not the same as knowing something is wrong.
  */
-export function checkCommissioning({ spaCircuit, options } = {}) {
-  return [...checkSpaEggTimer(spaCircuit), ...checkValveDelay(options)];
+export function checkCommissioning({ spaCircuit, options, njspcOnLan } = {}) {
+  return [
+    ...checkExposure(njspcOnLan),
+    ...checkSpaEggTimer(spaCircuit),
+    ...checkValveDelay(options),
+  ];
+}
+
+/**
+ * Whether njsPC answers on a network address rather than only on loopback.
+ *
+ * This is the widest hole in the whole system and the easiest to reopen.
+ * njsPC's REST API takes any request from anyone — no token, no password —
+ * and dashPanel deliberately bypasses every interlock the supervisor adds.
+ * Anyone on the wifi can switch bodies, call for heat and stop the pump.
+ *
+ * Checked by reachability rather than by reading `web.servers.http.ip`:
+ * njsPC does not publish that setting over its API, and reachability is the
+ * property that actually matters. A config value can be right while a
+ * reverse proxy, a container port map or a second njsPC makes it moot.
+ *
+ * `null` means the question was not asked — the supervisor talks to njsPC
+ * across a network by configuration, so loopback was never the plan. Not
+ * knowing is not the same as knowing it is fine.
+ */
+export function checkExposure(njspcOnLan) {
+  if (njspcOnLan !== true) return [];
+  return [{
+    id: "njspc-exposed",
+    severity: "warn",
+    what: "njsPC answers to anyone on the network",
+    detail:
+      "Its API needs no password and dashPanel bypasses every interlock " +
+      "this supervisor adds. Set web.servers.http.ip to 127.0.0.1 in njsPC's " +
+      "config.json and restart it; reach dashPanel over an SSH tunnel.",
+  }];
 }
 
 /**

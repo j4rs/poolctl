@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { networkInterfaces } from "node:os";
 import { readFile, stat } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -206,6 +207,44 @@ function applyCutoff(view) {
  * left at a test value, and the UI reported the resulting countdown
  * perfectly accurately without ever suggesting the configuration was wrong.
  */
+/**
+ * Can njsPC be reached from the network, or only from this box?
+ *
+ * Asked by trying it. Every non-internal IPv4 address this machine has is
+ * offered to njsPC's own port; one answer means it is listening on more than
+ * loopback. A refused connection is the good outcome and arrives instantly,
+ * so the usual cost of this is microseconds.
+ *
+ * Returns null when the supervisor is configured to reach njsPC across a
+ * network anyway, because then the question means nothing.
+ */
+async function njspcOnLan() {
+  let target;
+  try {
+    target = new URL(NJSPC_URL);
+  } catch {
+    return null;
+  }
+  if (!["localhost", "127.0.0.1", "::1"].includes(target.hostname)) return null;
+
+  const addresses = Object.values(networkInterfaces())
+    .flat()
+    .filter((n) => n && n.family === "IPv4" && !n.internal)
+    .map((n) => n.address);
+
+  for (const address of addresses) {
+    try {
+      const res = await fetch(`http://${address}:${target.port}/state/all`, {
+        signal: AbortSignal.timeout(1500),
+      });
+      if (res.ok) return true;
+    } catch {
+      /* Refused, unreachable or timed out — all mean not listening there. */
+    }
+  }
+  return false;
+}
+
 let lastReview = 0;
 let reviewTimer = null;
 
@@ -242,9 +281,10 @@ async function reviewCommissioning() {
        should cost us that one check — not every check. Whatever could not be
        read arrives as undefined, which the rules treat as "not known" rather
        than "not a problem". */
-    const [circuit, config] = await Promise.allSettled([
+    const [circuit, config, onLan] = await Promise.allSettled([
       njs.circuitConfig(SPA_CIRCUIT),
       njs.configAll(),
+      njspcOnLan(),
     ]);
     if (circuit.status === "rejected" && config.status === "rejected") {
       throw new Error(circuit.reason?.message ?? "no configuration could be read");
@@ -252,6 +292,7 @@ async function reviewCommissioning() {
     const findings = checkCommissioning({
       spaCircuit: circuit.value,
       options: config.value?.pool?.options,
+      njspcOnLan: onLan.value,
     });
     const changed = JSON.stringify(findings) !== JSON.stringify(own.commissioning);
     own.commissioning = findings;

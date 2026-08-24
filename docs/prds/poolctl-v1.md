@@ -1334,11 +1334,12 @@ temperature (read from source).
       call for heat, stop the pump, rewrite schedules. Owner's requirement,
       August 2026. Four things make it more than "add a password":
 
-      - **njsPC's own port is the wider hole.** Protecting the supervisor
-        does nothing about 4200, where njsPC's REST API and dashPanel accept
-        anything. dashPanel already bypasses every interlock we add
-        deliberately; unauthenticated, it bypasses them for everyone. Bind
-        njsPC to localhost and let only the supervisor reach it.
+      - [x] **njsPC's own port was the wider hole.** 4200 accepted anything
+        from anyone, and dashPanel deliberately bypasses every interlock we
+        add. Now bound to `127.0.0.1`, verified refused from the LAN address,
+        and the supervisor probes its own network addresses each commissioning
+        review so reopening it raises a warning rather than going unnoticed.
+        dashPanel is reached over an SSH tunnel.
       - **Plain HTTP over the LAN means credentials in clear.** TLS on a Pi
         with a self-signed certificate is unpleasant on iOS, which is the
         primary client. Decide between a self-signed cert the phone trusts

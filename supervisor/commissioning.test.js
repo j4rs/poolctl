@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect } from "vitest";
-import { checkCommissioning, NJSPC_DEFAULT_EGG_TIMER } from "./commissioning.js";
+import { checkCommissioning, checkExposure, NJSPC_DEFAULT_EGG_TIMER } from "./commissioning.js";
 import { SPA_TIMEOUT_MIN } from "../src/lib/sequences.js";
 
 /**
@@ -83,5 +83,53 @@ describe("the spa egg timer", () => {
 
   it("says nothing about a circuit with no egg timer reported", () => {
     expect(checkCommissioning({ spaCircuit: spa({ eggTimer: undefined }) })).toEqual([]);
+  });
+});
+
+describe("njsPC answering to the whole network", () => {
+  /**
+   * The widest hole in the system and the easiest to reopen: njsPC's API
+   * takes any request from anyone, and dashPanel bypasses every interlock
+   * the supervisor adds. Binding it to loopback is a config change somebody
+   * will eventually undo, so the supervisor checks rather than trusts.
+   */
+
+  it("warns when njsPC answered on a network address", () => {
+    const [f] = checkExposure(true);
+    expect(f.id).toBe("njspc-exposed");
+    expect(f.severity).toBe("warn");
+    expect(f.detail).toMatch(/127\.0\.0\.1/);
+    expect(f.detail).toMatch(/dashPanel/);
+  });
+
+  it("says nothing when it only answers on loopback", () => {
+    expect(checkExposure(false)).toEqual([]);
+  });
+
+  it("says nothing when the question does not apply", () => {
+    /* The supervisor may be pointed at njsPC across a network on purpose.
+       Not knowing is not the same as knowing it is fine, and neither is a
+       finding. */
+    expect(checkExposure(null)).toEqual([]);
+    expect(checkExposure(undefined)).toEqual([]);
+  });
+
+  it("is reported alongside the other findings, not instead of them", () => {
+    const found = checkCommissioning({
+      njspcOnLan: true,
+      spaCircuit: { id: 1, name: "Spa", eggTimer: 1, dontStop: false },
+    });
+    expect(found.map((f) => f.id)).toEqual(
+      expect.arrayContaining(["njspc-exposed", "spa-egg-tiny"]),
+    );
+  });
+
+  it("leads with it, because it is the one that matters most", () => {
+    const found = checkCommissioning({
+      njspcOnLan: true,
+      spaCircuit: { id: 1, name: "Spa", eggTimer: 1, dontStop: false },
+      options: { pumpDelay: true, valveDelayTime: 5 },
+    });
+    expect(found[0].id).toBe("njspc-exposed");
   });
 });

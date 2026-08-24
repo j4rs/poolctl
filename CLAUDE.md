@@ -6,7 +6,7 @@ nodejs-poolController.
 **Status:** the UI runs live against njsPC through the supervisor. Pi 4 is up,
 Lite, thermally characterised. The relay HAT has not arrived, so no equipment
 is connected — njsPC runs on a laptop with no serial port, which is enough to
-have settled most of the design questions. 464 tests; `npm test`.
+have settled most of the design questions. 469 tests; `npm test`.
 
 **This file is the operating manual for working in this repo — nothing more.**
 The full record lives elsewhere and is deliberately not duplicated here:
@@ -332,6 +332,12 @@ hardware, highest value first:
    deliberate change would be worse than one that says what it found. Only
    the Spa egg timer is covered so far; the rest of this list is still on
    you:
+   bind njsPC to loopback (`web.servers.http.ip` = `127.0.0.1` in its
+   `config.json`, then restart) — its API needs no password and dashPanel
+   bypasses every interlock here, so on `0.0.0.0` anyone on the wifi drives
+   the equipment; reach dashPanel over `ssh -L 4200:localhost:4200` instead.
+   The supervisor checks this one by trying to reach njsPC on its own LAN
+   address, so reopening it is caught rather than assumed. Still on you:
    disable priming at the pump keypad, leave Thermal Mode enabled, set
    `valveDelayTime` above real valve travel, size the transformer at 100 VA,
    set the Spa circuit `eggTimer` to 120 (njsPC defaults to 720 — a
