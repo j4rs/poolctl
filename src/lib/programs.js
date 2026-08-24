@@ -29,16 +29,39 @@ export const DEFAULT_PROGRAMS = [
   { id: "skimming", name: "Skimming", rpm: 2100, minutes: 30, circuit: null },
 ];
 
-/** Minutes, because a skim is 15–45 of them. Hours would make 60 the floor. */
+/**
+ * Minutes, because a skim is 15–45 of them. Hours would make 60 the floor.
+ *
+ * The long end exists for recovery, not for routine: brushing a green pool
+ * after a fortnight away and then running high speed for most of a day is a
+ * real job, and having to re-trigger it at hour twelve is not a safety
+ * feature. Owner's account, August 2026.
+ */
 export const DURATIONS = [
   { minutes: 15, label: "15 min" },
   { minutes: 30, label: "30 min" },
   { minutes: 60, label: "1 h" },
   { minutes: 120, label: "2 h" },
   { minutes: 240, label: "4 h" },
+  { minutes: 480, label: "8 h" },
+  { minutes: 720, label: "12 h" },
+  { minutes: 1080, label: "18 h" },
 ];
 
-export const MAX_MINUTES = 720;
+/**
+ * The longest run njsPC can express, in minutes.
+ *
+ * 1440 is not twenty-four hours to njsPC — `NixieBoard.setCircuitAsync`
+ * reads it as `dontStop` and the circuit then never expires on its own. So
+ * 1439 is the ceiling, and it is a real boundary rather than a chosen one.
+ *
+ * This was 720. That number was not arbitrary either — Pentair's manual, as
+ * quoted inside njsPC's own scheduler, caps a manual override at "12 hours
+ * or whatever that circuit Egg Timer is set to". But it is *their* default
+ * for a different feature, not a limit on the egg timer, and it turned a
+ * legitimate all-day recovery run into a chore.
+ */
+export const MAX_MINUTES = 1439;
 
 /**
  * What a given speed means for the other equipment.
@@ -89,7 +112,11 @@ export function validate(p, limits) {
     return `The pump will not run above ${limits.maxSpeed} rpm.`;
   }
   if (!Number.isFinite(p.minutes) || p.minutes <= 0) return "Pick how long it runs.";
-  if (p.minutes > MAX_MINUTES) return `Longest run is ${MAX_MINUTES / 60} hours.`;
+  if (p.minutes > MAX_MINUTES) {
+    /* Not "24 hours": to njsPC that value means never stop, so the ceiling
+       is a minute below it and the message says the real number. */
+    return "Longest run is 23 h 59 — a full day means never stopping.";
+  }
   return null;
 }
 

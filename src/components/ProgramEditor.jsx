@@ -97,8 +97,10 @@ export default function ProgramEditor({ value, onSave, onDelete, onCancel, runni
           })}
         </div>
         <div style={{ fontSize: 11.5, color: C.faint, marginTop: 10, lineHeight: 1.5 }}>
-          Every program stops on its own. A manual run you walk away from is
-          the one thing this prevents.
+          Every program stops on its own — a manual run you walk away from is
+          the one thing this prevents. The long end is for recovery: after
+          brushing a green pool, a schedule starting will not cut it short,
+          and the pump holds the faster of the two.
         </div>
       </Row>
 

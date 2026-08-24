@@ -77,6 +77,27 @@ describe("program validation", () => {
   const ok = { name: "Skim", rpm: 2100, minutes: 30 };
   it("accepts a complete program", () => expect(validate(ok)).toBeNull());
   it("requires a name", () => expect(validate({ ...ok, name: "  " })).toMatch(/name/i));
+
+  it("allows an all-day recovery run", () => {
+    /* Brushing a green pool after a fortnight away and running high speed
+       for most of a day is a real job. The old 12 h cap made it a chore. */
+    expect(validate({ ...ok, minutes: 1080 })).toBeNull();
+    expect(validate({ ...ok, minutes: MAX_MINUTES })).toBeNull();
+  });
+
+  it("stops a minute short of a full day", () => {
+    /* 1440 means `dontStop` to njsPC, not 24 hours — the one value that
+       would leave the pump running with nothing to end it. */
+    expect(MAX_MINUTES).toBe(1439);
+    expect(validate({ ...ok, minutes: 1440 })).toMatch(/never stopping/);
+  });
+
+  it("offers the long durations the recovery case needs", () => {
+    expect(DURATIONS.map((d) => d.minutes)).toEqual(
+      expect.arrayContaining([480, 720, 1080]),
+    );
+    for (const d of DURATIONS) expect(d.minutes).toBeLessThanOrEqual(MAX_MINUTES);
+  });
   it("requires a speed", () => expect(validate({ ...ok, rpm: 0 })).toMatch(/speed/i));
   it("requires a duration", () => expect(validate({ ...ok, minutes: 0 })).toMatch(/how long/i));
   it("caps the run length", () => {

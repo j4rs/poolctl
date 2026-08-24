@@ -6,7 +6,7 @@ nodejs-poolController.
 **Status:** the UI runs live against njsPC through the supervisor. Pi 4 is up,
 Lite, thermally characterised. The relay HAT has not arrived, so no equipment
 is connected — njsPC runs on a laptop with no serial port, which is enough to
-have settled most of the design questions. 425 tests; `npm test`.
+have settled most of the design questions. 428 tests; `npm test`.
 
 **This file is the operating manual for working in this repo — nothing more.**
 The full record lives elsewhere and is deliberately not duplicated here:
@@ -176,6 +176,21 @@ program (name, speed, required expiry) or spa mode. njsPC has no runtime
 pump-speed endpoint because that is how pool controllers model the pump —
 the absence was the domain model, not a gap. Run/stop and service mode sit
 above all of it.
+
+**A manual run is not cut short by a schedule, and may last most of a day.**
+Pentair's app ends a manual override when the next scheduled program starts —
+the IntelliCenter manual, quoted inside njsPC's own scheduler, caps it at
+"12 hours or whatever that circuit Egg Timer is set to". We do not call
+`manualOperationPriority`, so that does not happen here: the program's
+circuit and the schedule's circuit are both simply on, and
+`setTargetSpeed` takes the faster of them. An algae-recovery run at 3000 rpm
+keeps its speed through a filtration window and ends on its own egg timer.
+
+`MAX_MINUTES` is therefore **1439**, not 720. 1440 means `dontStop` to njsPC,
+so a minute short of a day is a real boundary rather than a chosen one, and
+the old 720 was Pentair's default for a different feature. The long durations
+exist for recovery — brushing a green pool after a fortnight away — not for
+routine use, and the expiry stays mandatory.
 
 **Schedules are njsPC's, and a schedule runs a circuit — not a speed.**
 There is no rpm field on an njsPC schedule; the pump holds the speed for the
