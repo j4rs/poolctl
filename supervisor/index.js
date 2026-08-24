@@ -23,6 +23,14 @@ import { toUiState, SPA_CIRCUIT, POOL_CIRCUIT } from "./map.js";
 
 const PORT = Number(process.env.PORT || 4300);
 const NJSPC_URL = process.env.NJSPC_URL || "http://localhost:4200";
+
+/* How often a frame goes out no matter what njsPC is doing.
+ *
+ * The client uses absence of frames to decide it has gone offline, so this is
+ * the pulse that decision is measured against. Clients MUST allow several
+ * missed beats before crying offline — see STALE_MS in useSupervisor.js. Do
+ * not lengthen this without lengthening that. */
+const HEARTBEAT_MS = 5000;
 const WEB_ROOT = fileURLToPath(new URL("../dist", import.meta.url));
 
 /* Supervisor-owned state: the things njsPC has no concept of. In production
@@ -176,6 +184,12 @@ wss.on("connection", (ws) => {
 });
 
 njs.start();
+
+/* njsPC only talks when something changes, and a quiet system is
+   indistinguishable from a dead one over a socket. This makes silence
+   meaningful: a client that stops hearing from us really has lost the link. */
+const heartbeat = setInterval(publish, HEARTBEAT_MS);
+
 server.listen(PORT, () => {
   console.log(`supervisor v0 on http://localhost:${PORT}  ->  njsPC at ${NJSPC_URL}`);
   console.log("NOTE: v0 relays state and two intents. None of the six interlocks");
@@ -184,6 +198,7 @@ server.listen(PORT, () => {
 
 for (const sig of ["SIGINT", "SIGTERM"]) {
   process.on(sig, () => {
+    clearInterval(heartbeat);
     njs.stop();
     server.close(() => process.exit(0));
   });

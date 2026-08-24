@@ -17,7 +17,15 @@ import { useState, useEffect, useRef, useCallback } from "react";
  * pump we cannot hear from are not the same fact.
  */
 
-const STALE_MS = 12000;
+/* Three missed heartbeats. The supervisor sends a frame every 5 s regardless
+   of njsPC activity, so this tolerates ordinary jitter and only trips on a
+   link that has genuinely stopped.
+
+   This was 12 s against a 15 s poll, which guaranteed a false "not connected"
+   banner in every quiet stretch. A staleness threshold must always be a
+   multiple of the heartbeat it measures, never shorter than it. */
+const HEARTBEAT_MS = 5000;
+const STALE_MS = HEARTBEAT_MS * 3;
 
 /** Same origin when served by the supervisor; overridable for `vite dev`. */
 function socketUrl() {
@@ -96,6 +104,16 @@ export function useSupervisor() {
       clearTimeout(retry.current);
       ws.current?.close();
     };
+  }, []);
+
+  /* Staleness needs its own clock. Deriving it only during render meant the
+     offline state appeared whenever something else happened to re-render —
+     late, and at unpredictable moments. This makes the transition prompt and
+     deterministic. */
+  const [, forceTick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => forceTick((n) => n + 1), 1000);
+    return () => clearInterval(t);
   }, []);
 
   /* Two independent ways to be offline: the browser cannot reach the
