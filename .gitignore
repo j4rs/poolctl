@@ -9,3 +9,4 @@ dist
 # toolchain, so it should not be prescribed to contributors.
 .claude/
 supervisor/node_modules
+state.json

@@ -6,6 +6,7 @@ import { WebSocketServer } from "ws";
 import { NjsPC } from "./njspc.js";
 import { toUiState, SPA_CIRCUIT, POOL_CIRCUIT } from "./map.js";
 import { applyTarget } from "./targets.js";
+import { Store, pickPersisted, applyPersisted } from "./store.js";
 
 /**
  * poolctl supervisor — v0.
@@ -32,11 +33,14 @@ const NJSPC_URL = process.env.NJSPC_URL || "http://localhost:4200";
  * missed beats before crying offline — see STALE_MS in useSupervisor.js. Do
  * not lengthen this without lengthening that. */
 const HEARTBEAT_MS = 5000;
+const STATE_FILE = process.env.STATE_FILE
+  || fileURLToPath(new URL("./state.json", import.meta.url));
 const WEB_ROOT = fileURLToPath(new URL("../dist", import.meta.url));
 
-/* Supervisor-owned state: the things njsPC has no concept of. In production
-   this must persist — a phone cannot be what remembers the bypass position.
-   v0 keeps it in memory and says so. */
+/* Supervisor-owned state: the things njsPC has no concept of.
+   Preferences here are restored from disk at startup; positions are not —
+   see store.js for why that distinction is deliberate. */
+const store = new Store(STATE_FILE);
 const own = {
   bypass: "around",
   targets: { pool: 88, spa: 102 },
@@ -54,6 +58,11 @@ const own = {
 
 let njsRaw = {};
 let ui = null;
+
+/** Queue a durable write. Only the persistable subset is ever written. */
+function remember() {
+  store.save(pickPersisted(own));
+}
 
 const njs = new NjsPC({
   url: NJSPC_URL,
@@ -107,6 +116,7 @@ const intents = {
   async setTarget({ body, degrees, delta }) {
     if (!(body in own.targets)) throw new Error(`unknown body ${body}`);
     own.targets[body] = applyTarget(own.targets[body], body, { degrees, delta });
+    remember();
     publish();
   },
 };
@@ -195,6 +205,10 @@ wss.on("connection", (ws) => {
   });
 });
 
+/* Restore before the first client can connect, so nobody sees defaults
+   flash past on the way to the real values. */
+Object.assign(own, applyPersisted(own, await store.load()));
+
 njs.start();
 
 /* njsPC only talks when something changes, and a quiet system is
@@ -209,9 +223,12 @@ server.listen(PORT, () => {
 });
 
 for (const sig of ["SIGINT", "SIGTERM"]) {
-  process.on(sig, () => {
+  process.on(sig, async () => {
     clearInterval(heartbeat);
     njs.stop();
+    /* Flush synchronously enough to beat the exit: a debounced write in
+       flight would otherwise be lost on every restart. */
+    await store.flush();
     server.close(() => process.exit(0));
   });
 }
