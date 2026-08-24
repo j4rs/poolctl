@@ -89,24 +89,30 @@ toolchain — see section 3.
 
 Built on the laptop, copied as artifacts. The Pi runs; it does not build.
 
-On the laptop. `$PI` is wherever you can SSH to the box — set it once:
+From the laptop. `$PI` is wherever you can SSH to the box:
 
 ```bash
 export PI=pi@poolctl.local
+./scripts/deploy.sh
 ```
 
-```bash
-npm run build
-rsync -a --delete dist/ $PI:~/poolctl/dist/
-rsync -a --exclude node_modules supervisor/ $PI:~/poolctl/supervisor/
-```
+That builds here, ships `dist/`, `supervisor/` and `src/lib/`, installs the
+two runtime dependencies on the Pi — `ws` and `socket.io-client`, both pure
+JavaScript, so nothing compiles — restarts the service and waits for
+`/health` to answer. `--dry-run` shows what would move without touching
+anything.
 
-On the Pi, install the two runtime dependencies — `ws` and
-`socket.io-client`, both pure JavaScript, so nothing compiles:
+**Use the script rather than rsync by hand.** The supervisor imports the
+shared spec across the repo boundary (`../src/lib/sequences.js` and the
+constants in `programs.js`), which is deliberate — sequences.js is the
+executable spec and there is one copy of it. A deploy that ships only
+`dist/` and `supervisor/` starts and then dies with `ERR_MODULE_NOT_FOUND`
+on a box with no screen to tell you. That is exactly how the first deploy
+here failed.
 
-```bash
-cd ~/poolctl/supervisor && npm install --omit=dev
-```
+The script never copies `auth.json` or `state.json`. Those exist only on the
+Pi, and overwriting them would sign the household out and reset the targets
+on every deploy.
 
 **Set a password before it is reachable by anything.**
 
@@ -160,6 +166,13 @@ systemctl status poolctl
 journalctl -u poolctl -f
 ```
 
+If anything was started by hand while testing, stop it first — it still holds
+port 4300 and the service will fail to bind:
+
+```bash
+pkill -x node
+```
+
 **The supervisor listens on all interfaces, unlike njsPC.** That is the
 point of it: the phones talk to this and nothing else. It is the one process
 on the box that is meant to be reachable, which is why it is the one with a
@@ -172,18 +185,15 @@ and confirm you get the sign-in screen rather than the app.
 
 ## 4. Deploying again
 
-Every later deploy is the same two rsyncs plus a restart:
-
 ```bash
-npm run build
-rsync -a --delete dist/ $PI:~/poolctl/dist/
-rsync -a --exclude node_modules supervisor/ $PI:~/poolctl/supervisor/
-ssh $PI 'sudo systemctl restart poolctl'
+PI=j4rs@poolctl.local ./scripts/deploy.sh
 ```
 
-`auth.json` and `state.json` live in the supervisor directory and are
-excluded from the repo, so the rsync above leaves them alone — but check
-that before adding `--delete` to the second one.
+The same script, every time. It ends by asking the Pi for `/health` and
+reporting what came back, so a deploy that silently failed to restart is not
+mistaken for one that worked. A supervisor that is up but cannot reach njsPC
+is reported as a note rather than a failure — that is a real state, not a
+broken deploy.
 
 ---
 

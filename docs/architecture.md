@@ -304,12 +304,16 @@ Built since: the supervisor and its transport, real connection state with a
 heartbeat, durable preferences, the pure interlocks, manual programs bound to
 njsPC circuits, schedules read from and written through to njsPC, a continuous
 evaluation loop asserting the invariants and enforcing targets-as-cutoffs, and
-517 tests — including the socket layer end to end, with the supervisor spawned
+521 tests — including the socket layer end to end, with the supervisor spawned
 as a real process against a fake njsPC.
 
 Not built: valve relay driving through REM, and scheduled preheat. Both want
 hardware or a water temperature.
 
-Not installed **on the Pi**: njsPC, REM, Node. Deliberate — njsPC in Nixie
-mode wants its serial port and relay configuration, which arrive with the HAT.
-It runs on a laptop meanwhile, which has been enough to settle the design.
+**On the Pi now**: Node 20 from Debian trixie, and the supervisor as a
+systemd service behind a password, deployed by `scripts/deploy.sh`.
+
+Still not installed there: njsPC and REM. Deliberate — njsPC in Nixie mode
+wants its serial port and relay configuration, which arrive with the HAT. It
+runs on a laptop meanwhile, which has been enough to settle the design, and
+the Pi's supervisor reports njsPC unreachable rather than pretending.

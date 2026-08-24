@@ -3,10 +3,12 @@
 DIY pool/spa controller replacing a Pentair IntelliConnect, built on
 nodejs-poolController.
 
-**Status:** the UI runs live against njsPC through the supervisor. Pi 4 is up,
-Lite, thermally characterised. The relay HAT has not arrived, so no equipment
-is connected — njsPC runs on a laptop with no serial port, which is enough to
-have settled most of the design questions. 517 tests; `npm test`.
+**Status:** the UI runs live against njsPC through the supervisor, and the
+supervisor now runs on the Pi as a systemd service behind a password —
+deployed with `scripts/deploy.sh`, see `docs/pi-bringup.md`. njsPC is still
+on a laptop, because the relay HAT has not arrived and Nixie mode wants a
+serial port, so the Pi's supervisor reports njsPC unreachable and says so.
+521 tests; `npm test`.
 
 **This file is the operating manual for working in this repo — nothing more.**
 The full record lives elsewhere and is deliberately not duplicated here:
