@@ -297,7 +297,9 @@ export function useController() {
      invariant in sequences.js with it. */
   const toggle = (key) =>
     setState((s) => {
-      if (key === "blower" && s.valves.intake !== "spa") return s;
+      /* Refuse to turn the blower ON outside spa mode, never to turn it
+         off — otherwise a blower left running becomes unreachable. */
+      if (key === "blower" && !s.blower && s.valves.intake !== "spa") return s;
       return { ...s, [key]: !s[key] };
     });
 

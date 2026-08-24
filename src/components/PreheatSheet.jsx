@@ -25,12 +25,17 @@ const clock = (ms) =>
  * option, not the main path.
  */
 export default function PreheatSheet({ waterTemp, targetTemp, onCancel, onConfirm }) {
+  /* Should be unreachable — the caller disables the control without a reading
+     — but a null here used to blank the screen, and `targetTemp - null` is
+     `targetTemp` in JavaScript, so the arithmetic would silently plan from a
+     phantom 0 °F rather than fail. Refuse plainly instead. */
+  const known = typeof waterTemp === "number";
   const [time, setTime] = useState("19:30");
 
   const plan = useMemo(() => {
     const readyAt = nextOccurrence(time);
-    const rise = Math.max(0, targetTemp - waterTemp);
-    const warmMin = (rise / SPA_HEAT_RATE) * 60;
+    const rise = known ? Math.max(0, targetTemp - waterTemp) : null;
+    const warmMin = known ? (rise / SPA_HEAT_RATE) * 60 : null;
     const transitionMin = 3;
     const startsAt = readyAt - (warmMin + transitionMin) * 60000;
     return { readyAt, rise, warmMin, transitionMin, startsAt, late: startsAt <= Date.now() };
@@ -70,8 +75,12 @@ export default function PreheatSheet({ waterTemp, targetTemp, onCancel, onConfir
           padding: "12px 14px", marginBottom: 16, fontFamily: FONT_DATA,
           fontSize: 11.5, color: C.muted, lineHeight: 1.7,
         }}>
-          <div>water now · {waterTemp.toFixed(1)}°F → target {targetTemp}°F</div>
-          <div>rise {plan.rise.toFixed(1)}°F at ~{SPA_HEAT_RATE}°F/hr · {Math.round(plan.warmMin)} min</div>
+          <div>water now · {known ? `${waterTemp.toFixed(1)}°F` : "unknown"} → target {targetTemp}°F</div>
+          <div>
+            {known
+              ? `rise ${plan.rise.toFixed(1)}°F at ~${SPA_HEAT_RATE}°F/hr · ${Math.round(plan.warmMin)} min`
+              : "cannot estimate without a water temperature"}
+          </div>
           <div>transition · {plan.transitionMin} min</div>
           <div style={{ color: C.stone, marginTop: 4 }}>
             starts {clock(plan.startsAt)} · ready {clock(plan.readyAt)}

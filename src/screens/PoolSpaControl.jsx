@@ -206,14 +206,24 @@ export default function PoolSpaControl({ controller, themeControl, onOpenHeat })
             </button>
           </div>
         ) : (
-          <button onClick={() => setSheet(true)} disabled={stale}
+          /* Preheat schedules backwards from the current water temperature,
+             so without a reading there is nothing to compute from. Disabled
+             with the reason rather than opening a sheet full of numbers
+             derived from a temperature nobody knows. */
+          <button onClick={() => setSheet(true)} disabled={stale || waterTemp == null}
             style={{
               width: "100%", padding: 13, marginBottom: 16, borderRadius: 10,
               border: `1px dashed ${C.line}`, background: "transparent",
-              color: C.muted, fontFamily: FONT_UI, fontSize: 13,
-              cursor: stale ? "not-allowed" : "pointer", opacity: stale ? 0.5 : 1,
+              color: C.muted, fontFamily: FONT_UI, fontSize: 13, display: "block",
+              cursor: stale || waterTemp == null ? "not-allowed" : "pointer",
+              opacity: stale ? 0.5 : 1,
             }}>
             Have the spa ready at a set time
+            {waterTemp == null && (
+              <span style={{ display: "block", fontSize: 10.5, color: C.faint, marginTop: 4 }}>
+                Needs a water temperature reading
+              </span>
+            )}
           </button>
         )
       )}
@@ -268,7 +278,13 @@ export default function PoolSpaControl({ controller, themeControl, onOpenHeat })
       )}
 
       <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-        <Toggle label="Blower" on={blower} disabled={stale || valves.intake !== "spa"}
+        {/* The gate stops the blower being switched ON outside spa mode. It
+            must never stop it being switched OFF: a control that is on and
+            unreachable is the one state CLAUDE.md rules out, and a blower
+            running where it should not be is exactly when you need the
+            button most. */}
+        <Toggle label="Blower" on={blower}
+          disabled={stale || (valves.intake !== "spa" && !blower)}
           reason={stale ? "Not connected" : "Available in spa mode"}
           onClick={() => toggle("blower")} />
         <Toggle label="Light" on={light} disabled={stale}

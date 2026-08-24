@@ -5,9 +5,7 @@ import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
 import { NjsPC } from "./njspc.js";
 import { toUiState, SPA_CIRCUIT, POOL_CIRCUIT } from "./map.js";
-/* The same spec file the UI mirrors. Importing it rather than restating the
-   caps is the point of ADR-10: one definition, two consumers. */
-import { HEATER_CAP, TARGET_MIN } from "../src/lib/sequences.js";
+import { applyTarget } from "./targets.js";
 
 /**
  * poolctl supervisor — v0.
@@ -108,9 +106,7 @@ const intents = {
    */
   async setTarget({ body, degrees, delta }) {
     if (!(body in own.targets)) throw new Error(`unknown body ${body}`);
-    const raw = delta != null ? own.targets[body] + Number(delta) : Number(degrees);
-    if (!Number.isFinite(raw)) throw new Error("target must be a number");
-    own.targets[body] = Math.min(HEATER_CAP[body], Math.max(TARGET_MIN[body], raw));
+    own.targets[body] = applyTarget(own.targets[body], body, { degrees, delta });
     publish();
   },
 };
