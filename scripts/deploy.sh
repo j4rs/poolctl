@@ -25,7 +25,9 @@ SERVICE="${SERVICE:-poolctl}"
 
 for arg in "$@"; do
   case "$arg" in
-    --dry-run) DRY_RUN="--dry-run" ;;
+    # -v so a dry run actually shows what it would move; silent output
+    # from a dry run tells you nothing and invites skipping it.
+    --dry-run) DRY_RUN="--dry-run -v" ;;
     *) PI="$arg" ;;
   esac
 done
@@ -66,6 +68,11 @@ echo "  node $remote_node — ok"
 say "Building here"
 npm run build
 
+# rsync creates only the final path component, so a first deploy onto a bare
+# Pi fails on the nested directory. --mkpath would do it but is rsync 3.2.3+
+# on both ends; mkdir is portable and obvious.
+ssh "$PI" "mkdir -p $REMOTE_DIR/dist $REMOTE_DIR/supervisor $REMOTE_DIR/src/lib"
+
 # --delete on dist is safe and wanted: it is purely generated, and stale
 # hashed asset filenames would otherwise accumulate forever.
 say "Copying the built client"
@@ -87,6 +94,21 @@ if [[ -n "$DRY_RUN" ]]; then
   say "Dry run — nothing was changed on the Pi"
   exit 0
 fi
+
+# The supervisor imports the shared spec across the repo boundary —
+# `../src/lib/sequences.js` and the constants in `programs.js`. That is
+# deliberate: sequences.js is the executable spec and the rule is that there
+# is one copy of it, not one per process.
+#
+# Ships the whole directory rather than the two files actually imported.
+# Sixty kilobytes of client code that never executes is a cheaper mistake
+# than a hand-maintained file list, which is how the first deploy to this Pi
+# died — ERR_MODULE_NOT_FOUND at boot, on a box with nothing to tell.
+say "Copying the shared spec"
+rsync -a $DRY_RUN \
+  --exclude '*.test.js' \
+  --exclude '*.test.jsx' \
+  src/lib/ "$PI:$REMOTE_DIR/src/lib/"
 
 say "Installing runtime dependencies"
 ssh "$PI" "cd $REMOTE_DIR/supervisor && npm install --omit=dev --no-audit --no-fund"

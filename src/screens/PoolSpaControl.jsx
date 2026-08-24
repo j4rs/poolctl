@@ -9,9 +9,21 @@ import PreheatSheet from "../components/PreheatSheet";
 import DelayProgress from "../components/DelayProgress";
 import { useConfirm } from "../lib/useConfirm";
 
-/** Coarse relative time. Precision past a minute is noise here. */
-const ago = (ms) => {
-  const s = Math.round(ms / 1000);
+/**
+ * Coarse relative time, or null when there is no time to be relative to.
+ *
+ * `lastSeen` is null until njsPC answers for the first time, and subtracting
+ * that from `Date.now()` gives the age of the Unix epoch. The Pi's first boot
+ * greeted us with "last seen 496557 h ago" — a supervisor that had never
+ * reached njsPC at all, reported as fifty-six years of downtime.
+ *
+ * Never seen and seen-a-while-ago are different facts and the banner says
+ * different things about them.
+ */
+const ago = (at) => {
+  if (at == null) return null;
+  const s = Math.round((Date.now() - at) / 1000);
+  if (s < 0) return null;
   if (s < 60) return `${s}s ago`;
   const m = Math.round(s / 60);
   return m < 60 ? `${m} min ago` : `${Math.round(m / 60)} h ago`;
@@ -84,9 +96,9 @@ export default function PoolSpaControl({ controller, themeControl, onOpenHeat })
           }} />
           <span>
             {connected ? "LIVE" : "OFFLINE"}
-            {stale && (
+            {stale && ago(lastSeen) && (
               <span style={{ display: "block", color: C.muted, letterSpacing: 0, fontSize: 9.5, marginTop: 2 }}>
-                last seen {ago(Date.now() - lastSeen)}
+                last seen {ago(lastSeen)}
               </span>
             )}
           </span>
@@ -101,10 +113,19 @@ export default function PoolSpaControl({ controller, themeControl, onOpenHeat })
           padding: "12px 14px", marginBottom: 14, fontSize: 12.5, lineHeight: 1.5,
           color: C.alert,
         }}>
-          <strong style={{ fontWeight: 600 }}>Not connected.</strong> Everything below
-          is the last state received{" "}
-          {ago(Date.now() - lastSeen)} and may no longer be true. Controls are
-          disabled — the equipment carries on without the phone.
+          <strong style={{ fontWeight: 600 }}>Not connected.</strong>{" "}
+          {ago(lastSeen) ? (
+            <>
+              Everything below is the last state received {ago(lastSeen)} and may
+              no longer be true. Controls are disabled — the equipment carries on
+              without the phone.
+            </>
+          ) : (
+            <>
+              The controller has not reached the pool equipment since it started,
+              so nothing below has ever been measured. Controls are disabled.
+            </>
+          )}
         </div>
       )}
 

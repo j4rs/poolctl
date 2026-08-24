@@ -134,6 +134,38 @@ describe("Water — offline", () => {
   });
 });
 
+describe("Water — never having reached njsPC", () => {
+  /* The Pi's first boot: a supervisor that has started but never heard from
+     njsPC. `lastSeen` is null, and subtracting that from Date.now() gives the
+     age of the Unix epoch — the screen said "last seen 496557 h ago". Never
+     seen and seen-a-while-ago are different facts. */
+
+  it("does not report fifty-six years of downtime", () => {
+    const { container } = water(makeController({ connected: false, lastSeen: null }));
+    expect(container.textContent).not.toMatch(/last seen/);
+    expect(container.textContent).not.toMatch(/\d{4,} h ago/);
+  });
+
+  it("says the equipment has never been reached", () => {
+    const { container } = water(makeController({ connected: false, lastSeen: null }));
+    expect(container.textContent).toMatch(/has not reached the pool equipment/);
+    expect(container.textContent).toMatch(/nothing below has ever been measured/);
+  });
+
+  it("still reports a genuine age when there is one", () => {
+    const { container } = water(makeController({
+      connected: false, lastSeen: Date.now() - 5 * 60_000,
+    }));
+    expect(container.textContent).toMatch(/last seen 5 min ago/);
+    expect(container.textContent).toMatch(/may no longer be true/);
+  });
+
+  it("disables the controls either way", () => {
+    water(makeController({ connected: false, lastSeen: null }));
+    expect(screen.getByLabelText("Hold to switch to Spa").disabled).toBe(true);
+  });
+});
+
 describe("Water — commissioning findings", () => {
   /* Settings njsPC owns that disagree with what this app believes. The spa
      that reverted after a minute was reported perfectly accurately and still
