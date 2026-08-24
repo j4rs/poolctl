@@ -30,7 +30,7 @@ const blankSchedule = () => ({
 
 export default function PumpControl({ controller, themeControl }) {
   const { state, setPumpRunning, setPanelMode,
-    startProgram, stopProgram, saveProgram, deleteProgram } = controller;
+    startProgram, stopProgram, saveProgram, deleteProgram, bindProgram } = controller;
   /* null means no reading from the pump — distinct from 0, which means
      stopped. The slider still needs a position, so it falls back to the
      filtration speed, but the readout says plainly that we do not know. */
@@ -49,6 +49,9 @@ export default function PumpControl({ controller, themeControl }) {
   const activeProgram = state.activeProgram ?? null;
   const pumpRunning = state.pumpRunning ?? false;
   const panelMode = state.panelMode ?? "auto";
+  /* What the pump will accept, as njsPC reports it. Null before a pump is
+     configured, which the editor falls back from rather than inventing. */
+  const pumpLimits = state.pumpLimits ?? null;
   const [schedules, setSchedules] = useState(INITIAL);
   const [editing, setEditing] = useState(null);
   const [editingProgram, setEditingProgram] = useState(null);
@@ -191,6 +194,15 @@ export default function PumpControl({ controller, themeControl }) {
         {programs.map((p) => {
           const running = activeProgram?.id === p.id;
           const left = running ? remaining(activeProgram) : null;
+          /* A program with no njsPC circuit has nowhere to put its speed, so
+             it cannot run at all — whatever the pump is doing. The reason is
+             rendered under the name rather than surfacing only on the tap
+             that fails. */
+          const unbound = p.circuit == null;
+          const blocked = unbound || !pumpRunning || spaOwnsPump;
+          const why = unbound
+            ? (p.bindError ?? "not set up in njsPC yet")
+            : null;
           return (
             <div key={p.id} style={{
               display: "flex", alignItems: "center", gap: 10,
@@ -200,13 +212,13 @@ export default function PumpControl({ controller, themeControl }) {
             }}>
               <button
                 onClick={() => (running ? stopProgram() : startProgram(p.id))}
-                disabled={!pumpRunning || spaOwnsPump}
+                disabled={blocked}
                 aria-label={running ? `Stop ${p.name}` : `Run ${p.name}`}
                 style={{
                   flex: 1, minWidth: 0, textAlign: "left", background: "transparent",
                   border: "none", padding: 0,
-                  cursor: !pumpRunning || spaOwnsPump ? "not-allowed" : "pointer",
-                  opacity: !pumpRunning || spaOwnsPump ? 0.45 : 1,
+                  cursor: blocked ? "not-allowed" : "pointer",
+                  opacity: blocked ? 0.45 : 1,
                 }}>
                 <div style={{ fontFamily: FONT_UI, fontSize: 14, fontWeight: 600, color: running ? C.heat : C.stone }}>
                   {running ? `${p.name} — stop` : p.name}
@@ -217,7 +229,23 @@ export default function PumpControl({ controller, themeControl }) {
                     ? `${Math.ceil(left / 60000)} min left`
                     : `${p.minutes} min`}
                 </div>
+                {why && (
+                  <div style={{ fontSize: 11, color: C.alert, marginTop: 5, lineHeight: 1.45 }}>
+                    {why}
+                  </div>
+                )}
               </button>
+              {unbound && (
+                <button onClick={() => bindProgram(p.id)} aria-label={`Set up ${p.name} in njsPC`}
+                  style={{
+                    flexShrink: 0, padding: "7px 11px", borderRadius: 8,
+                    border: `1px solid ${C.water}`, background: "transparent",
+                    color: C.water, fontFamily: FONT_UI, fontSize: 12, fontWeight: 500,
+                    cursor: "pointer",
+                  }}>
+                  Set up
+                </button>
+              )}
               <button onClick={() => setEditingProgram(p)} aria-label={`Edit ${p.name}`}
                 style={{
                   flexShrink: 0, width: 34, height: 34, borderRadius: 999,
@@ -327,6 +355,7 @@ export default function PumpControl({ controller, themeControl }) {
           running={activeProgram?.id === editingProgram.id}
           onSave={(d) => { saveProgram(d); setEditingProgram(null); }}
           onDelete={(id) => { deleteProgram(id); setEditingProgram(null); }}
+          limits={pumpLimits}
           onCancel={() => setEditingProgram(null)}
         />
       )}

@@ -1,0 +1,439 @@
+// @vitest-environment node
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { createServer } from "node:http";
+import { Server as SocketServer } from "socket.io";
+import { start, connect } from "./harness.test-utils.js";
+
+/* Each test spawns a supervisor and waits on real socket round trips, so the
+   5 s default is not enough to distinguish slow from broken. */
+vi.setConfig({ testTimeout: 20000, hookTimeout: 30000 });
+
+/**
+ * Binding a program, against an njsPC that answers.
+ *
+ * The fake below is not a stub of our own calls — it is a small
+ * reimplementation of the four njsPC behaviours the binding depends on, each
+ * read out of njsPC 10.0.1 and each verified once by hand against a running
+ * instance before being written down here:
+ *
+ *   - `PUT /config/circuit` with `id: 0` allocates, skipping 1 and 6
+ *   - `PUT /config/pump` replaces the pump wholesale, circuits included
+ *   - a circuit's `endTime` comes from its egg timer, and njsPC owns it
+ *   - `/state/all` reports the pump's range and its expanded type
+ *
+ * If njsPC ever stops behaving this way, these tests keep passing and are
+ * wrong — which is the standing risk with any fake. The mitigation is that
+ * every behaviour above is also asserted in `binding.test.js` against the
+ * shapes njsPC actually returned, and the comment there names the source.
+ */
+
+/** Enough of njsPC to bind a program to. */
+function fakeNjspc() {
+  const circuits = [
+    { id: 6, name: "Pool", type: 12, isOn: true, isActive: true, eggTimer: 720 },
+    { id: 1, name: "Spa", type: 13, isOn: false, isActive: true, eggTimer: 120 },
+  ];
+  /* The pump in its *config* shape — flat circuit ids. `/state/all` expands
+     these into objects, which is why the two are built separately below. */
+  let pumpCircuits = [
+    { id: 1, circuit: 6, speed: 1600, units: 0 },
+    { id: 2, circuit: 1, speed: 2800, units: 0 },
+  ];
+  const TYPE = {
+    val: 4, name: "vsf", minSpeed: 450, maxSpeed: 3450, maxCircuits: 8,
+  };
+  const writes = [];
+  let io;
+
+  const stateAll = () => ({
+    circuits,
+    valveMode: { name: "pool" },
+    temps: { bodies: [{ id: 1, isOn: true, temp: 84, heatStatus: { name: "off" } }] },
+    pumps: [{
+      id: 50, name: "IntelliFlo", isActive: true, minSpeed: 450, maxSpeed: 3450,
+      type: TYPE,
+      circuits: pumpCircuits.map((pc) => ({
+        ...pc,
+        circuit: { id: pc.circuit, isOn: Boolean(circuits.find((c) => c.id === pc.circuit)?.isOn) },
+      })),
+    }],
+    valves: [], chlorinators: [], delays: [],
+  });
+
+  const routes = {
+    "GET /state/all": () => stateAll(),
+    "GET /config/options/pumps": () => ({
+      pumpTypes: [TYPE],
+      pumps: [{
+        id: 50, name: "IntelliFlo", type: 4, address: 96, isActive: true,
+        minSpeed: 450, maxSpeed: 3450, circuits: pumpCircuits,
+      }],
+    }),
+    "PUT /config/circuit": (body) => {
+      let id = Number(body.id);
+      if (!id || id <= 0) {
+        /* njsPC allocates the next free id and excludes the body circuits. */
+        id = 2;
+        while (circuits.some((c) => c.id === id) || id === 1 || id === 6) id += 1;
+      }
+      const existing = circuits.find((c) => c.id === id);
+      const circuit = existing ?? { id, isOn: false, isActive: true };
+      Object.assign(circuit, {
+        name: body.name ?? circuit.name,
+        type: body.type ?? 0,
+        eggTimer: body.eggTimer ?? 0,
+      });
+      if (!existing) circuits.push(circuit);
+      return circuit;
+    },
+    "DELETE /config/circuit": (body) => {
+      const i = circuits.findIndex((c) => c.id === Number(body.id));
+      if (i < 0) return { id: body.id };
+      return circuits.splice(i, 1)[0];
+    },
+    "PUT /config/pump": (body) => {
+      /* The destructive part, faithfully: whatever arrives replaces what is
+         there, and an absent `circuits` key blanks the list. */
+      pumpCircuits = (body.circuits ?? []).map((c, i) => ({ ...c, id: i + 1 }));
+      return { id: 50, circuits: pumpCircuits };
+    },
+    "PUT /state/circuit/setState": (body) => {
+      const c = circuits.find((x) => x.id === Number(body.id));
+      if (!c) throw Object.assign(new Error("circuit not found"), { status: 404 });
+      c.isOn = Boolean(body.state);
+      c.endTime = c.isOn && c.eggTimer
+        ? new Date(Date.now() + c.eggTimer * 60000).toISOString()
+        : undefined;
+      return c;
+    },
+  };
+
+  const http = createServer(async (req, res) => {
+    const path = req.url.split("?")[0];
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    const body = chunks.length ? JSON.parse(Buffer.concat(chunks)) : {};
+    const route = routes[`${req.method} ${path}`];
+    if (!route) {
+      res.writeHead(404).end("not found");
+      return;
+    }
+    if (req.method !== "GET") writes.push({ path, body });
+    try {
+      const out = route(body);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(out));
+      /* Any change makes njsPC talk, which is what prompts a refetch. */
+      if (req.method !== "GET") io.emit("circuit", {});
+    } catch (err) {
+      res.writeHead(err.status ?? 500).end(err.message);
+    }
+  });
+  io = new SocketServer(http, { cors: { origin: "*" } });
+
+  return {
+    async listen() {
+      await new Promise((r) => http.listen(0, "127.0.0.1", r));
+      return `http://127.0.0.1:${http.address().port}`;
+    },
+    async close() {
+      await io.close();
+      await new Promise((r) => http.close(r));
+    },
+    circuits: () => circuits,
+    pumpCircuits: () => pumpCircuits,
+    writes: () => writes,
+    /* njsPC only speaks when something changes, and the supervisor only
+       refetches when it hears. A test that reaches in and edits state has to
+       say so, or it is waiting on the 15 s poll and calling that a race. */
+    touch: () => io.emit("circuit", {}),
+    fillPump: () => {
+      pumpCircuits = Array.from({ length: 8 }, (_, i) => ({ id: i + 1, circuit: 20 + i, speed: 1000 }));
+      io.emit("pump", {});
+    },
+  };
+}
+
+let njspc;
+let sup;
+let client;
+
+beforeEach(async () => {
+  njspc = fakeNjspc();
+  sup = await start({ njspcUrl: await njspc.listen() });
+  client = await connect(sup.port);
+  /* Wait for real state, not merely for the link.
+   *
+   * `connected` flips true the moment the socket.io connection opens, which
+   * is before the first `/state/all` has landed — so a bind issued on that
+   * signal alone finds no pump and refuses. `pumpLimits` is only non-null
+   * once njsPC's state has actually been read. */
+  await client.next((m) => m.type === "state" && m.state.pumpLimits != null, 8000);
+}, 25000);
+
+afterEach(async () => {
+  await client?.close();
+  await sup?.stop();
+  await njspc?.close();
+});
+
+/** The state as the supervisor currently sees it. */
+const now = async () => (await (await fetch(sup.url("/state"))).json());
+
+/** Wait until `check` holds of a published state frame. */
+const settles = (check, ms = 6000) =>
+  client.next((m) => m.type === "state" && check(m.state), ms).then((m) => m.state);
+
+describe("binding a program", () => {
+  it("reads the pump's real limits off njsPC", async () => {
+    expect((await now()).pumpLimits).toEqual({
+      pumpId: 50, minSpeed: 450, maxSpeed: 3450, maxCircuits: 8, used: 2,
+    });
+  });
+
+  it("starts unbound", async () => {
+    const { programs } = await now();
+    expect(programs.every((p) => p.circuit == null)).toBe(true);
+  });
+
+  it("creates a circuit and gives it the program's name and expiry", async () => {
+    expect((await client.intent("bindProgram", { id: "skimming" })).ok).toBe(true);
+    const circuit = njspc.circuits().find((c) => c.name === "Skimming");
+    expect(circuit).toBeTruthy();
+    expect(circuit.eggTimer).toBe(30);
+    /* Generic, not a body: a skim must not switch the pool over. */
+    expect(circuit.type).toBe(0);
+    /* Allocated around the body circuits njsPC reserves. */
+    expect(circuit.id).not.toBe(1);
+    expect(circuit.id).not.toBe(6);
+  });
+
+  it("puts the speed on the pump", async () => {
+    await client.intent("bindProgram", { id: "skimming" });
+    const circuit = njspc.circuits().find((c) => c.name === "Skimming");
+    expect(njspc.pumpCircuits()).toContainEqual(
+      expect.objectContaining({ circuit: circuit.id, speed: 2100, units: 0 }),
+    );
+  });
+
+  it("leaves the speeds the schedules run on alone", async () => {
+    /* The destructive-write guard. `PUT /config/pump` replaces the circuit
+       list, so a partial body would silently delete Pool and Spa. */
+    await client.intent("bindProgram", { id: "skimming" });
+    expect(njspc.pumpCircuits()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ circuit: 6, speed: 1600 }),
+        expect.objectContaining({ circuit: 1, speed: 2800 }),
+      ]),
+    );
+  });
+
+  it("remembers the circuit against the program", async () => {
+    await client.intent("bindProgram", { id: "skimming" });
+    const state = await settles((s) => s.programs.find((p) => p.id === "skimming")?.circuit != null);
+    const skimming = state.programs.find((p) => p.id === "skimming");
+    expect(skimming.circuit).toBe(njspc.circuits().find((c) => c.name === "Skimming").id);
+    expect(skimming.bindError).toBeNull();
+  });
+
+  it("consumes a pump slot", async () => {
+    await client.intent("bindProgram", { id: "skimming" });
+    await settles((s) => s.pumpLimits.used === 3);
+    expect((await now()).pumpLimits.used).toBe(3);
+  });
+
+  it("binds each program to its own circuit", async () => {
+    await client.intent("bindProgram", { id: "skimming" });
+    await client.intent("bindProgram", { id: "filtration" });
+    const ids = (await now()).programs.map((p) => p.circuit);
+    expect(new Set(ids).size).toBe(2);
+    expect(ids).not.toContain(null);
+  });
+
+  it("is idempotent — rebinding updates rather than piling up circuits", async () => {
+    await client.intent("bindProgram", { id: "skimming" });
+    const first = (await now()).programs.find((p) => p.id === "skimming").circuit;
+    await client.intent("bindProgram", { id: "skimming" });
+    const again = (await now()).programs.find((p) => p.id === "skimming").circuit;
+
+    expect(again).toBe(first);
+    expect(njspc.circuits().filter((c) => c.name === "Skimming")).toHaveLength(1);
+    expect(njspc.pumpCircuits().filter((c) => c.circuit === first)).toHaveLength(1);
+  });
+});
+
+describe("binding as a side effect of saving", () => {
+  it("binds a program the moment it is saved", async () => {
+    const program = { id: "vacuum", name: "Vacuum", rpm: 2600, minutes: 45, isNew: true };
+    expect((await client.intent("saveProgram", { program })).ok).toBe(true);
+    await settles((s) => s.programs.find((p) => p.id === "vacuum")?.circuit != null);
+    expect(njspc.circuits().find((c) => c.name === "Vacuum")).toBeTruthy();
+  });
+
+  it("pushes a rename and a new speed through to njsPC", async () => {
+    await client.intent("bindProgram", { id: "skimming" });
+    const circuit = (await now()).programs.find((p) => p.id === "skimming").circuit;
+
+    await client.intent("saveProgram", {
+      program: { id: "skimming", name: "Surface skim", rpm: 2400, minutes: 45 },
+    });
+    await settles((s) => s.programs.find((p) => p.id === "skimming")?.rpm === 2400);
+
+    const c = njspc.circuits().find((x) => x.id === circuit);
+    expect(c.name).toBe("Surface skim");
+    expect(c.eggTimer).toBe(45);
+    expect(njspc.pumpCircuits().find((x) => x.circuit === circuit).speed).toBe(2400);
+  });
+
+  it("keeps the circuit when the editor sends no circuit field", async () => {
+    /* The editor never sends one. Dropping it on save would orphan the
+       circuit in njsPC and quietly create a second. */
+    await client.intent("bindProgram", { id: "skimming" });
+    const before = (await now()).programs.find((p) => p.id === "skimming").circuit;
+    await client.intent("saveProgram", {
+      program: { id: "skimming", name: "Skimming", rpm: 2100, minutes: 30 },
+    });
+    await settles((s) => s.programs.find((p) => p.id === "skimming")?.name === "Skimming");
+    expect((await now()).programs.find((p) => p.id === "skimming").circuit).toBe(before);
+    expect(njspc.circuits().filter((c) => c.name === "Skimming")).toHaveLength(1);
+  });
+});
+
+describe("running a bound program", () => {
+  it("turns its circuit on", async () => {
+    await client.intent("bindProgram", { id: "skimming" });
+    const circuit = (await now()).programs.find((p) => p.id === "skimming").circuit;
+    expect((await client.intent("startProgram", { id: "skimming" })).ok).toBe(true);
+    expect(njspc.circuits().find((c) => c.id === circuit).isOn).toBe(true);
+  });
+
+  it("reports it as running, with njsPC's own expiry", async () => {
+    /* `endsAt` is read back from the circuit's `endTime` rather than computed
+       here. The egg timer is what actually stops the program, so a second
+       copy of it would only ever drift. */
+    await client.intent("bindProgram", { id: "skimming" });
+    await client.intent("startProgram", { id: "skimming" });
+    const state = await settles((s) => s.activeProgram != null);
+
+    expect(state.activeProgram).toMatchObject({ id: "skimming", name: "Skimming", rpm: 2100 });
+    const minutesLeft = (state.activeProgram.endsAt - Date.now()) / 60000;
+    expect(minutesLeft).toBeGreaterThan(28);
+    expect(minutesLeft).toBeLessThanOrEqual(30);
+  });
+
+  it("commands the higher of the speeds that are on", async () => {
+    /* `setTargetSpeed` takes the max across active circuits: Pool is on at
+       1600, so a 2100 skim wins. Reporting 1600 would put the screen at odds
+       with the equipment. */
+    await client.intent("bindProgram", { id: "skimming" });
+    await client.intent("startProgram", { id: "skimming" });
+    const state = await settles((s) => s.activeProgram != null);
+    expect(state.pumpCommandedRpm).toBe(2100);
+  });
+
+  it("stops it again", async () => {
+    await client.intent("bindProgram", { id: "skimming" });
+    await client.intent("startProgram", { id: "skimming" });
+    await settles((s) => s.activeProgram != null);
+
+    expect((await client.intent("stopProgram")).ok).toBe(true);
+    const state = await settles((s) => s.activeProgram == null);
+    expect(state.activeProgram).toBeNull();
+  });
+
+  it("notices a program that was started outside the app", async () => {
+    /* Because the running program is read out of njsPC rather than
+       remembered, dashPanel turning the circuit on shows up here too. */
+    await client.intent("bindProgram", { id: "skimming" });
+    const circuit = (await now()).programs.find((p) => p.id === "skimming").circuit;
+    njspc.circuits().find((c) => c.id === circuit).isOn = true;
+    njspc.touch();
+    const state = await settles((s) => s.activeProgram != null, 8000);
+    expect(state.activeProgram.id).toBe("skimming");
+  });
+});
+
+describe("deleting a bound program", () => {
+  it("takes the circuit back out of njsPC", async () => {
+    await client.intent("bindProgram", { id: "skimming" });
+    const circuit = (await now()).programs.find((p) => p.id === "skimming").circuit;
+
+    expect((await client.intent("deleteProgram", { id: "skimming" })).ok).toBe(true);
+    expect(njspc.circuits().find((c) => c.id === circuit)).toBeUndefined();
+  });
+
+  it("takes the speed off the pump too, and leaves the rest", async () => {
+    /* Pump first, then the circuit: the other order leaves the pump holding
+       an id that no longer resolves, and `setTargetSpeed` reads every entry
+       on every poll. */
+    await client.intent("bindProgram", { id: "skimming" });
+    const circuit = (await now()).programs.find((p) => p.id === "skimming").circuit;
+    await client.intent("deleteProgram", { id: "skimming" });
+
+    expect(njspc.pumpCircuits().find((c) => c.circuit === circuit)).toBeUndefined();
+    expect(njspc.pumpCircuits().map((c) => c.circuit)).toEqual([6, 1]);
+  });
+
+  it("frees the slot", async () => {
+    await client.intent("bindProgram", { id: "skimming" });
+    await settles((s) => s.pumpLimits.used === 3);
+    await client.intent("deleteProgram", { id: "skimming" });
+    await settles((s) => s.pumpLimits.used === 2);
+    expect((await now()).pumpLimits.used).toBe(2);
+  });
+});
+
+describe("when binding cannot happen", () => {
+  it("keeps the program but records why", async () => {
+    /* Defining a program is a preference and must work regardless; only
+       running it needs njsPC. */
+    const program = { id: "fast", name: "Too fast", rpm: 5000, minutes: 30, isNew: true };
+    expect((await client.intent("saveProgram", { program })).ok).toBe(true);
+
+    const state = await settles((s) => s.programs.some((p) => p.id === "fast"));
+    const saved = state.programs.find((p) => p.id === "fast");
+    expect(saved.circuit).toBeNull();
+    expect(saved.bindError).toMatch(/450–3450/);
+  });
+
+  it("refuses the retry with the same reason", async () => {
+    await client.intent("saveProgram", {
+      program: { id: "fast", name: "Too fast", rpm: 5000, minutes: 30, isNew: true },
+    });
+    const ack = await client.intent("bindProgram", { id: "fast" });
+    expect(ack.ok).toBe(false);
+    expect(ack.error).toMatch(/450–3450/);
+  });
+
+  it("refuses to run it, saying what is wrong rather than that it is unbound", async () => {
+    await client.intent("saveProgram", {
+      program: { id: "fast", name: "Too fast", rpm: 5000, minutes: 30, isNew: true },
+    });
+    const ack = await client.intent("startProgram", { id: "fast" });
+    expect(ack.error).toMatch(/Too fast/);
+    expect(ack.error).toMatch(/450–3450/);
+  });
+
+  it("clears the reason once the program is fixed", async () => {
+    await client.intent("saveProgram", {
+      program: { id: "fast", name: "Too fast", rpm: 5000, minutes: 30, isNew: true },
+    });
+    await settles((s) => s.programs.find((p) => p.id === "fast")?.bindError != null);
+
+    await client.intent("saveProgram", {
+      program: { id: "fast", name: "Brisk", rpm: 2800, minutes: 30 },
+    });
+    const state = await settles((s) => s.programs.find((p) => p.id === "fast")?.circuit != null);
+    expect(state.programs.find((p) => p.id === "fast").bindError).toBeNull();
+  });
+
+  it("refuses when the pump has no room left", async () => {
+    /* Eight circuits is the pump type's limit, and njsPC silently ignores
+       everything past it rather than complaining. */
+    njspc.fillPump();
+    await settles((s) => s.pumpLimits.used === 8, 8000);
+    const ack = await client.intent("bindProgram", { id: "skimming" });
+    expect(ack.ok).toBe(false);
+    expect(ack.error).toMatch(/8/);
+  });
+});

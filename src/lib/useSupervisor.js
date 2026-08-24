@@ -197,6 +197,9 @@ export function useSupervisor() {
     setPumpRunning: (on) => intent("setPumpRunning", { on }),
     setPanelMode: (mode) => intent("setPanelMode", { mode }),
     startProgram: (id) => intent("startProgram", { id }),
+    /* Create the njsPC circuit this program's speed lives on. Saving already
+       attempts it; this is the retry for when njsPC was down at the time. */
+    bindProgram: (id) => intent("bindProgram", { id }),
     stopProgram: () => intent("stopProgram"),
     saveProgram: (program) => intent("saveProgram", { program }),
     deleteProgram: (id) => intent("deleteProgram", { id }),

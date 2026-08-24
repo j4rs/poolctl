@@ -20,10 +20,14 @@ const makeState = (over = {}) => ({
   poolHeatDemand: false, blower: false, light: false,
   saltPpm: 3150, cellOutput: 45, connected: true, lastSeen: Date.now(),
   spaExpiresAt: null, preheat: null,
+  /* Bound by default: an unbound program cannot run, and most of what these
+     tests exercise is what happens after that. The unbound case has its own
+     block below. */
   programs: [
-    { id: "filtration", name: "Filtration", rpm: 1600, minutes: 60 },
-    { id: "skimming", name: "Skimming", rpm: 2100, minutes: 30 },
+    { id: "filtration", name: "Filtration", rpm: 1600, minutes: 60, circuit: 2, bindError: null },
+    { id: "skimming", name: "Skimming", rpm: 2100, minutes: 30, circuit: 3, bindError: null },
   ],
+  pumpLimits: { pumpId: 50, minSpeed: 450, maxSpeed: 3450, maxCircuits: 8, used: 4 },
   activeProgram: null, pumpRunning: true, panelMode: "auto", ...over,
 });
 
@@ -34,7 +38,8 @@ const makeController = (over = {}, fns = {}) => ({
   extendSpa: vi.fn(), schedulePreheat: vi.fn(), cancelPreheat: vi.fn(),
   simulateOutage: vi.fn(), problem: null, dismissProblem: vi.fn(),
   setPumpRunning: vi.fn(), setPanelMode: vi.fn(), startProgram: vi.fn(),
-  stopProgram: vi.fn(), saveProgram: vi.fn(), deleteProgram: vi.fn(), ...fns,
+  stopProgram: vi.fn(), saveProgram: vi.fn(), deleteProgram: vi.fn(),
+  bindProgram: vi.fn(), ...fns,
 });
 
 const water = (c) => render(<PoolSpaControl controller={c} themeControl={null} onOpenHeat={vi.fn()} />);
@@ -346,6 +351,56 @@ describe("Pump — programs", () => {
   it("opens the editor for a new one", () => {
     pump(makeController());
     fireEvent.click(screen.getByLabelText("Add program"));
+    expect(screen.getByRole("dialog")).toBeDefined();
+  });
+});
+
+describe("Pump — programs that are not bound to njsPC", () => {
+  /* A program's speed lives on an njsPC circuit. Until one exists the program
+     is a definition and nothing more, and the screen has to say which. */
+  const unbound = (over = {}) =>
+    makeController({
+      programs: [
+        { id: "filtration", name: "Filtration", rpm: 1600, minutes: 60, circuit: null, bindError: null, ...over },
+      ],
+    });
+
+  it("cannot be run", () => {
+    const c = unbound();
+    pump(c);
+    expect(screen.getByLabelText("Run Filtration").disabled).toBe(true);
+  });
+
+  it("says so, rather than looking merely greyed out", () => {
+    pump(unbound());
+    expect(screen.getByLabelText("Run Filtration").textContent).toMatch(/not set up in njsPC/i);
+  });
+
+  it("shows the real reason when there is one", () => {
+    /* The reason travels with the program because it persists — "no pump is
+       configured" is a state the system sits in for weeks before
+       commissioning, not a transient error worth a toast. */
+    pump(unbound({ bindError: "no pump is configured in njsPC" }));
+    expect(screen.getByLabelText("Run Filtration").textContent).toMatch(
+      /no pump is configured in njsPC/,
+    );
+  });
+
+  it("offers to set it up", () => {
+    const c = unbound();
+    pump(c);
+    fireEvent.click(screen.getByLabelText("Set up Filtration in njsPC"));
+    expect(c.bindProgram).toHaveBeenCalledWith("filtration");
+  });
+
+  it("does not offer to set up one that is already bound", () => {
+    pump(makeController());
+    expect(screen.queryByLabelText("Set up Filtration in njsPC")).toBeNull();
+  });
+
+  it("still opens for editing — defining one needs no njsPC", () => {
+    pump(unbound());
+    fireEvent.click(screen.getByLabelText("Edit Filtration"));
     expect(screen.getByRole("dialog")).toBeDefined();
   });
 });

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { DEFAULT_PROGRAMS } from "./programs.js";
+import { RPM_MIN, RPM_MAX } from "./pump.js";
 import {
   SEQUENCES, isSkipped, POOL_RPM, SPA_RPM, VALVE_RPM,
   HEATER_MIN_RPM, HEATER_CAP, TARGET_MIN, SPA_TIMEOUT_MIN, SPA_HEAT_RATE,
@@ -92,6 +93,10 @@ export function useController() {
        circuits with pump speeds and egg timers; here they are plain data. */
     programs: DEFAULT_PROGRAMS,
     activeProgram: null,
+    /* What the pump would accept. Invented like everything else here — the
+       live supervisor reads this off njsPC's pump. The shape matters more
+       than the numbers: null limits mean no pump is configured. */
+    pumpLimits: { pumpId: 50, minSpeed: RPM_MIN, maxSpeed: RPM_MAX, maxCircuits: 8, used: 2 },
     /* The pump itself, independent of speed: stopped means stopped. */
     pumpRunning: true,
     /* njsPC panel mode. 'service' means automation stands down and only
@@ -183,16 +188,11 @@ export function useController() {
 
       setState((s) => ({
         ...s, ...seed, ...patch,
-        /* A sequence takes the pump, so any manual hold is over. */
-    /* Manual programs, and which one is running. njsPC holds these as
-       circuits with pump speeds and egg timers; here they are plain data. */
-    programs: DEFAULT_PROGRAMS,
-    activeProgram: null,
-    /* The pump itself, independent of speed: stopped means stopped. */
-    pumpRunning: true,
-    /* njsPC panel mode. 'service' means automation stands down and only
-       manual commands act — the industry switch for working on equipment. */
-    panelMode: "auto",
+        /* A sequence takes the pump, so a manual program is over. This
+           replaced `pumpHold: null` when the hold was removed; a whole block
+           of initial state landed here by mistake at the same time, which
+           reset the program list and re-enabled automation on every step. */
+        activeProgram: null,
         target: landing, activeSequence: name, step, stepIndex: i, steps: plan,
       }));
 
@@ -257,7 +257,9 @@ export function useController() {
   const startProgram = (id) =>
     setState((s) => {
       const p = s.programs.find((x) => x.id === id);
-      if (!p) return s;
+      /* Unbound programs cannot run here either. The speed lives on an njsPC
+         circuit, so without one there is nowhere to put it. */
+      if (!p || p.circuit == null) return s;
       return {
         ...s,
         pumpRunning: true,
@@ -289,6 +291,25 @@ export function useController() {
       activeProgram: s.activeProgram?.id === id ? null : s.activeProgram,
       pumpRpm: s.activeProgram?.id === id ? POOL_RPM : s.pumpRpm,
     }));
+
+  /**
+   * Give a program a circuit.
+   *
+   * The supervisor creates one in njsPC and is told the id; here the id is
+   * made up. What is faithful is the shape of the flow — a program starts
+   * unbound, cannot run, and becomes runnable once bound.
+   */
+  const bindProgram = (id) =>
+    setState((s) => {
+      const target = s.programs.find((p) => p.id === id);
+      if (!target || target.circuit != null) return s;
+      const next = Math.max(6, ...s.programs.map((p) => p.circuit ?? 0)) + 1;
+      return {
+        ...s,
+        programs: s.programs.map((p) => (p.id === id ? { ...p, circuit: next } : p)),
+        pumpLimits: { ...s.pumpLimits, used: s.pumpLimits.used + 1 },
+      };
+    });
 
   /** Push the spa auto-revert out by another full timeout from now. */
   const extendSpa = () =>
@@ -405,6 +426,7 @@ export function useController() {
   return {
     state, setMode, setRpm, setTarget, adjustTarget, setPoolHeat, toggle,
     setPumpRunning, setPanelMode, startProgram, stopProgram, saveProgram, deleteProgram,
+    bindProgram,
     extendSpa, schedulePreheat, cancelPreheat, simulateOutage,
     /* The mock never refuses anything, but App renders the same Toast either
        way rather than caring which hook it was handed. */

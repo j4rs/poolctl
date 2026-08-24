@@ -16,14 +16,21 @@ import { Sheet, Row, Action } from "./Sheet";
  * speed a program will hold for its whole run is a decision; dragging the
  * live pump around is not.
  */
-export default function ProgramEditor({ value, onSave, onDelete, onCancel, running }) {
+export default function ProgramEditor({ value, onSave, onDelete, onCancel, running, limits }) {
   const [draft, setDraft] = useState(value);
   const set = (patch) => setDraft((d) => ({ ...d, ...patch }));
 
-  const problem = validate(draft);
+  /* The pump's own range when njsPC knows of a pump, the IntelliFlo figures
+     otherwise. They agree on this site, but they are not the same claim: one
+     is what the equipment reports, the other is what the manual says the
+     model does. Before commissioning only the second exists. */
+  const min = limits?.minSpeed ?? RPM_MIN;
+  const max = limits?.maxSpeed ?? RPM_MAX;
+
+  const problem = validate(draft, limits);
   const notes = speedNotes(draft.rpm);
   const kwh = (watts(draft.rpm) / 1000) * (draft.minutes / 60);
-  const pct = ((draft.rpm - RPM_MIN) / (RPM_MAX - RPM_MIN)) * 100;
+  const pct = ((draft.rpm - min) / (max - min)) * 100;
 
   return (
     <Sheet
@@ -51,7 +58,7 @@ export default function ProgramEditor({ value, onSave, onDelete, onCancel, runni
           <span style={{ fontSize: 13, color: C.muted, marginLeft: 4 }}>rpm</span>
         </div>
         <input
-          type="range" min={RPM_MIN} max={RPM_MAX} step={50} value={draft.rpm}
+          type="range" min={min} max={max} step={50} value={draft.rpm}
           aria-label="Program speed in rpm"
           onChange={(e) => set({ rpm: Number(e.target.value) })}
           style={{

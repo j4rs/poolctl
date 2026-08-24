@@ -10,6 +10,8 @@
  * If njsPC changes shape this is the one file that needs to know.
  */
 
+import { pumpLimits } from "./binding.js";
+
 /** njsPC's shared-equipment model fixes these circuit ids. */
 const SPA_CIRCUIT = 1;
 const POOL_CIRCUIT = 6;
@@ -73,8 +75,15 @@ export function toUiState(njs, own) {
        pump reports back over RS-485. Keeping them apart is what lets the UI
        tell "idle" from "commanded but silent", which is a wiring fault. */
     pumpCommandedRpm: (() => {
-      const on = (pump.circuits || []).find((pc) => pc?.circuit?.isOn);
-      return on?.speed ?? null;
+      /* The highest speed among the circuits that are on, not the first.
+         `NixiePumpVS.setTargetSpeed` takes the max, so with Pool at 1600 and
+         a skim program at 2100 both on, the pump is asked for 2100 — and
+         reporting 1600 would make the screen disagree with the equipment. */
+      const speeds = (pump.circuits || [])
+        .filter((pc) => pc?.circuit?.isOn)
+        .map((pc) => pc.speed)
+        .filter((s) => typeof s === "number");
+      return speeds.length ? Math.max(...speeds) : null;
     })(),
     pumpWatts: pump.watts ?? null,
     /* True while njsPC is holding the pump off for a valve move. The UI can
@@ -98,10 +107,39 @@ export function toUiState(njs, own) {
     spaExpiresAt: spaCircuit?.endTime ? Date.parse(spaCircuit.endTime) : null,
 
     /* Manual programs are njsPC circuits carrying a pump speed and an egg
-       timer. None exist until commissioning creates them, so an empty list
-       is the honest answer rather than an absent field. */
-    programs: own.programs ?? [],
-    activeProgram: own.activeProgram ?? null,
+       timer. The circuit is null until the program is bound, and the last
+       failed binding travels with it so the reason can be read on the row
+       rather than in a toast that has already gone. */
+    programs: (own.programs ?? []).map((p) => ({
+      ...p,
+      bindError: own.bindErrors?.[p.id] ?? null,
+    })),
+
+    /* Read back from njsPC rather than remembered.
+     *
+     * The circuit's `endTime` is njsPC's egg timer, and the egg timer is what
+     * actually stops the program — so holding our own `endsAt` alongside it
+     * would be a second copy of a timer we do not own, drifting from the
+     * first. It also means a program started from dashPanel shows up here,
+     * and one that expires disappears without anybody being told. */
+    activeProgram: (() => {
+      for (const p of own.programs ?? []) {
+        if (p.circuit == null) continue;
+        const c = byId(circuits, p.circuit);
+        if (!c?.isOn) continue;
+        return {
+          id: p.id,
+          name: p.name,
+          rpm: p.rpm,
+          endsAt: c.endTime ? Date.parse(c.endTime) : null,
+        };
+      }
+      return null;
+    })(),
+
+    /* What the pump will accept, straight from njsPC. Null until a pump is
+       configured, which is the honest answer before commissioning. */
+    pumpLimits: pumpLimits(njs),
     /* Whether the pump circuit is on at all, distinct from its speed. */
     pumpRunning: Boolean(poolCircuit?.isOn || spaCircuit?.isOn),
     /* njsPC panel mode: 'service' stands the schedules down. */

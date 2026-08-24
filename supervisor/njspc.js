@@ -66,10 +66,17 @@ export class NjsPC {
     }
   }
 
+  /** GET helper, for configuration reads that are not `/state/all`. */
+  async get(path) {
+    const res = await fetch(`${this.url}${path}`, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) throw new Error(`${path} ${res.status}`);
+    return res.json();
+  }
+
   /** PUT helper. Returns the parsed body, or throws with njsPC's message. */
-  async put(path, body) {
+  async put(path, body, method = "PUT") {
     const res = await fetch(`${this.url}${path}`, {
-      method: "PUT",
+      method,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(8000),
@@ -94,5 +101,52 @@ export class NjsPC {
 
   setSetPoint(id, setPoint) {
     return this.put("/state/body/setPoint", { id, setPoint });
+  }
+
+  /* ---- configuration -------------------------------------------------- */
+  /* Everything below writes njsPC's *configuration* rather than its state:
+     equipment that persists across restarts and shows up in dashPanel. These
+     are the calls that create the circuit a manual program runs on. They are
+     rarer and heavier than the state calls above, and none of them is on the
+     path of an ordinary mode change. */
+
+  /**
+   * Pumps, their circuits and the pump-type table, in one response.
+   * `/config/all` omits the type table, and the speed range lives there.
+   */
+  pumpOptions() {
+    return this.get("/config/options/pumps");
+  }
+
+  /** Add or update a circuit. `id: 0` asks njsPC to allocate one. */
+  setCircuitConfig(circuit) {
+    return this.put("/config/circuit", circuit);
+  }
+
+  deleteCircuitConfig(id) {
+    return this.put("/config/circuit", { id }, "DELETE");
+  }
+
+  /**
+   * Replace a pump's configuration.
+   *
+   * The whole pump, every time. `NixiePump.setPumpAsync` assigns the body
+   * over the pump rather than merging, and blanks `circuits` entirely when
+   * the key is absent — so a partial write here deletes the speeds the
+   * schedules depend on. Build the body with `withPumpCircuit`.
+   */
+  setPumpConfig(pump) {
+    return this.put("/config/pump", pump);
+  }
+
+  /**
+   * Change the speed of a circuit the pump already carries.
+   *
+   * njsPC does the read-modify-write itself here, which makes this the safe
+   * way to change a speed — but it refuses a circuit that is not already in
+   * the pump's list, so it cannot be used to bind one.
+   */
+  setPumpCircuitSpeed(pumpId, circuitId, speed) {
+    return this.put("/config/pumpCircuit", { pumpId, circuitId, speed });
   }
 }

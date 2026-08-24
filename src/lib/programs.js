@@ -22,7 +22,8 @@ import { CELL_MIN_RPM, HEATER_MIN_RPM } from "./sequences.js";
  * is not a thing with a lifetime.
  */
 
-/** Offered on a fresh install. Both are real activities, not demonstrations. */
+/** Offered on a fresh install. Both are real activities, not demonstrations.
+    Unbound: the supervisor creates the njsPC circuit on first save. */
 export const DEFAULT_PROGRAMS = [
   { id: "filtration", name: "Filtration", rpm: 1600, minutes: 60, circuit: null },
   { id: "skimming", name: "Skimming", rpm: 2100, minutes: 30, circuit: null },
@@ -60,16 +61,33 @@ export const blankProgram = () => ({
   rpm: 1800,
   minutes: 30,
   /* The njsPC circuit that carries this program's speed and egg timer.
-     Null until commissioning creates it — a program can be defined and
-     edited before there is any hardware to run it on. */
+     Null until the supervisor binds it, which it attempts on every save. A
+     program can be written and edited before there is a pump to run it on;
+     only running it needs the binding. */
   circuit: null,
   isNew: true,
 });
 
-/** A program needs a name, a plausible speed and a bounded run. */
-export function validate(p) {
+/**
+ * A program needs a name, a plausible speed and a bounded run.
+ *
+ * `limits` is the pump as njsPC describes it — `{ minSpeed, maxSpeed }` — and
+ * is optional because a program can be written before there is a pump to run
+ * it on. When it is present it is the authority, not the constants in
+ * `pump.js`: a different pump is a different range. njsPC will not do this
+ * for us — its own clamp in `setTargetSpeed` computes a bounded speed and
+ * then discards it without assigning — so an out-of-range speed reaches the
+ * equipment exactly as typed.
+ */
+export function validate(p, limits) {
   if (!p.name.trim()) return "Give it a name.";
   if (!Number.isFinite(p.rpm) || p.rpm <= 0) return "Pick a speed.";
+  if (limits?.minSpeed != null && p.rpm < limits.minSpeed) {
+    return `The pump will not run below ${limits.minSpeed} rpm.`;
+  }
+  if (limits?.maxSpeed != null && p.rpm > limits.maxSpeed) {
+    return `The pump will not run above ${limits.maxSpeed} rpm.`;
+  }
   if (!Number.isFinite(p.minutes) || p.minutes <= 0) return "Pick how long it runs.";
   if (p.minutes > MAX_MINUTES) return `Longest run is ${MAX_MINUTES / 60} hours.`;
   return null;

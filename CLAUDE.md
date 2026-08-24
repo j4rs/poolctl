@@ -6,7 +6,7 @@ nodejs-poolController.
 **Status:** the UI runs live against njsPC through the supervisor. Pi 4 is up,
 Lite, thermally characterised. The relay HAT has not arrived, so no equipment
 is connected — njsPC runs on a laptop with no serial port, which is enough to
-have settled most of the design questions. 259 tests; `npm test`.
+have settled most of the design questions. 319 tests; `npm test`.
 
 **This file is the operating manual for working in this repo — nothing more.**
 The full record lives elsewhere and is deliberately not duplicated here:
@@ -45,6 +45,7 @@ supervisor/              runs on the Pi; plain JS, no build step
   index.js               njsPC link, intents, WebSocket, serves dist/
   map.js                 njsPC state -> the shape the UI speaks
   interlocks.js          the rules njsPC lacks — pure, tested
+  binding.js             program -> njsPC circuit + pump speed — pure, tested
   targets.js             ADR-4 clamping
   store.js               durable preferences (not positions)
 ```
@@ -128,6 +129,22 @@ pump-speed endpoint because that is how pool controllers model the pump —
 the absence was the domain model, not a gap. Run/stop and service mode sit
 above all of it.
 
+**A program is two njsPC writes, not one.** The name and the expiry go on a
+circuit (`PUT /config/circuit`, `eggTimer`); the speed goes on the pump
+(`PUT /config/pump`, an entry in `pump.circuits`). `supervisor/binding.js`
+holds the parts that decide, and three njsPC facts make it what it is:
+
+- `PUT /config/pump` **replaces** the pump — `NixiePump.setPumpAsync` assigns
+  rather than merges, and blanks `circuits` when the key is missing. Always
+  read the pump and send it back whole, or the schedules lose their speeds.
+- `eggTimer: 1440` means *never stop*, not twenty-four hours.
+- njsPC does not clamp speed. `NixiePumpVS.setTargetSpeed` computes a bounded
+  value and discards it without assigning, so an out-of-range rpm reaches the
+  pump exactly as typed. Ours is the only check there is.
+
+The pump takes the **highest** speed among the circuits that are on, so a
+2100 rpm skim overrides filtration at 1600 without stopping it.
+
 **Valves move at zero flow, one at a time.** Settled against the IntelliFlo
 manual: with priming enabled the pump runs 1800 RPM for 3 sec on every restart
 and *ignores automation commands while priming*, so a 1000 rpm floor through a
@@ -173,22 +190,19 @@ is just something to respond to, which is why there is no state to sync.
 Full lists in PRD §10 (open questions) and §11 (backlog). Available without
 hardware, highest value first:
 
-1. **Bind programs to njsPC circuits.** Every intent is wired —
-   `setMode`, `setTarget`, `toggle`, `setPoolHeat`, `setPumpRunning`,
-   `setPanelMode` and the program CRUD. But a program's `circuit` is null
-   until commissioning creates one, so running it refuses with that reason.
-   `extendSpa` and preheat remain unimplemented. Every refusal surfaces in
-   the UI rather than being swallowed.
-2. **Commissioning checklist.** Several settings must be changed on the
+1. **Commissioning checklist.** Several settings must be changed on the
    equipment itself, not in software, and forgetting one is a silent fault:
    disable priming at the pump keypad, leave Thermal Mode enabled, set
    `valveDelayTime` above real valve travel, size the transformer at 100 VA,
    set the Spa circuit `eggTimer` to 120 (njsPC defaults to 720 — a
-   twelve-hour spa session), configure njsPC's valves with **no device
-   binding** so the supervisor drives the relays instead of REM's latch, and
-   create **one circuit per manual program** (name, pump speed, `eggTimer`)
-   — njsPC has no runtime pump-speed endpoint, and programs are how speed is
-   expressed at all.
+   twelve-hour spa session), and configure njsPC's valves with **no device
+   binding** so the supervisor drives the relays instead of REM's latch.
+   Program circuits are no longer on this list — the supervisor creates them
+   (see below) — but njsPC does need a **pump** configured before any
+   program can bind, because the speed has nowhere else to live.
+2. **`extendSpa` and scheduled preheat.** Still unimplemented, and still
+   refusing with a reason rather than doing nothing. Preheat wants a water
+   temperature, which wants the HAT.
 
 Blocked on the relay HAT: bus sniffing, the salt question (case 18), real
 `HEATER_MIN_RPM` / `CELL_MIN_RPM`, and thermals with the enclosure sealed.

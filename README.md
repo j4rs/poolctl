@@ -32,8 +32,9 @@ bus. That has still been enough to settle most of the design.
 
 Implemented in the supervisor: mode changes, heat targets with server-side
 clamping, blower and light, pool heat with the bypass interlock, pump
-run/stop, service mode, and manual programs. Not yet: valve relay driving,
-scheduled preheat, and anything needing a water temperature.
+run/stop, service mode, and manual programs bound to real njsPC circuits.
+Not yet: valve relay driving, scheduled preheat, and anything needing a water
+temperature.
 
 ## Run
 
@@ -78,7 +79,9 @@ and it is where both of this layer's shipped bugs lived.
 - **Pump** — run/stop, manual programs (a name, a speed and a required
   expiry), service mode to stand the schedules down, and schedules with
   add/edit/delete and real energy cost. No speed slider: njsPC drives the pump
-  from circuits, and an arbitrary rpm has neither a user nor a lifetime.
+  from circuits, and an arbitrary rpm has neither a user nor a lifetime. Each
+  program becomes an njsPC circuit with a pump speed and an egg timer; the
+  supervisor creates it, and a program that has none says why it cannot run.
 - **Bus** — RS-485 frame monitor for Phase 1 sniffing. Decode rate, per-frame
   hex and checksum, and undecoded frames surfaced rather than hidden, since
   those are what decide the chlorinator path (ADR-6).
@@ -101,6 +104,7 @@ supervisor/                runs on the Pi; plain JS, no build step
   index.js                 njsPC link, intents, WebSocket, serves dist/
   map.js                   njsPC state -> the shape the UI speaks
   interlocks.js            the rules njsPC lacks — pure, tested
+  binding.js               program -> njsPC circuit + pump speed
   targets.js               ADR-4 clamping
   store.js                 durable preferences
 docs/architecture.md       system view, state ownership, failure modes

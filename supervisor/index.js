@@ -11,6 +11,9 @@ import { DEFAULT_PROGRAMS } from "../src/lib/programs.js";
 import {
   floorRpm, bypassFor, mayCallForHeat, mayToggleBlower, refuse,
 } from "./interlocks.js";
+import {
+  circuitConfig, withPumpCircuit, withoutPumpCircuit, whyNotBindable, pumpLimits,
+} from "./binding.js";
 
 /**
  * poolctl supervisor — v0.
@@ -51,7 +54,10 @@ const own = {
      empty list. Persisted, and editable, but not yet runnable: each needs an
      njsPC circuit to carry its speed, which commissioning creates. */
   programs: DEFAULT_PROGRAMS,
-  activeProgram: null,
+  /* Why each program last failed to bind, by program id. Not persisted:
+     it describes njsPC's condition a moment ago, not a preference, and a
+     stale reason is worse than none. */
+  bindErrors: {},
   panelMode: "auto",
   targets: { pool: 88, spa: 102 },
   poolHeatDemand: false,
@@ -99,6 +105,89 @@ function publish() {
   for (const client of wss.clients) {
     if (client.readyState === 1) client.send(msg);
   }
+}
+
+/* ---- binding programs to njsPC ---------------------------------------- */
+
+/**
+ * Give a program an njsPC circuit, and give that circuit a speed on the pump.
+ *
+ * Idempotent: a program that already has a circuit has it updated rather than
+ * replaced, so saving a renamed program keeps its identity in njsPC instead of
+ * leaving the old circuit behind.
+ *
+ * Records the reason on failure rather than throwing it away, because the one
+ * that matters most — njsPC has no pump configured — is a state the system
+ * sits in for weeks before commissioning, not a transient error.
+ */
+async function bind(id) {
+  const p = own.programs.find((x) => x.id === id);
+  if (!p) throw refuse(`no program '${id}'`);
+
+  const fail = (why) => {
+    own.bindErrors[id] = why;
+    publish();
+    return refuse(why);
+  };
+
+  const limits = pumpLimits(njsRaw);
+  const why = whyNotBindable(p, limits);
+  if (why) throw fail(why);
+
+  try {
+    /* One: the circuit, which carries the name and the egg timer. njsPC
+       allocates the id when we send 0, skipping the Pool and Spa circuits. */
+    const circuit = await njs.setCircuitConfig(circuitConfig(p));
+    const circuitId = circuit?.id;
+    if (!Number.isFinite(circuitId)) {
+      throw new Error("njsPC did not return a circuit id");
+    }
+
+    /* Two: the speed, which lives on the pump. Read the pump in its config
+       shape and send it back complete — a partial write deletes the speeds
+       the schedules run on. */
+    const options = await njs.pumpOptions();
+    const pump = (options?.pumps ?? []).find((x) => x.id === limits.pumpId);
+    if (!pump) throw new Error(`pump ${limits.pumpId} vanished between reads`);
+    pump.circuits = withPumpCircuit(pump, { circuit: circuitId, speed: p.rpm }, limits);
+    await njs.setPumpConfig(pump);
+
+    p.circuit = circuitId;
+    delete own.bindErrors[id];
+    remember();
+    publish();
+    console.log(`bound program '${p.name}' to njsPC circuit ${circuitId} at ${p.rpm} rpm`);
+    return circuitId;
+  } catch (err) {
+    throw fail(err.message);
+  }
+}
+
+/**
+ * Take the circuit back out of njsPC.
+ *
+ * Pump first, then the circuit. The other order leaves the pump holding a
+ * circuit id that no longer resolves, and `setTargetSpeed` reads every entry
+ * on every poll.
+ */
+async function unbind(id) {
+  const p = own.programs.find((x) => x.id === id);
+  if (!p || p.circuit == null) return;
+
+  const limits = pumpLimits(njsRaw);
+  if (limits) {
+    const options = await njs.pumpOptions();
+    const pump = (options?.pumps ?? []).find((x) => x.id === limits.pumpId);
+    if (pump) {
+      pump.circuits = withoutPumpCircuit(pump, p.circuit);
+      await njs.setPumpConfig(pump);
+    }
+  }
+  await njs.deleteCircuitConfig(p.circuit);
+  console.log(`unbound program '${p.name}' from njsPC circuit ${p.circuit}`);
+  p.circuit = null;
+  remember();
+  publish();
 }
 
 /* ---- intents ---------------------------------------------------------- */
@@ -191,7 +280,6 @@ const intents = {
   /** Run or stop the pump outright — the Pool circuit being on at all. */
   async setPumpRunning({ on }) {
     await njs.setCircuit(POOL_CIRCUIT, Boolean(on));
-    if (!on) own.activeProgram = null;
     publish();
   },
 
@@ -207,26 +295,40 @@ const intents = {
   },
 
   /**
-   * Programs. Each is meant to be an njsPC circuit carrying the speed and the
-   * egg timer; until commissioning creates them a program is definable and
-   * editable but not runnable, and says so rather than pretending.
+   * Programs.
+   *
+   * A program is a name, a speed and an expiry; njsPC keeps those in two
+   * places — the name and the egg timer on a circuit, the speed in the
+   * pump's circuit list — so binding is two writes. `binding.js` decides
+   * what to write and refuses what njsPC would accept but should not.
+   *
+   * Binding is attempted whenever a program is saved, because a program that
+   * cannot run is not much of a program. It is also a separate intent, so a
+   * failure caused by njsPC being down can be retried without editing
+   * anything. Either way the program is kept: defining one is a preference
+   * and works offline, and only the binding needs njsPC.
    */
   async startProgram({ id }) {
     const p = own.programs.find((x) => x.id === id);
     if (!p) throw refuse(`no program '${id}'`);
     if (p.circuit == null) {
-      throw refuse(`'${p.name}' has no njsPC circuit yet — see commissioning`);
+      /* Prefer the reason as it stands now over the one recorded at the last
+         attempt: a pump configured since then makes the old message a lie. */
+      const why =
+        whyNotBindable(p, pumpLimits(njsRaw)) ??
+        own.bindErrors[id] ??
+        "it is not bound to a circuit yet";
+      throw refuse(`'${p.name}' cannot run — ${why}`);
     }
     await njs.setCircuit(p.circuit, true);
-    own.activeProgram = { id: p.id, name: p.name, rpm: p.rpm, endsAt: Date.now() + p.minutes * 60000 };
-    publish();
+    /* Nothing recorded here. The circuit's egg timer runs the expiry, and
+       `map.js` reads the running program back out of njsPC's own state. */
   },
 
   async stopProgram() {
-    const p = own.programs.find((x) => x.id === own.activeProgram?.id);
+    const running = ui?.activeProgram;
+    const p = own.programs.find((x) => x.id === running?.id);
     if (p?.circuit != null) await njs.setCircuit(p.circuit, false);
-    own.activeProgram = null;
-    publish();
   },
 
   async saveProgram({ program }) {
@@ -234,19 +336,36 @@ const intents = {
     if (!clean.id) throw refuse("program needs an id");
     /* Editing the running one stops it: leaving the pump going under a name
        that no longer describes it is worse than interrupting. */
-    if (own.activeProgram?.id === clean.id) await intents.stopProgram({});
+    if (ui?.activeProgram?.id === clean.id) await intents.stopProgram({});
+    /* Keep whichever circuit it was already bound to — the editor never
+       sends one, and dropping it here would orphan the circuit in njsPC. */
+    const previous = own.programs.find((x) => x.id === clean.id);
+    const merged = { ...clean, circuit: clean.circuit ?? previous?.circuit ?? null };
     own.programs = isNew
-      ? [...own.programs, clean]
-      : own.programs.map((x) => (x.id === clean.id ? clean : x));
+      ? [...own.programs, merged]
+      : own.programs.map((x) => (x.id === merged.id ? merged : x));
+    remember();
+    publish();
+    /* Saved either way. The binding is best-effort and reports itself. */
+    await bind(merged.id).catch(() => {});
+  },
+
+  async deleteProgram({ id }) {
+    if (ui?.activeProgram?.id === id) await intents.stopProgram({});
+    /* Unbind before forgetting, or the circuit outlives every reference to
+       it and shows up in dashPanel as equipment nobody can name. */
+    await unbind(id).catch((err) => {
+      console.warn(`could not unbind '${id}' before deleting: ${err.message}`);
+    });
+    own.programs = own.programs.filter((x) => x.id !== id);
+    delete own.bindErrors[id];
     remember();
     publish();
   },
 
-  async deleteProgram({ id }) {
-    if (own.activeProgram?.id === id) await intents.stopProgram({});
-    own.programs = own.programs.filter((x) => x.id !== id);
-    remember();
-    publish();
+  /** Retry a binding that failed, without editing the program. */
+  async bindProgram({ id }) {
+    await bind(id);
   },
 
   async setTarget({ body, degrees, delta }) {
