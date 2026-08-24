@@ -19,7 +19,12 @@ const makeState = (over = {}) => ({
   setpoint: null, heaterCall: "off", targets: { pool: 88, spa: 102 },
   poolHeatDemand: false, blower: false, light: false,
   saltPpm: 3150, cellOutput: 45, connected: true, lastSeen: Date.now(),
-  spaExpiresAt: null, preheat: null, ...over,
+  spaExpiresAt: null, preheat: null,
+  programs: [
+    { id: "filtration", name: "Filtration", rpm: 1600, minutes: 60 },
+    { id: "skimming", name: "Skimming", rpm: 2100, minutes: 30 },
+  ],
+  activeProgram: null, pumpRunning: true, panelMode: "auto", ...over,
 });
 
 const makeController = (over = {}, fns = {}) => ({
@@ -27,7 +32,9 @@ const makeController = (over = {}, fns = {}) => ({
   setMode: vi.fn(), setRpm: vi.fn(), setTarget: vi.fn(), adjustTarget: vi.fn(),
   setPoolHeat: vi.fn(), toggle: vi.fn(), holdPump: vi.fn(), releasePump: vi.fn(),
   extendSpa: vi.fn(), schedulePreheat: vi.fn(), cancelPreheat: vi.fn(),
-  simulateOutage: vi.fn(), problem: null, dismissProblem: vi.fn(), ...fns,
+  simulateOutage: vi.fn(), problem: null, dismissProblem: vi.fn(),
+  setPumpRunning: vi.fn(), setPanelMode: vi.fn(), startProgram: vi.fn(),
+  stopProgram: vi.fn(), saveProgram: vi.fn(), deleteProgram: vi.fn(), ...fns,
 });
 
 const water = (c) => render(<PoolSpaControl controller={c} themeControl={null} onOpenHeat={vi.fn()} />);
@@ -152,62 +159,11 @@ describe("Water — transition step list", () => {
 
 /* ----------------------------------------------------------------- pump */
 
-describe("Pump — presets", () => {
-  it("commands the preset speed", () => {
-    const c = makeController();
-    pump(c);
-    fireEvent.click(screen.getByText("Spa jets").closest("button"));
-    expect(c.setRpm).toHaveBeenCalledWith(2800);
-  });
-  it("marks the preset matching the current speed", () => {
-    const { container } = pump(makeController({ pumpRpm: 2100 }));
-    expect(container.textContent).toContain("Skimming");
-  });
-});
-
-describe("Pump — heat interlock", () => {
-  it("explains the floor while heat is calling", () => {
-    const { container } = pump(makeController({ heaterCall: "spa", mode: "spa", pumpRpm: 2800 }));
-    expect(container.textContent).toMatch(new RegExp(`Floored at ${HEATER_MIN_RPM}`));
-  });
-  it("warns below the thresholds when no heat is called", () => {
-    const { container } = pump(makeController({ pumpRpm: 800 }));
-    expect(container.textContent).toMatch(/will not fire|will not generate/);
-  });
-});
-
-describe("Pump — manual hold", () => {
-  it("pins the current speed", () => {
-    const c = makeController();
-    pump(c);
-    fireEvent.click(screen.getByText(/^Hold 1600 rpm$/));
-    expect(c.holdPump).toHaveBeenCalled();
-  });
-  it("shows the hold and offers release", () => {
-    const c = makeController({ pumpHold: { rpm: 2400, startedAt: Date.now(), expiresAt: null } });
-    pump(c);
-    expect(screen.getByText(/Holding 2400 rpm/)).toBeDefined();
-    fireEvent.click(screen.getByText("Release"));
-    expect(c.releasePump).toHaveBeenCalled();
-  });
-  it("is unavailable in spa mode, which owns the pump", () => {
-    const c = makeController({ mode: "spa" });
-    pump(c);
-    expect(screen.getByText(/^Hold \d+ rpm$/).closest("button").disabled).toBe(true);
-  });
-  it("offers an open-ended hold and timed ones", () => {
-    pump(makeController());
-    for (const label of ["Until I stop it", "1 h", "4 h"]) {
-      expect(screen.getByText(label)).toBeDefined();
-    }
-  });
-});
-
 describe("Pump — who is driving", () => {
   const badge = (over) => pump(makeController(over)).container.textContent;
   it("names spa mode", () => expect(badge({ mode: "spa" })).toMatch(/Spa mode/));
-  it("names a hold", () =>
-    expect(badge({ pumpHold: { rpm: 1600, startedAt: 1, expiresAt: null } })).toMatch(/Held/));
+  it("names a running program", () =>
+    expect(badge({ activeProgram: { id: "skimming", name: "Skimming", rpm: 2100, endsAt: Date.now() + 60000 } })).toMatch(/Skimming/));
   it("names manual when nothing else claims it", () =>
     expect(badge({})).toMatch(/Manual|Schedule/));
 });
@@ -225,9 +181,10 @@ describe("Pump — schedules", () => {
     fireEvent.click(rows().find((b) => b.getAttribute("aria-pressed") === "true"));
     expect(on()).toBe(before - 1);
   });
-  it("opens the editor from Add", () => {
+  it("opens the schedule editor from its Add", () => {
     pump(makeController());
-    fireEvent.click(screen.getByText("Add"));
+    /* Two Adds now — programs and schedules. */
+    fireEvent.click(screen.getByLabelText("Add schedule"));
     expect(screen.getByRole("dialog")).toBeDefined();
   });
   it("totals daily runtime and cost", () => {
@@ -310,5 +267,106 @@ describe("Schedule editor", () => {
     fireEvent.click(screen.getByText("Cancel"));
     expect(onCancel).toHaveBeenCalled();
     expect(onSave).not.toHaveBeenCalled();
+  });
+});
+
+/* ------------------------------------------------------------- programs */
+
+describe("Pump — run and stop", () => {
+  it("stops the pump", () => {
+    const c = makeController();
+    pump(c);
+    fireEvent.click(screen.getByText("Stop the pump"));
+    expect(c.setPumpRunning).toHaveBeenCalledWith(false);
+  });
+
+  it("offers to run it again once stopped, and says what that blocks", () => {
+    const c = makeController({ pumpRunning: false });
+    const { container } = pump(c);
+    fireEvent.click(screen.getByText("Run the pump"));
+    expect(c.setPumpRunning).toHaveBeenCalledWith(true);
+    expect(container.textContent).toMatch(/cannot run the pump while it is stopped/);
+  });
+
+  it("names the pump as stopped", () => {
+    expect(pump(makeController({ pumpRunning: false })).container.textContent).toMatch(/Stopped/);
+  });
+});
+
+describe("Pump — programs", () => {
+  it("lists them with speed and duration", () => {
+    const { container } = pump(makeController());
+    expect(container.textContent).toMatch(/Filtration/);
+    expect(container.textContent).toMatch(/2100 rpm/);
+    expect(container.textContent).toMatch(/30 min/);
+  });
+
+  it("runs one", () => {
+    const c = makeController();
+    pump(c);
+    fireEvent.click(screen.getByLabelText("Run Skimming"));
+    expect(c.startProgram).toHaveBeenCalledWith("skimming");
+  });
+
+  it("shows the time left and offers to stop it", () => {
+    const c = makeController({
+      activeProgram: { id: "skimming", name: "Skimming", rpm: 2100, endsAt: Date.now() + 12 * 60000 },
+    });
+    const { container } = pump(c);
+    expect(container.textContent).toMatch(/min left/);
+    fireEvent.click(screen.getByLabelText("Stop Skimming"));
+    expect(c.stopProgram).toHaveBeenCalled();
+  });
+
+  it("names the running program as the driver", () => {
+    const c = makeController({
+      activeProgram: { id: "skimming", name: "Skimming", rpm: 2100, endsAt: Date.now() + 60000 },
+    });
+    expect(pump(c).container.textContent).toMatch(/Skimming/);
+  });
+
+  it("cannot be run while the pump is stopped", () => {
+    const c = makeController({ pumpRunning: false });
+    pump(c);
+    expect(screen.getByLabelText("Run Filtration").disabled).toBe(true);
+  });
+
+  it("cannot be run in spa mode, which owns the pump", () => {
+    const c = makeController({ mode: "spa" });
+    pump(c);
+    expect(screen.getByLabelText("Run Filtration").disabled).toBe(true);
+  });
+
+  it("opens the editor for an existing program", () => {
+    pump(makeController());
+    fireEvent.click(screen.getByLabelText("Edit Filtration"));
+    expect(screen.getByRole("dialog")).toBeDefined();
+  });
+
+  it("opens the editor for a new one", () => {
+    pump(makeController());
+    fireEvent.click(screen.getByLabelText("Add program"));
+    expect(screen.getByRole("dialog")).toBeDefined();
+  });
+});
+
+describe("Pump — service mode", () => {
+  it("stands the schedules down", () => {
+    const c = makeController();
+    pump(c);
+    fireEvent.click(screen.getByText("Service"));
+    expect(c.setPanelMode).toHaveBeenCalledWith("service");
+  });
+
+  it("says plainly that nothing will start on its own", () => {
+    const { container } = pump(makeController({ panelMode: "service" }));
+    expect(container.textContent).toMatch(/Nothing will start on its own/);
+  });
+
+  it("resumes", () => {
+    const c = makeController({ panelMode: "service" });
+    pump(c);
+    fireEvent.click(screen.getByText("Resume"));
+    expect(c.setPanelMode).toHaveBeenCalledWith("auto");
   });
 });

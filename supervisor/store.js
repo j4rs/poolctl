@@ -89,8 +89,9 @@ export class Store {
  * and asking for heat again should be a deliberate act rather than something
  * a power cut resumes on your behalf.
  *
- * `pumpHold` is absent because njsPC owns it (ADR-11) and persists it itself
- * — duplicating it here would create two answers to one question.
+ * A running program is absent for the same class of reason: njsPC holds it
+ * as a circuit with an egg timer (ADR-11) and expires it on its own, so a
+ * second copy here would be a second answer to one question.
  */
 export const PERSISTED = ["targets", "preheat"];
 

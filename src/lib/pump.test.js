@@ -51,3 +51,52 @@ describe("active schedule", () => {
     expect(clockAt(at(9, 5).getTime())).toBe("09:05");
   });
 });
+
+/* ---------------------------------------------------------------------- */
+
+import { validate, speedNotes, blankProgram, remaining, DURATIONS, MAX_MINUTES } from "./programs";
+import { CELL_MIN_RPM, HEATER_MIN_RPM } from "./sequences";
+
+describe("program validation", () => {
+  const ok = { name: "Skim", rpm: 2100, minutes: 30 };
+  it("accepts a complete program", () => expect(validate(ok)).toBeNull());
+  it("requires a name", () => expect(validate({ ...ok, name: "  " })).toMatch(/name/i));
+  it("requires a speed", () => expect(validate({ ...ok, rpm: 0 })).toMatch(/speed/i));
+  it("requires a duration", () => expect(validate({ ...ok, minutes: 0 })).toMatch(/how long/i));
+  it("caps the run length", () => {
+    /* Unbounded is what njsPC's 720-minute default would give us. */
+    expect(validate({ ...ok, minutes: MAX_MINUTES + 1 })).toMatch(/Longest run/);
+  });
+  it("gives a new program a usable default duration", () => {
+    expect(validate(blankProgram())).toMatch(/name/i);
+    expect(blankProgram().minutes).toBeGreaterThan(0);
+  });
+});
+
+describe("speed notes", () => {
+  it("warns below chlorinator flow", () =>
+    expect(speedNotes(CELL_MIN_RPM - 100).join()).toMatch(/cell will not generate/));
+  it("warns below the heater minimum", () =>
+    expect(speedNotes(HEATER_MIN_RPM - 100).join()).toMatch(/heater will not fire/));
+  it("says nothing at a speed that satisfies both", () =>
+    expect(speedNotes(HEATER_MIN_RPM + 100)).toEqual([]));
+});
+
+describe("remaining time", () => {
+  it("counts down", () => {
+    expect(remaining({ endsAt: Date.now() + 60000 })).toBeGreaterThan(50000);
+  });
+  it("never goes negative", () => {
+    expect(remaining({ endsAt: Date.now() - 60000 })).toBe(0);
+  });
+  it("is null when nothing is running", () => expect(remaining(null)).toBeNull());
+});
+
+describe("durations offered", () => {
+  it("starts below an hour, because a skim is not an hour", () => {
+    expect(Math.min(...DURATIONS.map((d) => d.minutes))).toBeLessThan(60);
+  });
+  it("stays within the cap", () => {
+    expect(Math.max(...DURATIONS.map((d) => d.minutes))).toBeLessThanOrEqual(MAX_MINUTES);
+  });
+});

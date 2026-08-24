@@ -160,10 +160,10 @@ is just something to respond to, which is why there is no state to sync.
 Full lists in PRD §10 (open questions) and §11 (backlog). Available without
 hardware, highest value first:
 
-1. **Finish the intents.** `setMode`, `setTarget`, `toggle`, `setPoolHeat`,
-   `holdPump`/`releasePump` are wired. `setRpm` refuses pending the manual
-   pump circuit; `extendSpa` and the preheat pair are unimplemented — every
-   refusal surfaces in the UI rather than being swallowed.
+1. **Wire the program intents.** `setMode`, `setTarget`, `toggle`,
+   `setPoolHeat` are live. `setPumpRunning`, `setPanelMode` and the program
+   CRUD run against the mock only; `extendSpa` and preheat are unimplemented.
+   Every refusal surfaces in the UI rather than being swallowed.
 2. **Integration tests for the socket layer.** The suite covers the client and
    the supervisor's pure logic, not reconnection or the njsPC link — which is
    exactly where the heartbeat bug lived.
@@ -174,9 +174,9 @@ hardware, highest value first:
    set the Spa circuit `eggTimer` to 120 (njsPC defaults to 720 — a
    twelve-hour spa session), configure njsPC's valves with **no device
    binding** so the supervisor drives the relays instead of REM's latch, and
-   create the **manual pump circuit** the supervisor rewrites for speed —
-   njsPC has no runtime pump-speed endpoint, so without it `setRpm` has
-   nowhere to go.
+   create **one circuit per manual program** (name, pump speed, `eggTimer`)
+   — njsPC has no runtime pump-speed endpoint, and programs are how speed is
+   expressed at all.
 
 Blocked on the relay HAT: bus sniffing, the salt question (case 18), real
 `HEATER_MIN_RPM` / `CELL_MIN_RPM`, and thermals with the enclosure sealed.

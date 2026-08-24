@@ -180,20 +180,6 @@ const intents = {
     publish();
   },
 
-  /**
-   * Manual pump hold — njsPC's ManualPriorityDelay, per ADR-11. njsPC owns
-   * and persists it, which is why nothing here is written to our own store.
-   */
-  async holdPump() {
-    const circuit = ui?.mode === "spa" ? SPA_CIRCUIT : POOL_CIRCUIT;
-    if (ui?.mode === "spa") throw refuse("spa mode already ignores schedules");
-    await njs.setManualPriority(circuit);
-  },
-
-  async releasePump() {
-    /* Re-issuing clears it: njsPC toggles manual priority on the circuit. */
-    await njs.setManualPriority(POOL_CIRCUIT);
-  },
 
   async setTarget({ body, degrees, delta }) {
     if (!(body in own.targets)) throw new Error(`unknown body ${body}`);

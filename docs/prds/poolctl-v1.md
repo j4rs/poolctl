@@ -1198,21 +1198,23 @@ eyes on bonding.
       as normal, or it will cry wolf every cold snap. Pool freeze protection
       is a separate concern and is deliberately out of scope for v1.
 
-- [ ] **How the pump gets a speed.** njsPC has **no runtime endpoint for pump
-      speed**. It drives the pump from circuit assignments, so the only lever
-      is `/config/pumpCircuit`, which rewrites the speed a circuit runs at
-      *permanently* — including for every schedule that uses it. Setting
-      1800 rpm from the app would silently redefine what "filtration" means.
+- [x] **How the pump gets a speed.** *Answered, and it changed the UI.* njsPC
+      has no runtime pump-speed endpoint: it drives the pump from circuits,
+      and `/config/pumpCircuit` only rewrites what a circuit runs at.
 
-      The idiomatic fix is a **dedicated manual circuit** the supervisor owns
-      and rewrites, switched on with `manualOperationPriority` so schedules
-      stand aside. That also makes the pump hold and the speed slider one
-      mechanism rather than two, which is how the UI already presents them.
+      That absence was the domain model talking, not a gap. Pentair's own app
+      has no speed slider either, for the same reason — nobody dials an rpm,
+      they pick a program. The slider was a fabricated nice-to-have; it has
+      been removed along with `setRpm`, the preset row, and the threshold
+      markers that decorated it.
 
-      It is a commissioning decision — the circuit must exist in njsPC's
-      config — so `setRpm` currently refuses with that reason rather than
-      improvising. The heat floor is applied first regardless, so the refusal
-      reports the speed that *would* have been used.
+      Speed now lives in exactly two places, both of which njsPC already
+      models: **a schedule** (window plus speed) and **a program** (name,
+      speed, and a required expiry). Each program is one circuit with a pump
+      speed and an `eggTimer`. "Hold this speed" went with the slider — it
+      only meant anything when there was an arbitrary speed to hold.
+
+      Commissioning gains: create a circuit per program.
 
 - [ ] **Valve travel time.** Bounded **under 60 sec** by the manual's 1-minute
       duty cycle, but not stated exactly. `sequences.js` assumes 45 sec per move

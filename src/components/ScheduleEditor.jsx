@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { C, FONT_UI, FONT_DATA } from "../theme";
+import { Sheet, Row, Action } from "./Sheet";
 import { HEATER_MIN_RPM, CELL_MIN_RPM } from "../lib/sequences";
 import {
   RPM_MIN, RPM_MAX, watts, DAYS, daysLabel, hoursBetween, overlaps,
@@ -35,26 +36,11 @@ export default function ScheduleEditor({ value, others, onSave, onDelete, onCanc
     }));
 
   return (
-    <div
-      onClick={onCancel}
-      style={{
-        position: "fixed", inset: 0, zIndex: 20, background: C.scrim,
-        display: "flex", alignItems: "flex-end", justifyContent: "center",
-      }}>
-      <div
-        onClick={(e) => e.stopPropagation()}
-        role="dialog" aria-modal="true" aria-label={value.isNew ? "Add schedule" : "Edit schedule"}
-        style={{
-          width: "100%", maxWidth: 460, maxHeight: "92vh", overflowY: "auto",
-          background: C.surface, borderTop: `1px solid ${C.line}`,
-          borderRadius: "16px 16px 0 0", padding: "18px 16px",
-          paddingBottom: "calc(18px + env(safe-area-inset-bottom))",
-          fontFamily: FONT_UI, color: C.stone,
-        }}>
-        <div style={{ fontSize: 17, fontWeight: 600, marginBottom: 18 }}>
-          {value.isNew ? "New schedule" : "Edit schedule"}
-        </div>
-
+    <Sheet
+      title={value.isNew ? "New schedule" : "Edit schedule"}
+      label={value.isNew ? "Add schedule" : "Edit schedule"}
+      onCancel={onCancel}
+    >
         <Row label="Runs">
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <TimeField value={draft.start} onChange={(v) => set({ start: v })} label="Start time" />
@@ -139,26 +125,10 @@ export default function ScheduleEditor({ value, others, onSave, onDelete, onCanc
           {!value.isNew && <Action label="Delete" tone={C.alert} onClick={() => onDelete(draft.id)} />}
           <Action label="Save" primary disabled={invalid} onClick={() => onSave(draft)} />
         </div>
-      </div>
-    </div>
+    </Sheet>
   );
 }
 
-function Row({ label, hint, children }) {
-  return (
-    <div style={{ marginBottom: 18 }}>
-      <div style={{
-        display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8,
-      }}>
-        <span style={{ fontFamily: FONT_DATA, fontSize: 10, letterSpacing: 1.2, color: C.muted, textTransform: "uppercase" }}>
-          {label}
-        </span>
-        {hint && <span style={{ fontSize: 11.5, color: C.muted }}>{hint}</span>}
-      </div>
-      {children}
-    </div>
-  );
-}
 
 function TimeField({ value, onChange, label }) {
   return (
@@ -172,19 +142,3 @@ function TimeField({ value, onChange, label }) {
   );
 }
 
-function Action({ label, onClick, primary, tone, disabled }) {
-  return (
-    <button onClick={onClick} disabled={disabled}
-      style={{
-        flex: primary ? 1.4 : 1, padding: "14px 8px", borderRadius: 10,
-        border: `1px solid ${primary ? (disabled ? C.line : C.water) : C.line}`,
-        background: primary && !disabled ? C.water : "transparent",
-        color: primary ? (disabled ? C.faint : C.ground) : tone || C.stone,
-        fontFamily: FONT_UI, fontSize: 14, fontWeight: 600,
-        cursor: disabled ? "not-allowed" : "pointer",
-        opacity: disabled ? 0.6 : 1,
-      }}>
-      {label}
-    </button>
-  );
-}

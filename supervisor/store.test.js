@@ -53,7 +53,7 @@ describe("what persists", () => {
     preheat: null,
     bypass: "flow",
     poolHeatDemand: true,
-    pumpHold: { rpm: 2400 },
+    activeProgram: { id: "skimming", endsAt: 1 },
     connected: true,
   };
 
@@ -72,9 +72,9 @@ describe("what persists", () => {
     expect(pickPersisted(own).poolHeatDemand).toBeUndefined();
   });
 
-  it("leaves the pump hold to njsPC", () => {
-    /* ADR-11: njsPC's ManualPriorityDelay owns it. Two copies, two answers. */
-    expect(pickPersisted(own).pumpHold).toBeUndefined();
+  it("leaves a running program to njsPC", () => {
+    /* njsPC holds it as a circuit with an egg timer and expires it itself. */
+    expect(pickPersisted(own).activeProgram).toBeUndefined();
   });
 
   it("restores preferences over defaults and ignores the rest", () => {

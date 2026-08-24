@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { DEFAULT_PROGRAMS } from "./programs";
 import {
   SEQUENCES, isSkipped, POOL_RPM, SPA_RPM, VALVE_RPM,
   HEATER_MIN_RPM, HEATER_CAP, TARGET_MIN, SPA_TIMEOUT_MIN, SPA_HEAT_RATE,
@@ -87,11 +88,15 @@ export function useController() {
        the 3-wire contacts carry no temperature (ADR-4), so these can only
        end a heat call early — never raise the heater's cap. */
     targets: { pool: 88, spa: 102 },
-    /* Manual hold. While set, the pump stays here and schedules are
-       suspended. `expiresAt` null means it holds until released — the
-       server must persist this, since a phone cannot be the thing that
-       remembers the pump is pinned. */
-    pumpHold: null,
+    /* Manual programs, and which one is running. njsPC holds these as
+       circuits with pump speeds and egg timers; here they are plain data. */
+    programs: DEFAULT_PROGRAMS,
+    activeProgram: null,
+    /* The pump itself, independent of speed: stopped means stopped. */
+    pumpRunning: true,
+    /* njsPC panel mode. 'service' means automation stands down and only
+       manual commands act — the industry switch for working on equipment. */
+    panelMode: "auto",
     poolHeatDemand: false,
     blower: false,
     light: false,
@@ -179,7 +184,15 @@ export function useController() {
       setState((s) => ({
         ...s, ...seed, ...patch,
         /* A sequence takes the pump, so any manual hold is over. */
-        pumpHold: null,
+    /* Manual programs, and which one is running. njsPC holds these as
+       circuits with pump speeds and egg timers; here they are plain data. */
+    programs: DEFAULT_PROGRAMS,
+    activeProgram: null,
+    /* The pump itself, independent of speed: stopped means stopped. */
+    pumpRunning: true,
+    /* njsPC panel mode. 'service' means automation stands down and only
+       manual commands act — the industry switch for working on equipment. */
+    panelMode: "auto",
         target: landing, activeSequence: name, step, stepIndex: i, steps: plan,
       }));
 
@@ -220,24 +233,62 @@ export function useController() {
       return {
         ...s,
         pumpRpm: next,
-        /* Moving the slider under a hold retunes the hold, rather than
-           quietly dropping back to schedule control. */
-        pumpHold: s.pumpHold ? { ...s.pumpHold, rpm: next } : null,
       };
     });
 
-  /** Pin the current speed. `minutes` null holds until released. */
-  const holdPump = (minutes = null) =>
+
+  /* Start / stop the pump outright. Distinct from speed: this is the circuit
+     being on at all, which is what "stop the pump" means to anyone standing
+     at the equipment. */
+  const setPumpRunning = (on) =>
     setState((s) => ({
       ...s,
-      pumpHold: {
-        rpm: s.pumpRpm,
-        startedAt: Date.now(),
-        expiresAt: minutes ? Date.now() + minutes * 60000 : null,
-      },
+      pumpRunning: Boolean(on),
+      pumpRpm: on ? (s.activeProgram ? s.pumpRpm : POOL_RPM) : 0,
+      activeProgram: on ? s.activeProgram : null,
     }));
 
-  const releasePump = () => setState((s) => ({ ...s, pumpHold: null }));
+  /* Auto or service. Service suspends schedules without disabling them one
+     by one, and is what you want while cleaning a filter. */
+  const setPanelMode = (mode) =>
+    setState((s) => ({ ...s, panelMode: mode === "service" ? "service" : "auto" }));
+
+  /** Run a program. Expiry is mandatory — see programs.js. */
+  const startProgram = (id) =>
+    setState((s) => {
+      const p = s.programs.find((x) => x.id === id);
+      if (!p) return s;
+      return {
+        ...s,
+        pumpRunning: true,
+        pumpRpm: p.rpm,
+        activeProgram: { id: p.id, name: p.name, rpm: p.rpm, endsAt: Date.now() + p.minutes * 60000 },
+      };
+    });
+
+  const stopProgram = () =>
+    setState((s) => ({ ...s, activeProgram: null, pumpRpm: s.pumpRunning ? POOL_RPM : 0 }));
+
+  const saveProgram = (draft) =>
+    setState((s) => {
+      const { isNew, ...clean } = draft;
+      return {
+        ...s,
+        programs: isNew
+          ? [...s.programs, clean]
+          : s.programs.map((p) => (p.id === clean.id ? clean : p)),
+      };
+    });
+
+  /* Editing or deleting a running program stops it first: leaving the pump
+     running under a name that no longer exists is worse than interrupting. */
+  const deleteProgram = (id) =>
+    setState((s) => ({
+      ...s,
+      programs: s.programs.filter((p) => p.id !== id),
+      activeProgram: s.activeProgram?.id === id ? null : s.activeProgram,
+      pumpRpm: s.activeProgram?.id === id ? POOL_RPM : s.pumpRpm,
+    }));
 
   /** Push the spa auto-revert out by another full timeout from now. */
   const extendSpa = () =>
@@ -333,12 +384,9 @@ export function useController() {
       }
 
       setState((s) => {
-        const expired = s.pumpHold?.expiresAt && now >= s.pumpHold.expiresAt;
         const beat = { lastSeen: now, connected: true };
-        if (s.heaterCall === "off") {
-          return { ...s, ...beat, ...(expired ? { pumpHold: null } : {}) };
-        }
-        const base = expired ? { ...s, pumpHold: null } : s;
+        if (s.heaterCall === "off") return { ...s, ...beat };
+        const base = s;
         compressorAt.current = now;
         /* Compressed for the mock. The blower figure is near zero because
            blower and heater roughly cancel — see PRD §Thermal reality. */
@@ -355,7 +403,8 @@ export function useController() {
   useEffect(() => () => clearTimeout(timer.current), []);
 
   return {
-    state, setMode, setRpm, holdPump, releasePump, setTarget, adjustTarget, setPoolHeat, toggle,
+    state, setMode, setRpm, setTarget, adjustTarget, setPoolHeat, toggle,
+    setPumpRunning, setPanelMode, startProgram, stopProgram, saveProgram, deleteProgram,
     extendSpa, schedulePreheat, cancelPreheat, simulateOutage,
     /* The mock never refuses anything, but App renders the same Toast either
        way rather than caring which hook it was handed. */

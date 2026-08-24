@@ -88,6 +88,16 @@ export function toUiState(njs, own) {
     /* njsPC's own egg timer is the spa auto-revert (ADR-11 / commissioning). */
     spaExpiresAt: spaCircuit?.endTime ? Date.parse(spaCircuit.endTime) : null,
 
+    /* Manual programs are njsPC circuits carrying a pump speed and an egg
+       timer. None exist until commissioning creates them, so an empty list
+       is the honest answer rather than an absent field. */
+    programs: own.programs ?? [],
+    activeProgram: own.activeProgram ?? null,
+    /* Whether the pump circuit is on at all, distinct from its speed. */
+    pumpRunning: Boolean(poolCircuit?.isOn || spaCircuit?.isOn),
+    /* njsPC panel mode: 'service' stands the schedules down. */
+    panelMode: nameOf(njs.mode) === "service" ? "service" : "auto",
+
     /* Not yet mapped — no relay assignment exists until the HAT arrives. */
     blower: own.blower ?? false,
     light: own.light ?? false,

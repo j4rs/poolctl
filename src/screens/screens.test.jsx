@@ -33,6 +33,8 @@ const controller = {
   setPoolHeat: vi.fn(), toggle: vi.fn(), holdPump: vi.fn(), releasePump: vi.fn(),
   extendSpa: vi.fn(), schedulePreheat: vi.fn(), cancelPreheat: vi.fn(),
   simulateOutage: vi.fn(), problem: null, dismissProblem: vi.fn(),
+  setPumpRunning: vi.fn(), setPanelMode: vi.fn(), startProgram: vi.fn(),
+  stopProgram: vi.fn(), saveProgram: vi.fn(), deleteProgram: vi.fn(),
 };
 
 describe("screens render when nothing is known", () => {
@@ -71,6 +73,12 @@ describe("unknown is shown as unknown, not as zero", () => {
     const { container } = render(<PumpControl controller={controller} themeControl={null} />);
     expect(container.textContent).toContain("no reading from the pump");
     expect(container.textContent).not.toMatch(/\$0\.00\/day/);
+  });
+
+  it("Pump shows no programs rather than inventing some", () => {
+    /* A live supervisor has none until commissioning creates the circuits. */
+    const { container } = render(<PumpControl controller={controller} themeControl={null} />);
+    expect(container.textContent).toMatch(/No programs yet/);
   });
 
   it("preheat is refused, with the reason, rather than crashing", () => {

@@ -1,27 +1,15 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { C, FONT_UI, FONT_DATA } from "../theme";
 import { HEATER_MIN_RPM, CELL_MIN_RPM, POOL_RPM } from "../lib/sequences";
 import {
   RPM_MIN, RPM_MAX, watts, daysLabel, hoursBetween, activeSchedule, clockAt,
 } from "../lib/pump";
 import ScheduleEditor from "../components/ScheduleEditor";
+import ProgramEditor from "../components/ProgramEditor";
+import { blankProgram, remaining } from "../lib/programs";
 
 const RATE = 0.15;        // $/kWh — set to your own utility rate
 
-const MARKER_ROW = 14;    // vertical offset between staggered marker labels
-const MARKER_H = 44;      // total height of the marker strip above the slider
-
-const THRESHOLDS = [
-  { rpm: CELL_MIN_RPM, label: "Chlorinator flow", color: C.waterDim },
-  { rpm: HEATER_MIN_RPM, label: "Heater minimum", color: C.heat },
-];
-
-const PRESETS = [
-  { id: "eco", label: "Filtration", rpm: 1600 },
-  { id: "skim", label: "Skimming", rpm: 2100 },
-  { id: "spill", label: "Strong spill", rpm: 2200 },
-  { id: "spa", label: "Spa jets", rpm: 2800 },
-];
 
 const EVERY_DAY = [0, 1, 2, 3, 4, 5, 6];
 
@@ -40,24 +28,32 @@ const blankSchedule = () => ({
   start: "09:00", end: "13:00", rpm: 1600, days: EVERY_DAY, on: true, isNew: true,
 });
 
-const HOLD_OPTIONS = [
-  { id: "open", label: "Until I stop it", minutes: null },
-  { id: "1h", label: "1 h", minutes: 60 },
-  { id: "4h", label: "4 h", minutes: 240 },
-];
-
 export default function PumpControl({ controller, themeControl }) {
-  const { state, setRpm, holdPump, releasePump } = controller;
+  const { state, setPumpRunning, setPanelMode,
+    startProgram, stopProgram, saveProgram, deleteProgram } = controller;
   /* null means no reading from the pump — distinct from 0, which means
      stopped. The slider still needs a position, so it falls back to the
      filtration speed, but the readout says plainly that we do not know. */
   const rpm = state.pumpRpm;
   const rpmKnown = rpm != null;
   const sliderRpm = rpmKnown ? rpm : POOL_RPM;
-  const { pumpHold, heaterCall, mode } = state;
+  /* Defaults because the live supervisor legitimately has no programs until
+     commissioning creates the circuits, and no panel mode until njsPC
+     reports one. Absent is not the same as broken. */
+  const { heaterCall, mode } = state;
+  const programs = state.programs ?? [];
+  const activeProgram = state.activeProgram ?? null;
+  const pumpRunning = state.pumpRunning ?? false;
+  const panelMode = state.panelMode ?? "auto";
   const [schedules, setSchedules] = useState(INITIAL);
   const [editing, setEditing] = useState(null);
-  const [holdFor, setHoldFor] = useState("open");
+  const [editingProgram, setEditingProgram] = useState(null);
+  /* Countdowns need their own clock; state only moves on the beat. */
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => tick((n) => n + 1), 1000);
+    return () => clearInterval(t);
+  }, []);
 
   const scheduled = activeSchedule(schedules);
   const spaOwnsPump = mode === "spa";
@@ -65,18 +61,20 @@ export default function PumpControl({ controller, themeControl }) {
   /* In spa mode the pump is already immune to schedules, so a hold would
      protect against nothing — and the pool sequence resets the speed on the
      way out regardless. */
-  const owner = spaOwnsPump
-    ? { label: "Spa mode", tone: C.heat }
-    : pumpHold
-      ? { label: "Held", tone: C.heat }
-      : scheduled
-        ? { label: "Schedule", tone: C.water }
-        : { label: "Manual", tone: C.muted };
+  const owner = !pumpRunning
+    ? { label: "Stopped", tone: C.alert }
+    : spaOwnsPump
+      ? { label: "Spa mode", tone: C.heat }
+      : activeProgram
+        ? { label: activeProgram.name, tone: C.heat }
+        : panelMode === "service"
+          ? { label: "Service", tone: C.alert }
+          : scheduled
+            ? { label: "Schedule", tone: C.water }
+            : { label: "Idle", tone: C.muted };
 
   const w = rpmKnown ? watts(rpm) : null;
   const pct = ((sliderRpm - RPM_MIN) / (RPM_MAX - RPM_MIN)) * 100;
-  const activePreset = rpmKnown ? PRESETS.find((p) => Math.abs(p.rpm - rpm) < 60) : null;
-  const unmet = rpmKnown ? THRESHOLDS.filter((t) => rpm < t.rpm) : [];
 
   const daily = useMemo(() => {
     const on = schedules.filter((s) => s.on);
@@ -138,127 +136,116 @@ export default function PumpControl({ controller, themeControl }) {
           </div>
         </div>
 
-        {/* Labels alternate rows. The two thresholds sit close enough on the
-            scale that centred captions collide, and they will move again once
-            the real flow rates are measured — staggering holds either way. */}
-        <div style={{ position: "relative", height: MARKER_H, marginBottom: 2 }}>
-          {THRESHOLDS.map((t, i) => {
-            const p = ((t.rpm - RPM_MIN) / (RPM_MAX - RPM_MIN)) * 100;
-            const met = rpmKnown && rpm >= t.rpm;
-            const row = i % 2;
-            return (
-              <div key={t.label} style={{ position: "absolute", left: `${p}%`, top: row * MARKER_ROW, transform: "translateX(-50%)", textAlign: "center", width: 96 }}>
-                <div style={{ fontFamily: FONT_DATA, fontSize: 9, color: met ? t.color : C.faint, lineHeight: 1.25, whiteSpace: "nowrap", transition: "color 200ms" }}>{t.label}</div>
-                <div style={{ width: 1, height: MARKER_H - row * MARKER_ROW - 14, background: met ? t.color : C.line, margin: "3px auto 0", transition: "background 200ms" }} />
-              </div>
-            );
-          })}
+        {/* Run or stop, which is what "the pump" means to anyone standing at
+            the equipment. Speed belongs to a program or a schedule, never to a
+            live slider — njsPC drives the pump from circuits, and an arbitrary
+            rpm had neither a user nor an expiry. */}
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={() => setPumpRunning(!pumpRunning)}
+            style={{
+              flex: 1, padding: "15px 8px", borderRadius: 11,
+              border: `1px solid ${pumpRunning ? C.alert : C.water}`,
+              background: pumpRunning ? "transparent" : C.water,
+              color: pumpRunning ? C.alert : C.ground,
+              fontFamily: FONT_UI, fontSize: 15, fontWeight: 600, cursor: "pointer",
+            }}>
+            {pumpRunning ? "Stop the pump" : "Run the pump"}
+          </button>
         </div>
-
-        <input type="range" min={RPM_MIN} max={RPM_MAX} step={10} value={sliderRpm}
-          aria-label="Pump speed in rpm"
-          onChange={(e) => setRpm(Number(e.target.value))}
-          style={{ width: "100%", appearance: "none", height: 6, borderRadius: 3, outline: "none", cursor: "pointer",
-            background: `linear-gradient(90deg, ${C.water} ${pct}%, ${C.line} ${pct}%)` }} />
-        <style>{`
-          input[type=range]::-webkit-slider-thumb { appearance: none; width: 22px; height: 22px; border-radius: 11px; background: ${C.water}; border: 3px solid ${C.ground}; cursor: grab; }
-          input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 8px; background: ${C.water}; border: 3px solid ${C.ground}; cursor: grab; }
-          input[type=range]:focus-visible { outline: 2px solid ${C.water}; outline-offset: 4px; }
-        `}</style>
-        <div style={{ display: "flex", justifyContent: "space-between", fontFamily: FONT_DATA, fontSize: 10, color: C.faint, marginTop: 8 }}>
-          <span>{RPM_MIN}</span><span>{RPM_MAX}</span>
-        </div>
-
-        {heaterCall !== "off" && (
-          <div style={{ marginTop: 16, paddingTop: 14, borderTop: `1px solid ${C.line}`, fontSize: 12.5, color: C.heat, lineHeight: 1.55 }}>
-            Floored at {HEATER_MIN_RPM} rpm while the heater is calling.
-            Slower would starve the exchanger, so the slider stops here rather
-            than dropping the heat call.
-          </div>
-        )}
-
-        {heaterCall === "off" && unmet.length > 0 && (
-          <div style={{ marginTop: 16, paddingTop: 14, borderTop: `1px solid ${C.line}`, fontSize: 12.5, color: C.muted, lineHeight: 1.55 }}>
-            Below {unmet.map((u) => u.label.toLowerCase()).join(" and ")}.{" "}
-            {unmet.some((u) => u.label === "Heater minimum")
-              ? "The heater will not fire at this speed."
-              : "The cell will not generate at this speed."}
+        {!pumpRunning && (
+          <div style={{ fontSize: 11.5, color: C.faint, marginTop: 10, lineHeight: 1.5 }}>
+            Schedules and programs cannot run the pump while it is stopped.
           </div>
         )}
       </div>
 
-      {/* Manual hold. Without it a hand-set speed only survives to the next
-          schedule boundary, which is not what "run it until I say stop"
-          means. */}
-      {pumpHold ? (
-        <div style={{ background: C.surface, border: `1px solid ${C.heat}`, borderRadius: 14, padding: "14px 16px", marginBottom: 12, display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13.5, fontWeight: 600, color: C.heat }}>
-              Holding {pumpHold.rpm} rpm
-            </div>
-            <div style={{ fontFamily: FONT_DATA, fontSize: 10.5, color: C.muted, marginTop: 3, lineHeight: 1.45 }}>
-              Schedules paused ·{" "}
-              {pumpHold.expiresAt ? `until ${clockAt(pumpHold.expiresAt)}` : "until you release it"}
-            </div>
-          </div>
-          <button onClick={releasePump}
-            style={{ flexShrink: 0, padding: "11px 16px", borderRadius: 10, border: `1px solid ${C.heat}`, background: "transparent", color: C.heat, fontFamily: FONT_UI, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-            Release
-          </button>
-        </div>
-      ) : (
-        <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, padding: "14px 16px", marginBottom: 12 }}>
-          <div style={{ fontSize: 13.5, fontWeight: 500, marginBottom: 4 }}>Hold this speed</div>
-          <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5, marginBottom: 12 }}>
-            {spaOwnsPump
-              ? "Spa mode already ignores schedules, so there is nothing to hold against. Set the jet speed with the slider."
-              : scheduled
-                ? `Otherwise the ${scheduled.start}–${scheduled.end} schedule takes it back to ${scheduled.rpm} rpm.`
-                : "No schedule is running now, but the next one would take the pump back."}
-          </div>
-          <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
-            {HOLD_OPTIONS.map((o) => {
-              const on = holdFor === o.id;
-              return (
-                <button key={o.id} onClick={() => setHoldFor(o.id)} aria-pressed={on}
-                  style={{ flex: 1, padding: "9px 4px", borderRadius: 8, border: `1px solid ${on ? C.water : C.line}`, background: on ? C.wash : "transparent", color: on ? C.water : C.muted, fontFamily: FONT_UI, fontSize: 12, fontWeight: 500, cursor: "pointer" }}>
-                  {o.label}
-                </button>
-              );
-            })}
-          </div>
-          <button
-            onClick={() => holdPump(HOLD_OPTIONS.find((o) => o.id === holdFor).minutes)}
-            disabled={spaOwnsPump}
-            aria-label={spaOwnsPump ? `Hold ${rpm} rpm — not in spa mode` : `Hold ${rpm} rpm`}
-            style={{ width: "100%", padding: 13, borderRadius: 10, border: `1px solid ${spaOwnsPump ? C.line : C.water}`, background: spaOwnsPump ? "transparent" : C.water, color: spaOwnsPump ? C.muted : C.ground, fontFamily: FONT_UI, fontSize: 14, fontWeight: 600, cursor: spaOwnsPump ? "not-allowed" : "pointer", opacity: spaOwnsPump ? 0.75 : 1 }}>
-            Hold {rpmKnown ? rpm : sliderRpm} rpm
-            {/* The reason rides on the control, matching Toggle and PR-3,
-                rather than sitting in a paragraph above it. */}
-            {spaOwnsPump && (
-              <span style={{ display: "block", fontSize: 10.5, fontWeight: 400, color: C.faint, marginTop: 4 }}>
-                Not in spa mode
-              </span>
-            )}
-          </button>
-        </div>
-      )}
+      {/* Programs — a named speed you run on purpose, for a bounded time.
+          Each is an njsPC circuit with a pump speed and an egg timer. */}
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
+        <div style={{ fontSize: 17, fontWeight: 600 }}>Programs</div>
+        <button onClick={() => setEditingProgram(blankProgram())} aria-label="Add program"
+          style={{ background: "transparent", border: "none", color: C.water, fontFamily: FONT_UI, fontSize: 13, cursor: "pointer", padding: 0 }}>
+          Add
+        </button>
+      </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 24 }}>
-        {PRESETS.map((p) => {
-          const active = activePreset?.id === p.id;
+      <div style={{ display: "grid", gap: 8, marginBottom: 24 }}>
+        {programs.map((p) => {
+          const running = activeProgram?.id === p.id;
+          const left = running ? remaining(activeProgram) : null;
           return (
-            <button key={p.id} onClick={() => setRpm(p.rpm)}
-              style={{ padding: "12px 14px", borderRadius: 11, border: `1px solid ${active ? C.water : C.line}`,
-                background: active ? C.wash : "transparent", color: C.stone,
-                textAlign: "left", cursor: "pointer", transition: "all 160ms ease" }}>
-              <div style={{ fontSize: 13.5, fontWeight: 500 }}>{p.label}</div>
-              <div style={{ fontFamily: FONT_DATA, fontSize: 11, color: active ? C.water : C.muted, marginTop: 4 }}>
-                {p.rpm} rpm · {watts(p.rpm)} W
-              </div>
-            </button>
+            <div key={p.id} style={{
+              display: "flex", alignItems: "center", gap: 10,
+              border: `1px solid ${running ? C.heat : C.line}`,
+              background: running ? C.wash : "transparent",
+              borderRadius: 11, padding: "12px 12px 12px 14px",
+            }}>
+              <button
+                onClick={() => (running ? stopProgram() : startProgram(p.id))}
+                disabled={!pumpRunning || spaOwnsPump}
+                aria-label={running ? `Stop ${p.name}` : `Run ${p.name}`}
+                style={{
+                  flex: 1, minWidth: 0, textAlign: "left", background: "transparent",
+                  border: "none", padding: 0,
+                  cursor: !pumpRunning || spaOwnsPump ? "not-allowed" : "pointer",
+                  opacity: !pumpRunning || spaOwnsPump ? 0.45 : 1,
+                }}>
+                <div style={{ fontFamily: FONT_UI, fontSize: 14, fontWeight: 600, color: running ? C.heat : C.stone }}>
+                  {running ? `${p.name} — stop` : p.name}
+                </div>
+                <div style={{ fontFamily: FONT_DATA, fontSize: 11, color: C.muted, marginTop: 3 }}>
+                  {p.rpm} rpm · {watts(p.rpm)} W ·{" "}
+                  {running && left != null
+                    ? `${Math.ceil(left / 60000)} min left`
+                    : `${p.minutes} min`}
+                </div>
+              </button>
+              <button onClick={() => setEditingProgram(p)} aria-label={`Edit ${p.name}`}
+                style={{
+                  flexShrink: 0, width: 34, height: 34, borderRadius: 999,
+                  border: `1px solid ${C.line}`, background: "transparent",
+                  color: C.muted, cursor: "pointer", fontSize: 15, padding: 0,
+                }}>
+                ›
+              </button>
+            </div>
           );
         })}
+        {programs.length === 0 && (
+          <div style={{ fontSize: 12.5, color: C.faint, padding: "8px 2px", lineHeight: 1.5 }}>
+            No programs yet. Add one for the things you do by hand — skimming,
+            or clearing the water after service.
+          </div>
+        )}
+      </div>
+
+      {/* Automation, as a whole. njsPC's panel mode: service stands the
+          schedules down without disabling them one at a time. */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: 12, marginBottom: 24,
+        background: C.surface, border: `1px solid ${panelMode === "service" ? C.alert : C.line}`,
+        borderRadius: 12, padding: "13px 14px",
+      }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13.5, fontWeight: 600, color: panelMode === "service" ? C.alert : C.stone }}>
+            {panelMode === "service" ? "Service — schedules are standing down" : "Automation running"}
+          </div>
+          <div style={{ fontSize: 11.5, color: C.muted, marginTop: 3, lineHeight: 1.45 }}>
+            {panelMode === "service"
+              ? "Only manual commands act. Nothing will start on its own."
+              : "Schedules run as configured."}
+          </div>
+        </div>
+        <button onClick={() => setPanelMode(panelMode === "service" ? "auto" : "service")}
+          style={{
+            flexShrink: 0, padding: "10px 14px", borderRadius: 9,
+            border: `1px solid ${panelMode === "service" ? C.water : C.line}`,
+            background: "transparent",
+            color: panelMode === "service" ? C.water : C.muted,
+            fontFamily: FONT_UI, fontSize: 13, fontWeight: 600, cursor: "pointer",
+          }}>
+          {panelMode === "service" ? "Resume" : "Service"}
+        </button>
       </div>
 
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
@@ -315,6 +302,16 @@ export default function PumpControl({ controller, themeControl }) {
         stays on screen until you release it. Spa mode sets its own speed and
         takes the pump back either way.
       </div>
+
+      {editingProgram && (
+        <ProgramEditor
+          value={editingProgram}
+          running={activeProgram?.id === editingProgram.id}
+          onSave={(d) => { saveProgram(d); setEditingProgram(null); }}
+          onDelete={(id) => { deleteProgram(id); setEditingProgram(null); }}
+          onCancel={() => setEditingProgram(null)}
+        />
+      )}
 
       {editing && (
         <ScheduleEditor
