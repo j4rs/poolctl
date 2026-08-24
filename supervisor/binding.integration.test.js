@@ -81,6 +81,10 @@ function fakeNjspc() {
         minSpeed: 450, maxSpeed: 3450, circuits: pumpCircuits,
       }],
     }),
+    "GET /config/circuit/1": () => {
+      const c = circuits.find((x) => x.id === 1);
+      return { id: c.id, name: c.name, type: c.type, eggTimer: c.eggTimer, showInFeatures: false, freeze: false };
+    },
     "PUT /config/circuit": (body) => {
       let id = Number(body.id);
       if (!id || id <= 0) {
@@ -96,6 +100,12 @@ function fakeNjspc() {
         eggTimer: body.eggTimer ?? 0,
       });
       if (!existing) circuits.push(circuit);
+      /* njsPC recomputes a running circuit's end time on a config write —
+         `setEndTime(..., bForce = true)`. This is the whole mechanism behind
+         extending a spa session, so the fake has to model it. */
+      if (circuit.isOn && circuit.eggTimer) {
+        circuit.endTime = new Date(Date.now() + circuit.eggTimer * 60000).toISOString();
+      }
       return circuit;
     },
     "DELETE /config/circuit": (body) => {
@@ -619,5 +629,59 @@ describe("the evaluation loop", () => {
        clock rather than needing to be re-provoked. */
     const later = await settles((s) => s.violations.length > 0, 8000);
     expect(later.violations.map((v) => v.id)).toContain("heat-below-floor");
+  });
+});
+
+describe("extending a spa session", () => {
+  /**
+   * njsPC has no endpoint that moves an end time, and re-sending "on" to a
+   * circuit that is already on does nothing — `setEndTime` only fires on an
+   * off→on transition. A config write is the one caller that forces it.
+   */
+  const spaEnd = async () => (await now()).spaExpiresAt;
+
+  it("refuses when the spa is not on", async () => {
+    const ack = await client.intent("extendSpa");
+    expect(ack.ok).toBe(false);
+    expect(ack.error).toMatch(/not on/);
+  });
+
+  it("pushes the end time out without stopping the spa", async () => {
+    await client.intent("setMode", { mode: "spa" });
+    await settles((s) => s.mode === "spa", 8000);
+    const before = await spaEnd();
+    expect(before).toBeTruthy();
+
+    await new Promise((r) => setTimeout(r, 1100));
+    expect((await client.intent("extendSpa")).ok).toBe(true);
+    const after = await settles((s) => s.spaExpiresAt > before, 8000);
+
+    expect(after.spaExpiresAt).toBeGreaterThan(before);
+    /* Still in spa, and the circuit never went off — no body switch, no
+       valve travel, which is the entire point of doing it this way. */
+    expect(after.mode).toBe("spa");
+    expect(njspc.circuits().find((c) => c.id === 1).isOn).toBe(true);
+  });
+
+  it("resets to a full session rather than adding a slice", async () => {
+    await client.intent("setMode", { mode: "spa" });
+    await settles((s) => s.mode === "spa", 8000);
+    await new Promise((r) => setTimeout(r, 1100));
+    await client.intent("extendSpa");
+    const after = await settles((s) => s.spaExpiresAt != null, 8000);
+
+    /* The Spa circuit's egg timer is 120 in the fake, matching commissioning. */
+    const minutes = (after.spaExpiresAt - Date.now()) / 60000;
+    expect(minutes).toBeGreaterThan(119);
+    expect(minutes).toBeLessThanOrEqual(120);
+  });
+
+  it("refuses a spa with no timer to extend", async () => {
+    njspc.setSpaEggTimer(0);
+    await client.intent("setMode", { mode: "spa" });
+    await settles((s) => s.mode === "spa", 8000);
+    const ack = await client.intent("extendSpa");
+    expect(ack.ok).toBe(false);
+    expect(ack.error).toMatch(/no timer/);
   });
 });

@@ -6,7 +6,7 @@ nodejs-poolController.
 **Status:** the UI runs live against njsPC through the supervisor. Pi 4 is up,
 Lite, thermally characterised. The relay HAT has not arrived, so no equipment
 is connected — njsPC runs on a laptop with no serial port, which is enough to
-have settled most of the design questions. 455 tests; `npm test`.
+have settled most of the design questions. 464 tests; `npm test`.
 
 **This file is the operating manual for working in this repo — nothing more.**
 The full record lives elsewhere and is deliberately not duplicated here:
@@ -218,6 +218,20 @@ the old 720 was Pentair's default for a different feature. The long durations
 exist for recovery — brushing a green pool after a fortnight away — not for
 routine use, and the expiry stays mandatory.
 
+**Extending the spa is a config write, not a state one.** njsPC has no
+endpoint that moves an end time, and re-sending "on" to a circuit already on
+does nothing — `setEndTime` fires on an off→on transition or when `bForce` is
+set, and a circuit *config* write is the only caller that sets it. So
+`extendSpa` writes the Spa circuit's configuration back unchanged, which
+recomputes its end time as now plus the egg timer with no body switch and no
+valve travel. Measured live: 116.3 min remaining became 119.97.
+
+Send every field on that write. njsPC's guard on `showInFeatures` reads
+`typeof x !== 'undefined' || typeof x === 'undefined'` — always true — so the
+field is written from the request every time and omitting it silently sets it
+false. `echoCircuitConfig` exists so nobody has to remember which fields are
+safe to leave out.
+
 **Schedules are njsPC's, and a schedule runs a circuit — not a speed.**
 There is no rpm field on an njsPC schedule; the pump holds the speed for the
 circuit the schedule names. So a manual program and a schedule are now the
@@ -326,16 +340,12 @@ hardware, highest value first:
    Program circuits are no longer on this list — the supervisor creates them
    (see below) — but njsPC does need a **pump** configured before any
    program can bind, because the speed has nowhere else to live.
-2. **`extendSpa`.** The button is on screen and refuses. Needs no hardware,
-   and the spa is used at night against a 120-minute egg timer, so it is the
-   one unimplemented intent with a daily use. Check how njsPC prefers an egg
-   timer extended before committing to an approach.
-3. **Authentication — nothing has any.** Anyone on the wifi can reach the
+2. **Authentication — nothing has any.** Anyone on the wifi can reach the
    supervisor and drive 240 V equipment. njsPC's own port is the wider hole:
    protecting 4300 does nothing about 4200, where dashPanel and the REST API
    accept anything. See PRD §11 for the four parts of this that make it more
    than adding a password. Owner's requirement, August 2026.
-4. **Scheduled preheat.** Still unimplemented, and still
+3. **Scheduled preheat.** Still unimplemented, and still
    refusing with a reason rather than doing nothing. Preheat wants a water
    temperature, which wants the HAT.
 

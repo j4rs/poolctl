@@ -13,7 +13,8 @@ import {
 } from "./interlocks.js";
 import { checkInvariants } from "./invariants.js";
 import {
-  circuitConfig, withPumpCircuit, withoutPumpCircuit, whyNotBindable, pumpLimits,
+  circuitConfig, echoCircuitConfig, withPumpCircuit, withoutPumpCircuit,
+  whyNotBindable, pumpLimits,
 } from "./binding.js";
 import { checkCommissioning } from "./commissioning.js";
 import { scheduleConfig, whyNotSchedulable } from "./schedules.js";
@@ -524,6 +525,33 @@ const intents = {
   /** Retry a binding that failed, without editing the program. */
   async bindProgram({ id }) {
     await bind(id);
+  },
+
+  /**
+   * Extend the spa session.
+   *
+   * njsPC's egg timer is what ends a spa session (ADR-11), and there is no
+   * endpoint that moves an end time. `setEndTime` only fires on an off→on
+   * transition — so re-sending "on" to a spa that is already on does nothing
+   * — unless `bForce` is set, which happens in exactly one place: a circuit
+   * config write. Writing the Spa circuit's configuration back unchanged
+   * therefore recomputes its end time as now plus the egg timer, without
+   * stopping the body or moving a valve. Verified against njsPC 10.0.1: the
+   * end time advanced by precisely the elapsed time.
+   *
+   * This resets to a full session rather than adding a fixed amount, which
+   * is both what njsPC can express and what the button means to somebody
+   * sitting in the water.
+   */
+  async extendSpa() {
+    if (ui?.mode !== "spa") throw refuse("the spa is not on");
+    const cfg = await njs.circuitConfig(SPA_CIRCUIT);
+    if (!cfg?.eggTimer || cfg.dontStop) {
+      /* Nothing to extend: njsPC is not going to end this session anyway,
+         and the commissioning check already says so. */
+      throw refuse("the spa has no timer to extend");
+    }
+    await njs.setCircuitConfig(echoCircuitConfig(cfg));
   },
 
   /**

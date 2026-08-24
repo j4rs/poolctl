@@ -54,6 +54,37 @@ export function circuitConfig(program) {
 }
 
 /**
+ * A circuit's configuration echoed back to njsPC unchanged.
+ *
+ * This looks pointless and is not. `NixieBoard.setCircuitAsync` ends with
+ * `setEndTime(circuit, scircuit, scircuit.isOn, true)` — and that `true` is
+ * `bForce`, which is the only way to make njsPC recompute a running
+ * circuit's end time. `setEndTime` otherwise only fires on an off→on
+ * transition, so re-sending "on" to a circuit that is already on does
+ * nothing at all. Writing the config back is how an egg timer gets extended
+ * without stopping the equipment.
+ *
+ * Every field is sent explicitly rather than omitted, because omission is
+ * not neutral. The guard on `showInFeatures` reads
+ * `if (typeof data.showInFeatures !== 'undefined' || typeof
+ * data.showInFeatures === 'undefined')` — a tautology, so the field is
+ * always written from the request, and leaving it out silently sets it
+ * false. `name`, `type` and `freeze` are preserved on omission; this does
+ * not rely on knowing which is which.
+ */
+export function echoCircuitConfig(cfg) {
+  const type = cfg?.type && typeof cfg.type === "object" ? cfg.type.val : cfg?.type;
+  return {
+    id: cfg.id,
+    name: cfg.name,
+    type,
+    eggTimer: cfg.eggTimer,
+    showInFeatures: Boolean(cfg.showInFeatures),
+    freeze: Boolean(cfg.freeze),
+  };
+}
+
+/**
  * Why this program cannot be bound, or null.
  *
  * Speed is checked against the pump's own advertised range rather than a

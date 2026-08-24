@@ -209,7 +209,9 @@ export function useSupervisor() {
     deleteSchedule: (id) => intent("deleteSchedule", { id }),
     setScheduleEnabled: (id, on) => intent("setScheduleEnabled", { id, on }),
     toggle: (key) => intent("toggle", { key }),
-    extendSpa: (minutes) => intent("extendSpa", { minutes }),
+    /* No argument: njsPC can only reset the egg timer to a full session, not
+       add an arbitrary amount, and a full session is what the button means. */
+    extendSpa: () => intent("extendSpa"),
     schedulePreheat: (readyAt) => intent("schedulePreheat", { readyAt }),
     cancelPreheat: () => intent("cancelPreheat"),
   };

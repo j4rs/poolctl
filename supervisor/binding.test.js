@@ -1,8 +1,9 @@
 // @vitest-environment node
 import { describe, it, expect } from "vitest";
 import {
-  circuitConfig, whyNotBindable, withPumpCircuit, withoutPumpCircuit,
-  pumpLimits, freeSlots, GENERIC_CIRCUIT, RPM_UNITS, DONT_STOP_MINUTES,
+  circuitConfig, echoCircuitConfig, whyNotBindable, withPumpCircuit,
+  withoutPumpCircuit, pumpLimits, freeSlots, GENERIC_CIRCUIT, RPM_UNITS,
+  DONT_STOP_MINUTES,
 } from "./binding.js";
 
 /**
@@ -207,5 +208,41 @@ describe("reading the pump's limits out of njsPC state", () => {
     expect(freeSlots(pumpLimits(njs))).toBe(6);
     expect(freeSlots({ maxCircuits: null, used: 2 })).toBeNull();
     expect(freeSlots(null)).toBeNull();
+  });
+});
+
+describe("echoing a circuit's configuration back", () => {
+  /**
+   * The mechanism behind extending a spa session. Writing a circuit's config
+   * back unchanged is the only way to make njsPC recompute a *running*
+   * circuit's end time: `setEndTime` fires on an off→on transition or when
+   * `bForce` is set, and a config write is the one caller that sets it.
+   */
+  const spa = { id: 1, name: "Spa", type: 13, eggTimer: 120, showInFeatures: false, freeze: false };
+
+  it("sends the circuit back exactly as it was", () => {
+    expect(echoCircuitConfig(spa)).toEqual(spa);
+  });
+
+  it("never omits showInFeatures", () => {
+    /* njsPC's guard on this field is `typeof x !== 'undefined' || typeof x
+       === 'undefined'` — always true — so the field is written from the
+       request every time and omitting it silently sets it false. */
+    expect(echoCircuitConfig(spa)).toHaveProperty("showInFeatures", false);
+    expect(echoCircuitConfig({ ...spa, showInFeatures: true }).showInFeatures).toBe(true);
+  });
+
+  it("keeps the egg timer, which is the value the new end time is built from", () => {
+    expect(echoCircuitConfig({ ...spa, eggTimer: 90 }).eggTimer).toBe(90);
+  });
+
+  it("unwraps an expanded type, which state sends and config does not", () => {
+    expect(echoCircuitConfig({ ...spa, type: { val: 13, name: "spa" } }).type).toBe(13);
+  });
+
+  it("coerces absent flags rather than passing undefined through", () => {
+    const out = echoCircuitConfig({ id: 1, name: "Spa", type: 13, eggTimer: 120 });
+    expect(out.showInFeatures).toBe(false);
+    expect(out.freeze).toBe(false);
   });
 });
