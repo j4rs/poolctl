@@ -32,7 +32,7 @@ describe("schedule spans", () => {
 
 describe("active schedule", () => {
   const at = (h, m = 0) => new Date(2026, 7, 24, h, m);
-  const list = [{ id: 1, start: "08:00", end: "18:00", rpm: 1600, days: every, on: true }];
+  const list = [{ id: 1, start: "08:00", end: "18:00", rpm: 1600, days: every, enabled: true }];
 
   it("finds the window in force", () => {
     expect(activeSchedule(list, at(10))?.id).toBe(1);
@@ -41,11 +41,27 @@ describe("active schedule", () => {
     expect(activeSchedule(list, at(20))).toBeNull();
   });
   it("ignores a disabled window", () => {
-    expect(activeSchedule([{ ...list[0], on: false }], at(10))).toBeNull();
+    expect(activeSchedule([{ ...list[0], enabled: false }], at(10))).toBeNull();
   });
-  it("lets the later window win where two overlap", () => {
-    const two = [list[0], { id: 2, start: "09:00", end: "11:00", rpm: 2600, days: every, on: true }];
+  it("lets the fastest window win where two overlap", () => {
+    /* njsPC's rule, in two halves: NixieSchedule ORs a circuit's schedules
+       together, and NixiePumpVS.setTargetSpeed takes Math.max across the
+       circuits that are on. "The later one wins" was a mock-era invention. */
+    const two = [list[0], { id: 2, start: "09:00", end: "11:00", rpm: 2600, days: every, enabled: true }];
     expect(activeSchedule(two, at(10))?.id).toBe(2);
+  });
+  it("is not fooled by ordering", () => {
+    /* The same pair the other way round. Under the old rule this returned
+       the slower schedule purely because it came last in the array. */
+    const two = [
+      { id: 2, start: "09:00", end: "11:00", rpm: 2600, days: every, enabled: true },
+      { id: 1, start: "08:00", end: "18:00", rpm: 1600, days: every, enabled: true },
+    ];
+    expect(activeSchedule(two, at(10))?.id).toBe(2);
+  });
+  it("copes with a schedule whose circuit carries no speed", () => {
+    const two = [list[0], { id: 3, start: "09:00", end: "11:00", rpm: null, days: every, enabled: true }];
+    expect(activeSchedule(two, at(10))?.id).toBe(1);
   });
   it("formats a clock time zero-padded", () => {
     expect(clockAt(at(9, 5).getTime())).toBe("09:05");

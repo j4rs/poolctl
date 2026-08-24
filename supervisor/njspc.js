@@ -150,6 +150,15 @@ export class NjsPC {
     return this.put("/config/circuit", { id }, "DELETE");
   }
 
+  /** Add or update a schedule. `id: 0` asks njsPC to allocate a slot. */
+  setScheduleConfig(schedule) {
+    return this.put("/config/schedule", schedule);
+  }
+
+  deleteScheduleConfig(id) {
+    return this.put("/config/schedule", { id }, "DELETE");
+  }
+
   /**
    * Replace a pump's configuration.
    *

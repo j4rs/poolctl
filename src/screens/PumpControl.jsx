@@ -14,24 +14,19 @@ const RATE = 0.15;        // $/kWh — set to your own utility rate
 
 const EVERY_DAY = [0, 1, 2, 3, 4, 5, 6];
 
-/* ILLUSTRATIVE ONLY — see the mock-data warning in useController.js.
-   Several windows, varying speeds, a note and a disabled row, chosen to
-   exercise the UI. The real schedule is a single daily window; the PRD has it. */
-const INITIAL = [
-  { id: 1, start: "08:00", end: "12:00", rpm: 1600, days: EVERY_DAY, on: true },
-  { id: 2, start: "12:00", end: "16:00", rpm: 2600, days: EVERY_DAY, on: true, note: "Solar gain hours" },
-  { id: 3, start: "16:00", end: "20:00", rpm: 1400, days: EVERY_DAY, on: true },
-  { id: 4, start: "22:00", end: "23:30", rpm: 2100, days: [0, 6], on: false, note: "Weekend skim" },
-];
-
+/* A new schedule starts as a blank the editor fills in. No speed: the speed
+   belongs to whichever circuit it is pointed at, which is njsPC's model and
+   the reason the old rpm slider is gone from here too. */
 const blankSchedule = () => ({
   id: `new-${Math.random().toString(36).slice(2, 8)}`,
-  start: "09:00", end: "13:00", rpm: 1600, days: EVERY_DAY, on: true, isNew: true,
+  circuit: null, start: "09:00", end: "13:00", days: EVERY_DAY,
+  enabled: true, isNew: true,
 });
 
 export default function PumpControl({ controller, themeControl }) {
   const { state, setPumpRunning, setPanelMode,
-    startProgram, stopProgram, saveProgram, deleteProgram, bindProgram } = controller;
+    startProgram, stopProgram, saveProgram, deleteProgram, bindProgram,
+    saveSchedule, deleteSchedule, setScheduleEnabled } = controller;
   /* null means no reading from the pump — distinct from 0, which means
      stopped. The slider still needs a position, so it falls back to the
      filtration speed, but the readout says plainly that we do not know. */
@@ -53,9 +48,17 @@ export default function PumpControl({ controller, themeControl }) {
   /* What the pump will accept, as njsPC reports it. Null before a pump is
      configured, which the editor falls back from rather than inventing. */
   const pumpLimits = state.pumpLimits ?? null;
+  /* njsPC owns schedules; this list is read back from it, not held here.
+     Absent means not known yet — distinct from a known-empty list, and the
+     daily total says so rather than confidently reporting $0.00. */
+  const schedulesKnown = Array.isArray(state.schedules);
+  const schedules = state.schedules ?? [];
+  /* What a schedule can be pointed at — the circuits the pump has a speed
+     for. Empty before commissioning, which the editor says rather than
+     offering an empty picker. */
+  const pumpCircuits = state.pumpCircuits ?? [];
   /* Anything that starts or stops equipment asks twice. See useConfirm. */
   const confirm = useConfirm();
-  const [schedules, setSchedules] = useState(INITIAL);
   const [editing, setEditing] = useState(null);
   const [editingProgram, setEditingProgram] = useState(null);
   /* Countdowns need their own clock; state only moves on the beat. */
@@ -68,9 +71,9 @@ export default function PumpControl({ controller, themeControl }) {
   const scheduled = activeSchedule(schedules);
   const spaOwnsPump = mode === "spa";
 
-  /* In spa mode the pump is already immune to schedules, so a hold would
-     protect against nothing — and the pool sequence resets the speed on the
-     way out regardless. */
+  /* Who is driving the pump right now, most specific first. In spa mode the
+     pump is immune to schedules, and the pool transition resets the speed on
+     the way out regardless. */
   const owner = !pumpRunning
     ? { label: "Stopped", tone: C.alert }
     : spaOwnsPump
@@ -87,24 +90,26 @@ export default function PumpControl({ controller, themeControl }) {
   const pct = ((sliderRpm - RPM_MIN) / (RPM_MAX - RPM_MIN)) * 100;
 
   const daily = useMemo(() => {
-    const on = schedules.filter((s) => s.on);
+    /* Only schedules whose circuit the pump actually carries a speed for.
+       One pointed elsewhere costs nothing and would otherwise contribute a
+       confident NaN to the daily total. */
+    const on = schedules.filter((s) => s.enabled && typeof s.rpm === "number");
     const kwh = on.reduce((a, s) => a + (watts(s.rpm) / 1000) * hoursBetween(s.start, s.end), 0);
     const hours = on.reduce((a, s) => a + hoursBetween(s.start, s.end), 0);
     return { kwh, hours, cost: kwh * RATE };
   }, [schedules]);
 
-  const toggleSchedule = (id) =>
-    setSchedules((ss) => ss.map((s) => (s.id === id ? { ...s, on: !s.on } : s)));
+  /* These write through to njsPC and return; the list re-renders when njsPC
+     reports the change, not when the tap lands (ADR-7). */
+  const onToggleSchedule = (s) => setScheduleEnabled(s.id, !s.enabled);
 
-  const saveSchedule = (draft) => {
-    const { isNew, ...clean } = draft;
-    setSchedules((ss) =>
-      isNew ? [...ss, clean] : ss.map((s) => (s.id === clean.id ? clean : s)));
+  const onSaveSchedule = (draft) => {
+    saveSchedule(draft);
     setEditing(null);
   };
 
-  const deleteSchedule = (id) => {
-    setSchedules((ss) => ss.filter((s) => s.id !== id));
+  const onDeleteSchedule = (id) => {
+    deleteSchedule(id);
     setEditing(null);
   };
 
@@ -338,21 +343,25 @@ export default function PumpControl({ controller, themeControl }) {
           </div>
         )}
         {schedules.map((s) => {
-          const kwh = (watts(s.rpm) / 1000) * hoursBetween(s.start, s.end);
+          /* Null rpm means the schedule points at a circuit the pump carries
+             no speed for. It will still run the circuit; it just will not
+             move the pump, which is worth saying rather than rendering NaN. */
+          const known = typeof s.rpm === "number";
+          const kwh = known ? (watts(s.rpm) / 1000) * hoursBetween(s.start, s.end) : null;
           return (
-            <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 14px", borderBottom: `1px solid ${C.line}`, opacity: s.on ? 1 : 0.42 }}>
+            <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 14px", borderBottom: `1px solid ${C.line}`, opacity: s.enabled ? 1 : 0.42 }}>
               {/* Enabling one means the pump starts at its next boundary;
                   disabling one means it does not. Both change flow. */}
               <button
-                onClick={confirm.guard(`schedule:${s.id}`, () => toggleSchedule(s.id))}
-                aria-pressed={s.on}
+                onClick={confirm.guard(`schedule:${s.id}`, () => onToggleSchedule(s))}
+                aria-pressed={s.enabled}
                 aria-label={
                   confirm.isArmed(`schedule:${s.id}`)
-                    ? `Confirm: ${s.on ? "disable" : "enable"} schedule ${s.start} to ${s.end}`
+                    ? `Confirm: ${s.enabled ? "disable" : "enable"} schedule ${s.start} to ${s.end}`
                     : `Enable schedule ${s.start} to ${s.end}`
                 }
-                style={{ width: 34, height: 20, borderRadius: 10, flexShrink: 0, background: s.on ? C.water : C.line, position: "relative", cursor: "pointer", transition: "background 180ms", border: confirm.isArmed(`schedule:${s.id}`) ? `2px solid ${C.heat}` : "none" }}>
-                <span style={{ position: "absolute", top: 3, left: s.on ? 17 : 3, width: 14, height: 14, borderRadius: 7, background: s.on ? C.ground : C.surfaceUp, transition: "left 180ms" }} />
+                style={{ width: 34, height: 20, borderRadius: 10, flexShrink: 0, background: s.enabled ? C.water : C.line, position: "relative", cursor: "pointer", transition: "background 180ms", border: confirm.isArmed(`schedule:${s.id}`) ? `2px solid ${C.heat}` : "none" }}>
+                <span style={{ position: "absolute", top: 3, left: s.enabled ? 17 : 3, width: 14, height: 14, borderRadius: 7, background: s.enabled ? C.ground : C.surfaceUp, transition: "left 180ms" }} />
               </button>
               {/* The row body opens the editor; the switch stays its own
                   target so enabling never means editing by accident. */}
@@ -360,13 +369,18 @@ export default function PumpControl({ controller, themeControl }) {
                 style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 12, background: "transparent", border: "none", padding: 0, cursor: "pointer", textAlign: "left", color: "inherit" }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontFamily: FONT_DATA, fontSize: 14, color: C.stone }}>{s.start} – {s.end}</div>
-                  <div style={{ fontSize: 11.5, color: C.muted, marginTop: 3 }}>{daysLabel(s.days)}{s.note ? ` · ${s.note}` : ""}</div>
+                  <div style={{ fontSize: 11.5, color: C.muted, marginTop: 3 }}>
+                    {daysLabel(s.days)}{s.circuitName ? ` · ${s.circuitName}` : ""}
+                  </div>
                 </div>
                 <div style={{ textAlign: "right", flexShrink: 0 }}>
-                  <div style={{ fontFamily: FONT_DATA, fontSize: 14, color: C.water }}>
-                    {s.rpm}<span style={{ fontSize: 10, color: C.muted, marginLeft: 2 }}>rpm</span>
+                  <div style={{ fontFamily: FONT_DATA, fontSize: 14, color: known ? C.water : C.faint }}>
+                    {known ? s.rpm : "—"}
+                    <span style={{ fontSize: 10, color: C.muted, marginLeft: 2 }}>rpm</span>
                   </div>
-                  <div style={{ fontFamily: FONT_DATA, fontSize: 11, color: C.muted, marginTop: 3 }}>{kwh.toFixed(1)} kWh</div>
+                  <div style={{ fontFamily: FONT_DATA, fontSize: 11, color: C.muted, marginTop: 3 }}>
+                    {known ? `${kwh.toFixed(1)} kWh` : "no pump speed"}
+                  </div>
                 </div>
                 <span style={{ color: C.muted, fontSize: 16, lineHeight: 1 }}>›</span>
               </button>
@@ -374,16 +388,26 @@ export default function PumpControl({ controller, themeControl }) {
           );
         })}
         <div style={{ display: "flex", justifyContent: "space-between", padding: 14, background: C.surfaceUp }}>
-          <span style={{ fontSize: 13, color: C.muted }}>{daily.hours.toFixed(1)} h/day runtime</span>
-          <span style={{ fontFamily: FONT_DATA, fontSize: 13 }}>{daily.kwh.toFixed(1)} kWh · ${daily.cost.toFixed(2)}/day</span>
+          <span style={{ fontSize: 13, color: C.muted }}>
+            {schedulesKnown ? `${daily.hours.toFixed(1)} h/day runtime` : "runtime unknown"}
+          </span>
+          <span style={{ fontFamily: FONT_DATA, fontSize: 13, color: schedulesKnown ? C.stone : C.faint }}>
+            {schedulesKnown
+              ? `${daily.kwh.toFixed(1)} kWh · $${daily.cost.toFixed(2)}/day`
+              : "— kWh"}
+          </span>
         </div>
       </div>
 
+      {/* Left over from the slider and the hold, both of which are gone.
+          Replaced with how overlaps actually resolve, which is the question
+          this screen now raises and njsPC answers. */}
       <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.6, padding: "0 2px" }}>
-        A speed set by hand lasts until the next schedule begins. Hold it to
-        keep it past that — an open-ended hold pauses filtration too, so it
-        stays on screen until you release it. Spa mode sets its own speed and
-        takes the pump back either way.
+        Overlapping schedules are not a conflict. njsPC runs every circuit
+        whose schedule says so and drives the pump at the fastest of them, so
+        a skim window inside a filtration window simply speeds the pump up
+        while both are on. Spa mode sets its own speed and takes the pump
+        back either way.
       </div>
 
       {editingProgram && (
@@ -401,8 +425,9 @@ export default function PumpControl({ controller, themeControl }) {
         <ScheduleEditor
           value={editing}
           others={schedules.filter((s) => s.id !== editing.id)}
-          onSave={saveSchedule}
-          onDelete={deleteSchedule}
+          onSave={onSaveSchedule}
+          onDelete={onDeleteSchedule}
+          circuits={pumpCircuits}
           onCancel={() => setEditing(null)} />
       )}
     </div>

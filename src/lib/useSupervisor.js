@@ -203,6 +203,11 @@ export function useSupervisor() {
     stopProgram: () => intent("stopProgram"),
     saveProgram: (program) => intent("saveProgram", { program }),
     deleteProgram: (id) => intent("deleteProgram", { id }),
+    /* Schedules live in njsPC, which owns and evaluates them. These write
+       through; the list comes back from njsPC's own state. */
+    saveSchedule: (schedule) => intent("saveSchedule", { schedule }),
+    deleteSchedule: (id) => intent("deleteSchedule", { id }),
+    setScheduleEnabled: (id, on) => intent("setScheduleEnabled", { id, on }),
     toggle: (key) => intent("toggle", { key }),
     extendSpa: (minutes) => intent("extendSpa", { minutes }),
     schedulePreheat: (readyAt) => intent("schedulePreheat", { readyAt }),

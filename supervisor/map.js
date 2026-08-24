@@ -11,6 +11,7 @@
  */
 
 import { pumpLimits } from "./binding.js";
+import { toUiSchedule, isRealSchedule } from "./schedules.js";
 
 /** njsPC's shared-equipment model fixes these circuit ids. */
 const SPA_CIRCUIT = 1;
@@ -140,6 +141,36 @@ export function toUiState(njs, own) {
     /* What the pump will accept, straight from njsPC. Null until a pump is
        configured, which is the honest answer before commissioning. */
     pumpLimits: pumpLimits(njs),
+
+    /* Every circuit the pump carries a speed for — what a schedule or a
+       program can actually be pointed at. The speed lives on the pump, so
+       this is the one list that knows both the name and the rpm. */
+    pumpCircuits: (pump.circuits || [])
+      .map((pc) => {
+        const id = pc?.circuit?.id ?? pc?.circuit ?? null;
+        return {
+          circuit: id,
+          name: pc?.circuit?.name ?? byId(circuits, id)?.name ?? null,
+          rpm: typeof pc?.speed === "number" ? pc.speed : null,
+        };
+      })
+      .filter((c) => c.circuit != null),
+
+    /* njsPC's schedules, not ours. It owns them (ADR-11) and evaluates them
+       on its own timers, so the supervisor translates and writes back rather
+       than keeping a copy that could disagree. Inactive slots are dropped —
+       njsPC keeps empty ones in the array. */
+    schedules: !Array.isArray(njs.schedules) ? null : njs.schedules.filter(isRealSchedule).map((s) =>
+      toUiSchedule(s, {
+        speedFor: (id) => {
+          const pc = (pump.circuits || []).find(
+            (x) => (x?.circuit?.id ?? x?.circuit) === id,
+          );
+          return typeof pc?.speed === "number" ? pc.speed : null;
+        },
+        nameFor: (id) => byId(circuits, id)?.name ?? null,
+      }),
+    ),
 
     /* Settings on njsPC that disagree with what this repo believes. Empty is
        the normal case; anything here is a silent fault made audible. */

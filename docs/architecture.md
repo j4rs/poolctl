@@ -302,8 +302,9 @@ job.
 
 Built since: the supervisor and its transport, real connection state with a
 heartbeat, durable preferences, the pure interlocks, manual programs bound to
-njsPC circuits, and 374 tests — including the socket layer end to end, with
-the supervisor spawned as a real process against a fake njsPC.
+njsPC circuits, schedules read from and written through to njsPC, and 425
+tests — including the socket layer end to end, with the supervisor spawned as
+a real process against a fake njsPC.
 
 Not built: valve relay driving through REM, scheduled preheat, and the
 `extendSpa` intent. All three want hardware or a water temperature.

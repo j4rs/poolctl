@@ -3,9 +3,7 @@ import { C, FONT_UI, FONT_DATA } from "../theme";
 import { Sheet, Row, Action } from "./Sheet";
 import { useConfirm } from "../lib/useConfirm";
 import { HEATER_MIN_RPM, CELL_MIN_RPM } from "../lib/sequences";
-import {
-  RPM_MIN, RPM_MAX, watts, DAYS, daysLabel, hoursBetween, overlaps,
-} from "../lib/pump";
+import { watts, DAYS, daysLabel, hoursBetween, overlaps } from "../lib/pump";
 
 /**
  * Add or edit one pump schedule, as a bottom sheet.
@@ -15,17 +13,24 @@ import {
  * than block: the server resolves them, and forbidding them here would be
  * guessing at an interlock the UI does not own.
  */
-export default function ScheduleEditor({ value, others, onSave, onDelete, onCancel }) {
+export default function ScheduleEditor({ value, others, circuits = [], onSave, onDelete, onCancel }) {
   const [draft, setDraft] = useState(value);
   const confirm = useConfirm();
   const set = (patch) => setDraft((d) => ({ ...d, ...patch }));
 
+  /* The speed is the circuit's, not the schedule's. njsPC schedules carry no
+     rpm at all — they run a circuit, and the pump holds that circuit's
+     speed. Same reason the live pump slider went. */
+  const chosen = circuits.find((c) => c.circuit === draft.circuit) ?? null;
+  const rpm = chosen?.rpm ?? null;
+
   const hours = hoursBetween(draft.start, draft.end);
-  const kwh = (watts(draft.rpm) / 1000) * hours;
+  const kwh = rpm != null ? (watts(rpm) / 1000) * hours : null;
   const clashes = others.filter((o) => overlaps(draft, o));
   const noDays = draft.days.length === 0;
   const noSpan = draft.start === draft.end;
-  const invalid = noDays || noSpan;
+  const noCircuit = draft.circuit == null;
+  const invalid = noDays || noSpan || noCircuit;
 
   /* Functional update: taps arriving faster than a re-render would each
      compute from the same stale day list and cancel each other out. */
@@ -72,30 +77,50 @@ export default function ScheduleEditor({ value, others, onSave, onDelete, onCanc
           </div>
         </Row>
 
-        <Row label="Speed">
-          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 10 }}>
-            <div style={{ fontFamily: FONT_DATA, fontSize: 26, fontWeight: 500 }}>
-              {draft.rpm}<span style={{ fontSize: 12, color: C.muted, marginLeft: 3 }}>rpm</span>
+        <Row label="Runs">
+          {circuits.length === 0 ? (
+            <div style={{ fontSize: 12.5, color: C.alert, lineHeight: 1.5 }}>
+              No circuits with a pump speed yet. njsPC needs a pump configured,
+              and a program bound, before a schedule has anything to run.
             </div>
-            <div style={{ fontFamily: FONT_DATA, fontSize: 14, color: C.water }}>
-              {watts(draft.rpm)}<span style={{ fontSize: 10, color: C.muted, marginLeft: 2 }}>W</span>
-            </div>
-          </div>
-          <input type="range" min={RPM_MIN} max={RPM_MAX} step={10} value={draft.rpm}
-            aria-label="Schedule pump speed in rpm"
-            onChange={(e) => set({ rpm: Number(e.target.value) })}
-            style={{
-              width: "100%", appearance: "none", height: 6, borderRadius: 3, outline: "none",
-              cursor: "pointer",
-              background: `linear-gradient(90deg, ${C.water} ${((draft.rpm - RPM_MIN) / (RPM_MAX - RPM_MIN)) * 100}%, ${C.line} ${((draft.rpm - RPM_MIN) / (RPM_MAX - RPM_MIN)) * 100}%)`,
-            }} />
-          <div style={{ fontFamily: FONT_DATA, fontSize: 10.5, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>
-            {draft.rpm < CELL_MIN_RPM
-              ? "Below chlorinator flow — the cell will not generate."
-              : draft.rpm < HEATER_MIN_RPM
-                ? "Below heater minimum — the heater will not fire."
-                : "Above both flow thresholds."}
-          </div>
+          ) : (
+            <>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {circuits.map((c) => {
+                  const on = draft.circuit === c.circuit;
+                  return (
+                    <button key={c.circuit} onClick={() => set({ circuit: c.circuit })}
+                      aria-pressed={on} aria-label={`Run ${c.name}`}
+                      style={{
+                        flex: "1 0 30%", padding: "10px 6px", borderRadius: 8,
+                        border: `1px solid ${on ? C.water : C.line}`,
+                        background: on ? C.wash : "transparent",
+                        color: on ? C.water : C.muted, cursor: "pointer",
+                        fontFamily: FONT_UI, fontSize: 12.5, fontWeight: 500,
+                      }}>
+                      <div>{c.name ?? `Circuit ${c.circuit}`}</div>
+                      <div style={{ fontFamily: FONT_DATA, fontSize: 10.5, marginTop: 2, color: C.muted }}>
+                        {c.rpm != null ? `${c.rpm} rpm` : "no speed"}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* The thresholds still inform the choice, they just describe
+                  the circuit being picked rather than a slider position. */}
+              {rpm != null && (
+                <div style={{ fontFamily: FONT_DATA, fontSize: 10.5, color: C.muted, marginTop: 10, lineHeight: 1.5 }}>
+                  {watts(rpm)} W ·{" "}
+                  {rpm < CELL_MIN_RPM
+                    ? "below chlorinator flow — the cell will not generate."
+                    : rpm < HEATER_MIN_RPM
+                      ? "below heater minimum — the heater will not fire."
+                      : "above both flow thresholds."}
+                </div>
+              )}
+            </>
+          )}
         </Row>
 
         <div style={{
@@ -105,20 +130,23 @@ export default function ScheduleEditor({ value, others, onSave, onDelete, onCanc
           <span style={{ fontSize: 12.5, color: C.muted }}>
             {noSpan ? "No runtime" : `${hours.toFixed(1)} h per run`}
           </span>
-          <span style={{ fontFamily: FONT_DATA, fontSize: 13 }}>
-            {kwh.toFixed(2)} kWh
+          <span style={{ fontFamily: FONT_DATA, fontSize: 13, color: kwh == null ? C.faint : C.stone }}>
+            {kwh == null ? "— kWh" : `${kwh.toFixed(2)} kWh`}
           </span>
         </div>
 
         {clashes.length > 0 && (
           <div style={{ fontSize: 12, color: C.heat, marginBottom: 14, lineHeight: 1.5 }}>
-            Overlaps {clashes.map((c) => `${c.start}–${c.end}`).join(", ")}. The
-            later schedule wins while both are active.
+            Overlaps {clashes.map((c) => `${c.start}–${c.end}`).join(", ")}.
+            Not a conflict: njsPC runs every circuit whose schedule says so
+            and drives the pump at the fastest of them.
           </div>
         )}
         {invalid && (
           <div style={{ fontSize: 12, color: C.alert, marginBottom: 14, lineHeight: 1.5 }}>
-            {noDays ? "Pick at least one day." : "Start and end cannot match."}
+            {noCircuit
+              ? "Pick what this schedule runs."
+              : noDays ? "Pick at least one day." : "Start and end cannot match."}
           </div>
         )}
 

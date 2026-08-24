@@ -63,16 +63,30 @@ export function overlaps(x, y) {
 }
 
 /**
- * The schedule that would be driving the pump right now, or null.
+ * The schedule driving the pump right now, or null.
  *
- * Where windows overlap the later one wins, matching what the editor warns.
+ * Where windows overlap, the **fastest** wins — not the latest. That was an
+ * invention of the mock era and it is wrong against njsPC, which resolves
+ * overlaps in two steps:
+ *
+ *   Per circuit, `NixieSchedule` ORs its schedules together — the circuit is
+ *   on if any schedule says it should be, so same-circuit windows union
+ *   rather than one superseding the other.
+ *
+ *   Across circuits, `NixiePumpVS.setTargetSpeed` takes `Math.max` of the
+ *   speeds of every circuit that is on.
+ *
+ * So the pump runs at the highest speed any active schedule asks for, and
+ * this is which schedule that is.
  */
 export function activeSchedule(schedules, date = new Date()) {
   const day = date.getDay();
   const mins = date.getHours() * 60 + date.getMinutes();
-  const hits = schedules.filter(
-    (s) => s.on && s.days.includes(day) && spans(s).some(([a, b]) => mins >= a && mins < b));
-  return hits.length ? hits[hits.length - 1] : null;
+  const hits = (schedules ?? []).filter(
+    (s) => s.enabled !== false && s.days.includes(day)
+      && spans(s).some(([a, b]) => mins >= a && mins < b));
+  if (!hits.length) return null;
+  return hits.reduce((best, s) => ((s.rpm ?? 0) > (best.rpm ?? 0) ? s : best));
 }
 
 /** 24h clock for a timestamp, matching the schedule fields. */

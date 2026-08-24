@@ -30,6 +30,16 @@ const makeState = (over = {}) => ({
     { id: "skimming", name: "Skimming", rpm: 2100, minutes: 30, circuit: 3, bindError: null },
   ],
   pumpLimits: { pumpId: 50, minSpeed: 450, maxSpeed: 3450, maxCircuits: 8, used: 4 },
+  /* Schedules come from njsPC now, so they arrive in state like everything
+     else. A schedule names a circuit; the rpm is the circuit's. */
+  pumpCircuits: [
+    { circuit: 6, name: "Pool", rpm: 1600 },
+    { circuit: 7, name: "Solar gain", rpm: 2600 },
+  ],
+  schedules: [
+    { id: 1, circuit: 6, circuitName: "Pool", rpm: 1600, start: "08:00", end: "12:00", days: EVERY, enabled: true, clockOnly: true, repeats: true },
+    { id: 2, circuit: 7, circuitName: "Solar gain", rpm: 2600, start: "12:00", end: "16:00", days: EVERY, enabled: true, clockOnly: true, repeats: true },
+  ],
   activeProgram: null, pumpRunning: true, panelMode: "auto", ...over,
 });
 
@@ -41,7 +51,8 @@ const makeController = (over = {}, fns = {}) => ({
   simulateOutage: vi.fn(), problem: null, dismissProblem: vi.fn(),
   setPumpRunning: vi.fn(), setPanelMode: vi.fn(), startProgram: vi.fn(),
   stopProgram: vi.fn(), saveProgram: vi.fn(), deleteProgram: vi.fn(),
-  bindProgram: vi.fn(), ...fns,
+  bindProgram: vi.fn(), saveSchedule: vi.fn(), deleteSchedule: vi.fn(),
+  setScheduleEnabled: vi.fn(), ...fns,
 });
 
 /**
@@ -245,17 +256,29 @@ describe("Pump — who is driving", () => {
 });
 
 describe("Pump — schedules", () => {
-  it("toggles a schedule", () => {
+  it("asks njsPC to switch a schedule off rather than switching it here", () => {
+    /* The row must not flip on the tap. njsPC owns schedules; the list
+       re-renders when njsPC says it changed (ADR-7). */
+    const c = makeController();
+    pump(c);
+    const row = screen.getByLabelText("Enable schedule 08:00 to 12:00");
+    confirmTap(row);
+    expect(c.setScheduleEnabled).toHaveBeenCalledWith(1, false);
+    expect(row.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("names the circuit each schedule runs", () => {
+    /* The rpm is the circuit's, so the circuit is the thing worth naming. */
     const { container } = pump(makeController());
-    /* Scoped to schedule rows: the hold-duration chips also use
-       aria-pressed, and one of them is selected by default. */
-    const rows = () => [...container.querySelectorAll("button[aria-pressed]")]
-      .filter((b) => /^Enable schedule /.test(b.getAttribute("aria-label") || ""));
-    const on = () => rows().filter((b) => b.getAttribute("aria-pressed") === "true").length;
-    const before = on();
-    expect(before).toBeGreaterThan(0);
-    fireEvent.click(rows().find((b) => b.getAttribute("aria-pressed") === "true"));
-    expect(on()).toBe(before - 1);
+    expect(container.textContent).toMatch(/Solar gain/);
+  });
+
+  it("says so when a schedule points at a circuit with no pump speed", () => {
+    const { container } = pump(makeController({
+      schedules: [{ id: 1, circuit: 9, circuitName: "Orphan", rpm: null, start: "08:00", end: "12:00", days: EVERY, enabled: true }],
+    }));
+    expect(container.textContent).toMatch(/no pump speed/);
+    expect(container.textContent).not.toMatch(/NaN/);
   });
   it("opens the schedule editor from its Add", () => {
     pump(makeController());
@@ -300,9 +323,13 @@ describe("Heat screen", () => {
 /* ------------------------------------------------------- schedule editor */
 
 describe("Schedule editor", () => {
-  const base = { id: 1, start: "08:00", end: "18:00", rpm: 1600, days: EVERY, on: true };
-  const editor = (value, others = [], fns = {}) =>
-    render(<ScheduleEditor value={value} others={others}
+  const base = { id: 1, circuit: 6, start: "08:00", end: "18:00", days: EVERY, enabled: true };
+  const CIRCUITS = [
+    { circuit: 6, name: "Pool", rpm: 1600 },
+    { circuit: 7, name: "Solar gain", rpm: 2600 },
+  ];
+  const editor = (value, others = [], fns = {}, circuits = CIRCUITS) =>
+    render(<ScheduleEditor value={value} others={others} circuits={circuits}
       onSave={fns.onSave || vi.fn()} onDelete={fns.onDelete || vi.fn()} onCancel={fns.onCancel || vi.fn()} />);
 
   it("saves a valid schedule", () => {
@@ -328,6 +355,43 @@ describe("Schedule editor", () => {
     const { container } = editor(base, [{ ...base, id: 2, start: "10:00", end: "12:00" }]);
     expect(container.textContent).toMatch(/overlap/i);
     expect(screen.getByText("Save").closest("button").disabled).toBe(false);
+  });
+
+  it("describes an overlap the way njsPC resolves it", () => {
+    /* Not "the later one wins" — that was ours and it was wrong. njsPC ORs
+       a circuit's schedules together and drives the pump at the max. */
+    const { container } = editor(base, [{ ...base, id: 2, start: "10:00", end: "12:00" }]);
+    expect(container.textContent).toMatch(/fastest/i);
+    expect(container.textContent).not.toMatch(/later schedule wins/i);
+  });
+
+  it("picks what to run rather than a speed", () => {
+    /* njsPC schedules carry no rpm at all: they run a circuit, and the pump
+       holds that circuit's speed. Same reason the pump slider went. */
+    const onSave = vi.fn();
+    editor({ ...base, circuit: null }, [], { onSave });
+    expect(screen.queryByLabelText(/speed in rpm/i)).toBeNull();
+    expect(screen.getByText("Save").closest("button").disabled).toBe(true);
+
+    fireEvent.click(screen.getByLabelText("Run Solar gain"));
+    fireEvent.click(screen.getByText("Save"));
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ circuit: 7 }));
+  });
+
+  it("shows the chosen circuit's speed and what it means", () => {
+    const { container } = editor(base);
+    expect(container.textContent).toMatch(/1600 rpm/);
+    /* 1600 is under HEATER_MIN_RPM (1900), and saying so is the point of
+       showing it: this is the speed the schedule will hold all window. */
+    expect(container.textContent).toMatch(/below heater minimum/i);
+  });
+
+  it("says there is nothing to run before commissioning", () => {
+    /* No pump in njsPC means no circuit carries a speed, so a schedule has
+       nothing to point at. An empty picker would just look broken. */
+    editor({ ...base, circuit: null }, [], {}, []);
+    expect(screen.getByText(/No circuits with a pump speed yet/)).toBeDefined();
+    expect(screen.getByText("Save").closest("button").disabled).toBe(true);
   });
 
   it("deletes an existing schedule", () => {
@@ -643,14 +707,16 @@ describe("Confirming anything that moves equipment", () => {
   });
 
   it("guards enabling a schedule, which decides whether the pump starts", () => {
-    pump(makeController());
+    const c = makeController();
+    pump(c);
     const b = screen.getByLabelText("Enable schedule 08:00 to 12:00");
     fireEvent.click(b);
     expect(b.getAttribute("aria-label")).toMatch(/^Confirm: disable schedule/);
     /* Armed is not switched: the row must not read as off until it is. */
     expect(b.getAttribute("aria-pressed")).toBe("true");
+    expect(c.setScheduleEnabled).not.toHaveBeenCalled();
     fireEvent.click(b);
-    expect(b.getAttribute("aria-pressed")).toBe("false");
+    expect(c.setScheduleEnabled).toHaveBeenCalledWith(1, false);
   });
 
   it("does not guard the taps that only open a sheet", () => {

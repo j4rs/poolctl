@@ -6,6 +6,30 @@ import {
   HEATER_MIN_RPM, HEATER_CAP, TARGET_MIN, SPA_TIMEOUT_MIN, SPA_HEAT_RATE,
 } from "./sequences.js";
 
+
+/* ILLUSTRATIVE ONLY — see the mock-data warning above.
+ *
+ * These carry circuits rather than bare speeds because that is njsPC's model
+ * and the live screen speaks it: a schedule runs a circuit, and the circuit
+ * is what the pump has a speed for. The names do the work the old free-text
+ * note used to, and unlike a note they survive the trip to real equipment. */
+const MOCK_PUMP_CIRCUITS = [
+  { circuit: 6, name: "Pool", rpm: 1600 },
+  { circuit: 1, name: "Spa", rpm: 2800 },
+  { circuit: 7, name: "Solar gain", rpm: 2600 },
+  { circuit: 8, name: "Evening", rpm: 1400 },
+  { circuit: 9, name: "Skim", rpm: 2100 },
+];
+
+const EVERY_DAY = [0, 1, 2, 3, 4, 5, 6];
+
+const MOCK_SCHEDULES = [
+  { id: 1, circuit: 6, circuitName: "Pool", rpm: 1600, start: "08:00", end: "12:00", days: EVERY_DAY, enabled: true, clockOnly: true, repeats: true },
+  { id: 2, circuit: 7, circuitName: "Solar gain", rpm: 2600, start: "12:00", end: "16:00", days: EVERY_DAY, enabled: true, clockOnly: true, repeats: true },
+  { id: 3, circuit: 8, circuitName: "Evening", rpm: 1400, start: "16:00", end: "20:00", days: EVERY_DAY, enabled: true, clockOnly: true, repeats: true },
+  { id: 4, circuit: 9, circuitName: "Skim", rpm: 2100, start: "22:00", end: "23:30", days: [0, 6], enabled: false, clockOnly: true, repeats: true },
+];
+
 /**
  * Apply one step to the local simulation and return the matching state patch.
  *
@@ -96,7 +120,14 @@ export function useController() {
     /* What the pump would accept. Invented like everything else here — the
        live supervisor reads this off njsPC's pump. The shape matters more
        than the numbers: null limits mean no pump is configured. */
-    pumpLimits: { pumpId: 50, minSpeed: RPM_MIN, maxSpeed: RPM_MAX, maxCircuits: 8, used: 2 },
+    pumpLimits: { pumpId: 50, minSpeed: RPM_MIN, maxSpeed: RPM_MAX, maxCircuits: 8, used: 5 },
+    /* The circuits the pump carries a speed for. A schedule points at one of
+       these; the speed is the circuit's, never the schedule's. */
+    pumpCircuits: MOCK_PUMP_CIRCUITS,
+    /* ILLUSTRATIVE. Several windows at different speeds, to exercise the
+       screen. The real schedule is one daily filtration window — the PRD has
+       it. Live, these come from njsPC and none of this is used. */
+    schedules: MOCK_SCHEDULES,
     /* The pump itself, independent of speed: stopped means stopped. */
     pumpRunning: true,
     /* njsPC panel mode. 'service' means automation stands down and only
@@ -311,6 +342,33 @@ export function useController() {
       };
     });
 
+  /* Schedules. Live these are njsPC's and the supervisor writes through;
+     here they are plain state so the screen works with no backend. */
+  const saveSchedule = (draft) =>
+    setState((s) => {
+      const { isNew, ...clean } = draft;
+      const named = {
+        ...clean,
+        circuitName: s.pumpCircuits.find((c) => c.circuit === clean.circuit)?.name ?? null,
+        rpm: s.pumpCircuits.find((c) => c.circuit === clean.circuit)?.rpm ?? null,
+      };
+      return {
+        ...s,
+        schedules: isNew
+          ? [...s.schedules, { ...named, id: Math.max(0, ...s.schedules.map((x) => x.id)) + 1 }]
+          : s.schedules.map((x) => (x.id === named.id ? named : x)),
+      };
+    });
+
+  const deleteSchedule = (id) =>
+    setState((s) => ({ ...s, schedules: s.schedules.filter((x) => x.id !== id) }));
+
+  const setScheduleEnabled = (id, on) =>
+    setState((s) => ({
+      ...s,
+      schedules: s.schedules.map((x) => (x.id === id ? { ...x, enabled: on } : x)),
+    }));
+
   /** Push the spa auto-revert out by another full timeout from now. */
   const extendSpa = () =>
     setState((s) =>
@@ -426,7 +484,7 @@ export function useController() {
   return {
     state, setMode, setRpm, setTarget, adjustTarget, setPoolHeat, toggle,
     setPumpRunning, setPanelMode, startProgram, stopProgram, saveProgram, deleteProgram,
-    bindProgram,
+    bindProgram, saveSchedule, deleteSchedule, setScheduleEnabled,
     extendSpa, schedulePreheat, cancelPreheat, simulateOutage,
     /* The mock never refuses anything, but App renders the same Toast either
        way rather than caring which hook it was handed. */

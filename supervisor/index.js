@@ -15,6 +15,7 @@ import {
   circuitConfig, withPumpCircuit, withoutPumpCircuit, whyNotBindable, pumpLimits,
 } from "./binding.js";
 import { checkCommissioning } from "./commissioning.js";
+import { scheduleConfig, whyNotSchedulable } from "./schedules.js";
 
 /**
  * poolctl supervisor — v0.
@@ -461,6 +462,39 @@ const intents = {
   /** Retry a binding that failed, without editing the program. */
   async bindProgram({ id }) {
     await bind(id);
+  },
+
+  /**
+   * Schedules.
+   *
+   * njsPC owns these outright — it evaluates them on its own timers and will
+   * switch a body without asking (ADR-11). So these intents translate and
+   * write through; nothing is kept on this side that could disagree, and the
+   * list the UI renders is read straight back out of njsPC's state.
+   */
+  async saveSchedule({ schedule }) {
+    const why = whyNotSchedulable(schedule);
+    if (why) throw refuse(why);
+    await njs.setScheduleConfig(scheduleConfig(schedule));
+  },
+
+  async deleteSchedule({ id }) {
+    if (!Number.isFinite(Number(id))) throw refuse(`no schedule '${id}'`);
+    await njs.deleteScheduleConfig(Number(id));
+  },
+
+  /**
+   * Switch a schedule off without deleting it.
+   *
+   * njsPC keeps `disabled` separate from `isActive`, which is the difference
+   * between "not running this week" and "gone". Read-modify-write, because
+   * `setScheduleAsync` fills unspecified fields from the stored schedule and
+   * we would rather send what we mean than rely on that.
+   */
+  async setScheduleEnabled({ id, on }) {
+    const current = (ui?.schedules ?? []).find((s) => s.id === Number(id));
+    if (!current) throw refuse(`no schedule '${id}'`);
+    await njs.setScheduleConfig(scheduleConfig({ ...current, enabled: Boolean(on) }));
   },
 
   async setTarget({ body, degrees, delta }) {

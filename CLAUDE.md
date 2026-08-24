@@ -6,7 +6,7 @@ nodejs-poolController.
 **Status:** the UI runs live against njsPC through the supervisor. Pi 4 is up,
 Lite, thermally characterised. The relay HAT has not arrived, so no equipment
 is connected — njsPC runs on a laptop with no serial port, which is enough to
-have settled most of the design questions. 374 tests; `npm test`.
+have settled most of the design questions. 425 tests; `npm test`.
 
 **This file is the operating manual for working in this repo — nothing more.**
 The full record lives elsewhere and is deliberately not duplicated here:
@@ -49,6 +49,7 @@ supervisor/              runs on the Pi; plain JS, no build step
   interlocks.js          the rules njsPC lacks — pure, tested
   commissioning.js       njsPC's own settings, checked against what we believe
   binding.js             program -> njsPC circuit + pump speed — pure, tested
+  schedules.js           njsPC schedules <-> the shape the UI speaks
   targets.js             ADR-4 clamping
   store.js               durable preferences (not positions)
 ```
@@ -175,6 +176,36 @@ program (name, speed, required expiry) or spa mode. njsPC has no runtime
 pump-speed endpoint because that is how pool controllers model the pump —
 the absence was the domain model, not a gap. Run/stop and service mode sit
 above all of it.
+
+**Schedules are njsPC's, and a schedule runs a circuit — not a speed.**
+There is no rpm field on an njsPC schedule; the pump holds the speed for the
+circuit the schedule names. So a manual program and a schedule are now the
+same currency: the program owns name/speed/expiry and its circuit, and a
+schedule points at one. Anything you can press, you can put on a timer.
+
+Three things that cost a live bug each, all in `schedules.js`:
+
+- **`/state/all` and `/config/all` are different shapes.** State expands
+  enums into `{val,name,desc}` and `scheduleDays` into `{val,days:[…]}`; the
+  supervisor reads state. `Number({val:127})` is `NaN`, which read as *no
+  days at all*.
+- **Empty schedule slots are truthy.** njsPC keeps unused slots in the same
+  array, with a `circuit` object present but carrying no `id`. Test the id.
+- **A new schedule needs `heatSource`.** `setScheduleAsync` inherits it from
+  the stored schedule, so editing works and creating fails with "Invalid heat
+  source: undefined". Always send 32, *No Change* — which ADR-4 wants anyway,
+  alongside `changeHeatSetpoint: false`, so a schedule can never move the
+  heater.
+
+**Overlapping schedules are not a conflict, and the fastest wins.** Per
+circuit `NixieSchedule` ORs its schedules together, so same-circuit windows
+union; across circuits `NixiePumpVS.setTargetSpeed` takes `Math.max`. The old
+"the later schedule wins" was a mock-era invention and was wrong on screen.
+
+**Day bitmask: Monday is bit 0, Sunday is bit 6.** `Date#getDay` puts Sunday
+at 0. Convert only through `daysToMask`/`maskToDays`, which are round-trip
+tested across all 128 masks — an off-by-one here runs the pool a day out and
+throws nothing.
 
 **A program is two njsPC writes, not one.** The name and the expiry go on a
 circuit (`PUT /config/circuit`, `eggTimer`); the speed goes on the pump

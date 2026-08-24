@@ -78,7 +78,9 @@ and it is where both of this layer's shipped bugs lived.
   never setpoints — see ADR-4.
 - **Pump** — run/stop, manual programs (a name, a speed and a required
   expiry), service mode to stand the schedules down, and schedules with
-  add/edit/delete and real energy cost. No speed slider: njsPC drives the pump
+  add/edit/delete and real energy cost. Schedules are njsPC's own, read and
+  written through; each one runs a circuit, so a manual program is also the
+  thing a schedule can put on a timer. No speed slider: njsPC drives the pump
   from circuits, and an arbitrary rpm has neither a user nor a lifetime. Each
   program becomes an njsPC circuit with a pump speed and an egg timer; the
   supervisor creates it, and a program that has none says why it cannot run.
@@ -108,6 +110,7 @@ supervisor/                runs on the Pi; plain JS, no build step
   interlocks.js            the rules njsPC lacks — pure, tested
   commissioning.js         njsPC settings checked against what we believe
   binding.js               program -> njsPC circuit + pump speed
+  schedules.js             njsPC schedules <-> the shape the UI speaks
   targets.js               ADR-4 clamping
   store.js                 durable preferences
 docs/architecture.md       system view, state ownership, failure modes
