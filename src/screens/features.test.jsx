@@ -6,6 +6,7 @@ import PumpControl from "./PumpControl";
 import HeatControl from "./HeatControl";
 import ScheduleEditor from "../components/ScheduleEditor";
 import ProgramEditor from "../components/ProgramEditor";
+import PreheatSheet from "../components/PreheatSheet";
 import { SEQUENCES, HEATER_MIN_RPM } from "../lib/sequences";
 
 afterEach(cleanup);
@@ -76,7 +77,7 @@ describe("Water — blower gate", () => {
     water(c);
     const b = screen.getByText("Blower").closest("button");
     expect(b.disabled).toBe(false);
-    fireEvent.click(b);
+    confirmTap(b);
     expect(c.toggle).toHaveBeenCalledWith("blower");
   });
 
@@ -87,7 +88,7 @@ describe("Water — blower gate", () => {
     const b = screen.getByText("Blower").closest("button");
     expect(b.getAttribute("aria-pressed")).toBe("true");
     expect(b.disabled, "a running blower must stay stoppable").toBe(false);
-    fireEvent.click(b);
+    confirmTap(b);
     expect(c.toggle).toHaveBeenCalledWith("blower");
   });
 });
@@ -127,7 +128,7 @@ describe("Water — spa auto-revert", () => {
     const c = makeController({ mode: "spa", spaExpiresAt: Date.now() + 20 * 60000 });
     water(c);
     expect(screen.getByText(/Reverts to pool/)).toBeDefined();
-    fireEvent.click(screen.getByText("Extend"));
+    confirmTap(screen.getByText("Extend"));
     expect(c.extendSpa).toHaveBeenCalled();
   });
   it("is absent in pool mode", () => {
@@ -152,7 +153,7 @@ describe("Water — preheat", () => {
   it("shows a scheduled preheat and lets it be cancelled", () => {
     const c = makeController({ preheat: { readyAt: Date.now() + 3600e3, startsAt: Date.now() + 1800e3 } });
     water(c);
-    fireEvent.click(screen.getByText("Cancel"));
+    confirmTap(screen.getByText("Cancel"));
     expect(c.cancelPreheat).toHaveBeenCalled();
   });
 });
@@ -218,13 +219,13 @@ describe("Heat screen", () => {
   it("calls for pool heat", () => {
     const c = makeController();
     render(<HeatControl controller={c} onBack={vi.fn()} />);
-    fireEvent.click(screen.getByText(/Heat the pool/));
+    confirmTap(screen.getByText(/Heat the pool/));
     expect(c.setPoolHeat).toHaveBeenCalledWith(true);
   });
   it("offers to stop once heat is demanded", () => {
     const c = makeController({ poolHeatDemand: true, heaterCall: "pool", valves: { intake: "pool", returns: "split", bypass: "flow" } });
     render(<HeatControl controller={c} onBack={vi.fn()} />);
-    fireEvent.click(screen.getByText(/Pool heat is on/));
+    confirmTap(screen.getByText(/Pool heat is on/));
     expect(c.setPoolHeat).toHaveBeenCalledWith(false);
   });
   it("goes back", () => {
@@ -506,6 +507,93 @@ describe("Confirming anything that moves equipment", () => {
     expect(onDelete).not.toHaveBeenCalled();
     fireEvent.click(screen.getByText("Tap again"));
     expect(onDelete).toHaveBeenCalledWith("skimming");
+  });
+
+  it("guards pool heat, which opens the bypass and starts a heat pump", () => {
+    const c = makeController();
+    render(<HeatControl controller={c} onBack={vi.fn()} />);
+    const b = screen.getByText(/Heat the pool/).closest("button");
+    fireEvent.click(b);
+    expect(c.setPoolHeat).not.toHaveBeenCalled();
+    expect(b.textContent).toMatch(/Tap again to start heating/);
+    fireEvent.click(b);
+    expect(c.setPoolHeat).toHaveBeenCalledWith(true);
+  });
+
+  it("does not let a toggle read as switched before it has switched", () => {
+    /* The armed state is not the on state. A toggle whose `aria-pressed`
+       moved on the arming tap would be lying in exactly the way ADR-7 exists
+       to prevent — and a screen reader would announce a heat call that has
+       not been made. */
+    const c = makeController();
+    render(<HeatControl controller={c} onBack={vi.fn()} />);
+    const b = screen.getByText(/Heat the pool/).closest("button");
+    expect(b.getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(b);
+    expect(b.getAttribute("aria-pressed"), "armed is not on").toBe("false");
+    expect(b.getAttribute("aria-label")).toBe("Confirm: Heat the pool");
+  });
+
+  it("guards the blower, which is a 1.5 HP motor", () => {
+    const c = makeController({ mode: "spa", valves: { intake: "spa", returns: "spa", bypass: "flow" } });
+    water(c);
+    const b = screen.getByText("Blower").closest("button");
+    fireEvent.click(b);
+    expect(c.toggle).not.toHaveBeenCalled();
+    expect(b.textContent).toMatch(/Tap again to start it/);
+    fireEvent.click(b);
+    expect(c.toggle).toHaveBeenCalledWith("blower");
+  });
+
+  it("leaves the light alone — no actuator, no flow", () => {
+    /* The line has to fall somewhere, and it falls here. A light that comes
+       on when you did not mean it costs nothing to undo. */
+    const c = makeController();
+    water(c);
+    fireEvent.click(screen.getByText("Light").closest("button"));
+    expect(c.toggle).toHaveBeenCalledWith("light");
+  });
+
+  it("guards extending a spa session", () => {
+    const c = makeController({ mode: "spa", spaExpiresAt: Date.now() + 20 * 60000 });
+    water(c);
+    const b = screen.getByText("Extend");
+    fireEvent.click(b);
+    expect(c.extendSpa).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText("Tap again"));
+    expect(c.extendSpa).toHaveBeenCalled();
+  });
+
+  it("guards cancelling a scheduled preheat", () => {
+    const c = makeController({ preheat: { readyAt: Date.now() + 3600e3, startsAt: Date.now() + 1800e3 } });
+    water(c);
+    fireEvent.click(screen.getByText("Cancel"));
+    expect(c.cancelPreheat).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText("Tap again"));
+    expect(c.cancelPreheat).toHaveBeenCalled();
+  });
+
+  it("guards scheduling a preheat, which is valve travel at an unwatched hour", () => {
+    const onConfirm = vi.fn();
+    render(
+      <PreheatSheet waterTemp={84} target={102} onConfirm={onConfirm} onCancel={vi.fn()} />,
+    );
+    const b = screen.getByText("Schedule");
+    fireEvent.click(b);
+    expect(onConfirm).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText("Tap again"));
+    expect(onConfirm).toHaveBeenCalled();
+  });
+
+  it("guards enabling a schedule, which decides whether the pump starts", () => {
+    pump(makeController());
+    const b = screen.getByLabelText("Enable schedule 08:00 to 12:00");
+    fireEvent.click(b);
+    expect(b.getAttribute("aria-label")).toMatch(/^Confirm: disable schedule/);
+    /* Armed is not switched: the row must not read as off until it is. */
+    expect(b.getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(b);
+    expect(b.getAttribute("aria-pressed")).toBe("false");
   });
 
   it("does not guard the taps that only open a sheet", () => {

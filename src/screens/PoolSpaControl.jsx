@@ -6,6 +6,7 @@ import Stat from "../components/Stat";
 import Toggle from "../components/Toggle";
 import HoldButton from "../components/HoldButton";
 import PreheatSheet from "../components/PreheatSheet";
+import { useConfirm } from "../lib/useConfirm";
 
 /** Coarse relative time. Precision past a minute is noise here. */
 const ago = (ms) => {
@@ -21,6 +22,10 @@ const countdown = (ms) => {
 };
 
 export default function PoolSpaControl({ controller, themeControl, onOpenHeat }) {
+  /* Everything below that moves an actuator or changes flow asks twice.
+     The mode switch is the exception and uses HoldButton instead — two
+     minutes of uncancellable valve travel earns a hold, not a tap. */
+  const confirm = useConfirm();
   const { state, setMode, toggle, extendSpa, schedulePreheat, cancelPreheat,
     simulateOutage } = controller;
   const {
@@ -167,14 +172,17 @@ export default function PoolSpaControl({ controller, themeControl, onOpenHeat })
               Valves swing back and the heater stops. Extend if you are still in.
             </div>
           </div>
-          <button onClick={extendSpa} disabled={stale}
+          <button
+            onClick={confirm.guard("extendSpa", extendSpa)}
+            disabled={stale}
+            aria-label={confirm.isArmed("extendSpa") ? "Confirm: extend the spa session" : "Extend the spa session"}
             style={{
               flexShrink: 0, padding: "11px 16px", borderRadius: 10,
               border: `1px solid ${C.heat}`, background: "transparent",
               color: C.heat, fontFamily: FONT_UI, fontSize: 13, fontWeight: 600,
               cursor: stale ? "not-allowed" : "pointer", opacity: stale ? 0.5 : 1,
             }}>
-            Extend
+            {confirm.isArmed("extendSpa") ? "Tap again" : "Extend"}
           </button>
         </div>
       )}
@@ -195,14 +203,23 @@ export default function PoolSpaControl({ controller, themeControl, onOpenHeat })
                 {" · "}estimate only, the heating rate is unmeasured
               </div>
             </div>
-            <button onClick={cancelPreheat} disabled={stale}
+            <button
+              onClick={confirm.guard("cancelPreheat", cancelPreheat)}
+              disabled={stale}
+              aria-label={
+                confirm.isArmed("cancelPreheat")
+                  ? "Confirm: cancel the scheduled preheat"
+                  : "Cancel the scheduled preheat"
+              }
               style={{
                 flexShrink: 0, padding: "11px 14px", borderRadius: 10,
-                border: `1px solid ${C.line}`, background: "transparent",
-                color: C.muted, fontFamily: FONT_UI, fontSize: 13,
+                border: `1px solid ${confirm.isArmed("cancelPreheat") ? C.heat : C.line}`,
+                background: "transparent",
+                color: confirm.isArmed("cancelPreheat") ? C.heat : C.muted,
+                fontFamily: FONT_UI, fontSize: 13,
                 cursor: stale ? "not-allowed" : "pointer",
               }}>
-              Cancel
+              {confirm.isArmed("cancelPreheat") ? "Tap again" : "Cancel"}
             </button>
           </div>
         ) : (
@@ -286,7 +303,11 @@ export default function PoolSpaControl({ controller, themeControl, onOpenHeat })
         <Toggle label="Blower" on={blower}
           disabled={stale || (valves.intake !== "spa" && !blower)}
           reason={stale ? "Not connected" : "Available in spa mode"}
-          onClick={() => toggle("blower")} />
+          armed={confirm.isArmed("blower")}
+          confirmLabel={blower ? "Tap again to stop it" : "Tap again to start it"}
+          onClick={confirm.guard("blower", () => toggle("blower"))} />
+        {/* The light is the one switch here that asks once: no actuator, no
+            flow, and nothing it can do that the next tap cannot undo. */}
         <Toggle label="Light" on={light} disabled={stale}
           reason="Not connected" onClick={() => toggle("light")} />
       </div>

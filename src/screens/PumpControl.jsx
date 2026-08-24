@@ -341,9 +341,17 @@ export default function PumpControl({ controller, themeControl }) {
           const kwh = (watts(s.rpm) / 1000) * hoursBetween(s.start, s.end);
           return (
             <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 14px", borderBottom: `1px solid ${C.line}`, opacity: s.on ? 1 : 0.42 }}>
-              <button onClick={() => toggleSchedule(s.id)} aria-pressed={s.on}
-                aria-label={`Enable schedule ${s.start} to ${s.end}`}
-                style={{ width: 34, height: 20, borderRadius: 10, border: "none", flexShrink: 0, background: s.on ? C.water : C.line, position: "relative", cursor: "pointer", transition: "background 180ms" }}>
+              {/* Enabling one means the pump starts at its next boundary;
+                  disabling one means it does not. Both change flow. */}
+              <button
+                onClick={confirm.guard(`schedule:${s.id}`, () => toggleSchedule(s.id))}
+                aria-pressed={s.on}
+                aria-label={
+                  confirm.isArmed(`schedule:${s.id}`)
+                    ? `Confirm: ${s.on ? "disable" : "enable"} schedule ${s.start} to ${s.end}`
+                    : `Enable schedule ${s.start} to ${s.end}`
+                }
+                style={{ width: 34, height: 20, borderRadius: 10, flexShrink: 0, background: s.on ? C.water : C.line, position: "relative", cursor: "pointer", transition: "background 180ms", border: confirm.isArmed(`schedule:${s.id}`) ? `2px solid ${C.heat}` : "none" }}>
                 <span style={{ position: "absolute", top: 3, left: s.on ? 17 : 3, width: 14, height: 14, borderRadius: 7, background: s.on ? C.ground : C.surfaceUp, transition: "left 180ms" }} />
               </button>
               {/* The row body opens the editor; the switch stays its own

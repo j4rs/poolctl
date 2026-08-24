@@ -3,6 +3,7 @@ import { C, FONT_UI, FONT_DATA } from "../theme";
 import { SEQUENCES, SPA_HEAT_RATE } from "../lib/sequences";
 import TargetTemp from "../components/TargetTemp";
 import Toggle from "../components/Toggle";
+import { useConfirm } from "../lib/useConfirm";
 
 /**
  * Heat control. Reached by tapping the heater on the Water screen.
@@ -13,6 +14,9 @@ import Toggle from "../components/Toggle";
  */
 export default function HeatControl({ controller, onBack }) {
   const { state, adjustTarget, setPoolHeat } = controller;
+  /* Calling for heat starts a heat pump that will run for hours, and ending
+     a call mid-cycle is its own event. Both ask twice. */
+  const confirm = useConfirm();
   const {
     waterTemp, setpoint, heaterCall, targets, blower, valves, mode,
     poolHeatDemand, activeSequence, stepIndex,
@@ -79,7 +83,9 @@ export default function HeatControl({ controller, onBack }) {
               : busy ? "Sequence in progress"
               : undefined
           }
-          onClick={() => setPoolHeat(!poolHeatDemand)} />
+          armed={confirm.isArmed("poolHeat")}
+          confirmLabel={poolHeatDemand ? "Tap again to stop heating" : "Tap again to start heating"}
+          onClick={confirm.guard("poolHeat", () => setPoolHeat(!poolHeatDemand))} />
       </div>
 
       {heatSeq && (

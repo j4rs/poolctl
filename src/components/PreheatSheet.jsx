@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { C, FONT_UI, FONT_DATA } from "../theme";
+import { useConfirm } from "../lib/useConfirm";
 import { SPA_HEAT_RATE } from "../lib/sequences";
 
 /** Next occurrence of HH:MM — today if it is still ahead, else tomorrow. */
@@ -25,6 +26,7 @@ const clock = (ms) =>
  * option, not the main path.
  */
 export default function PreheatSheet({ waterTemp, targetTemp, onCancel, onConfirm }) {
+  const confirm = useConfirm();
   /* Should be unreachable — the caller disables the control without a reading
      — but a null here used to blank the screen, and `targetTemp - null` is
      `targetTemp` in JavaScript, so the arithmetic would silently plan from a
@@ -108,13 +110,19 @@ export default function PreheatSheet({ waterTemp, targetTemp, onCancel, onConfir
             }}>
             Cancel
           </button>
-          <button onClick={() => onConfirm(plan.readyAt)}
+          {/* Scheduling commits a mode change, which is valve travel — just
+              at a time nobody will be watching. */}
+          <button
+            onClick={confirm.guard("schedule", () => onConfirm(plan.readyAt))}
+            aria-label={confirm.isArmed("schedule") ? "Confirm: schedule the preheat" : "Schedule the preheat"}
             style={{
-              flex: 2, padding: 13, borderRadius: 10, border: `1px solid ${C.water}`,
-              background: C.water, color: C.ground, fontFamily: FONT_UI,
-              fontSize: 14, fontWeight: 600, cursor: "pointer",
+              flex: 2, padding: 13, borderRadius: 10,
+              border: `1px solid ${confirm.isArmed("schedule") ? C.heat : C.water}`,
+              background: confirm.isArmed("schedule") ? "transparent" : C.water,
+              color: confirm.isArmed("schedule") ? C.heat : C.ground,
+              fontFamily: FONT_UI, fontSize: 14, fontWeight: 600, cursor: "pointer",
             }}>
-            Schedule
+            {confirm.isArmed("schedule") ? "Tap again" : "Schedule"}
           </button>
         </div>
       </div>

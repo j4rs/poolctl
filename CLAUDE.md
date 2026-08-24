@@ -6,7 +6,7 @@ nodejs-poolController.
 **Status:** the UI runs live against njsPC through the supervisor. Pi 4 is up,
 Lite, thermally characterised. The relay HAT has not arrived, so no equipment
 is connected — njsPC runs on a laptop with no serial port, which is enough to
-have settled most of the design questions. 328 tests; `npm test`.
+have settled most of the design questions. 336 tests; `npm test`.
 
 **This file is the operating manual for working in this repo — nothing more.**
 The full record lives elsewhere and is deliberately not duplicated here:
@@ -79,14 +79,25 @@ form is here so it never gets skipped.
 - **Disabled controls state their reason, and never render an active state.**
   If a control is on, its toggle must be actionable. Reasons render as text,
   never as `title` tooltips — phone-first, no hover. (PR-3)
-- **Anything that starts or stops equipment asks twice.** `useConfirm` arms on
-  the first tap and acts on the second, in place — not a modal, which would
-  move the target and put Cancel under the thumb that was already reaching.
-  Applies to pump run/stop, program run/stop, service mode and both deletes.
-  Mode changes keep `HoldButton` instead: two minutes of uncancellable valve
-  travel earns a five-second hold. Do **not** extend this to controls that
-  only open a sheet or edit a draft — confirming everything teaches people to
-  tap twice without reading, which is worse than confirming nothing.
+- **Anything that moves an actuator or changes flow asks twice.** That is the
+  test — not "is it a big button". `useConfirm` arms on the first tap and acts
+  on the second, in place; not a modal, which would move the target and put
+  Cancel under the thumb already reaching for it. Currently: pump run/stop,
+  program run/stop, service mode, schedule enable/disable, pool heat, blower,
+  extend spa, schedule/cancel preheat, and both deletes. Mode changes keep
+  `HoldButton` instead — two minutes of uncancellable valve travel earns a
+  five-second hold rather than a second tap.
+
+  Not guarded, and each for a reason: the **light** (no actuator, no flow, and
+  the next tap undoes it), **target steppers** (a cutoff is not a call, the
+  call itself is guarded, and confirming every increment of a stepper is
+  unusable), **Set up** (writes njsPC config but moves nothing), and anything
+  that only opens a sheet or edits a draft. Confirming everything teaches
+  people to tap twice without reading, which is worse than confirming nothing.
+
+  An armed control **must not render as switched** — `aria-pressed` stays put
+  until the second tap. Arming is not acting, and a toggle that reads as on
+  before it is on lies in exactly the way ADR-7 exists to prevent.
 - **`src/lib/sequences.js` is the executable spec.** The server implements the
   same steps in the same order. If they disagree, one of them is a bug.
 - **Every number needs a source.** Two figures in the PRD turned out to be
