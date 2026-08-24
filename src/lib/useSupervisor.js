@@ -174,7 +174,12 @@ export function useSupervisor() {
     dismissProblem: () => setProblem(null),
 
     setMode: (mode) => intent("setMode", { mode }),
+    /* Absolute set. The stepper uses adjustTarget instead — see below. */
     setTarget: (body, degrees) => intent("setTarget", { body, degrees }),
+    /* Relative. A function cannot cross JSON, and resolving one here against
+       state that may be a frame behind would drop taps. The supervisor
+       accumulates and clamps. */
+    adjustTarget: (body, delta) => intent("setTarget", { body, delta }),
     setRpm: (rpm) => intent("setRpm", { rpm }),
     setPoolHeat: (on) => intent("setPoolHeat", { on }),
     toggle: (key) => intent("toggle", { key }),

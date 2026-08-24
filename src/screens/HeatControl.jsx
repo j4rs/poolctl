@@ -12,7 +12,7 @@ import Toggle from "../components/Toggle";
  * is standing between a target and the water right now.
  */
 export default function HeatControl({ controller, onBack }) {
-  const { state, setTarget, setPoolHeat } = controller;
+  const { state, adjustTarget, setPoolHeat } = controller;
   const {
     waterTemp, setpoint, heaterCall, targets, blower, valves, mode,
     poolHeatDemand, activeSequence, stepIndex,
@@ -98,7 +98,7 @@ export default function HeatControl({ controller, onBack }) {
         </div>
       )}
 
-      <TargetTemp targets={targets} activeCall={heaterCall} onChange={setTarget} />
+      <TargetTemp targets={targets} activeCall={heaterCall} onAdjust={adjustTarget} />
 
       {/* Why a pool target may look inert: in pool mode the bypass routes
           flow around the exchanger, so nothing happens until heat is called

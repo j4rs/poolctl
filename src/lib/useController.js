@@ -288,6 +288,9 @@ export function useController() {
     });
   };
 
+  /** Relative form, matching the live transport. */
+  const adjustTarget = (body, delta) => setTarget(body, (v) => v + delta);
+
   /* The spa is always full, so the blower is never unsafe here. It is
      gated to spa mode as a preference: jets while spilling just dump heat
      and noise into the pool. Relax if you disagree — and drop the matching
@@ -350,7 +353,7 @@ export function useController() {
   useEffect(() => () => clearTimeout(timer.current), []);
 
   return {
-    state, setMode, setRpm, holdPump, releasePump, setTarget, setPoolHeat, toggle,
+    state, setMode, setRpm, holdPump, releasePump, setTarget, adjustTarget, setPoolHeat, toggle,
     extendSpa, schedulePreheat, cancelPreheat, simulateOutage,
     /* The mock never refuses anything, but App renders the same Toast either
        way rather than caring which hook it was handed. */

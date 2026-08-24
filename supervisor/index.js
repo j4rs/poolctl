@@ -5,6 +5,9 @@ import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
 import { NjsPC } from "./njspc.js";
 import { toUiState, SPA_CIRCUIT, POOL_CIRCUIT } from "./map.js";
+/* The same spec file the UI mirrors. Importing it rather than restating the
+   caps is the point of ADR-10: one definition, two consumers. */
+import { HEATER_CAP, TARGET_MIN } from "../src/lib/sequences.js";
 
 /**
  * poolctl supervisor — v0.
@@ -92,9 +95,22 @@ const intents = {
     /* njsPC's shared-body model does the whole switch off one circuit. */
     await njs.setCircuit(mode === "spa" ? SPA_CIRCUIT : POOL_CIRCUIT, true);
   },
-  async setTarget({ body, degrees }) {
+  /**
+   * Targets are cutoffs, not setpoints (ADR-4). Clamping them to the heater's
+   * own caps is supervisor job #4, and it belongs here rather than in the
+   * client: a target that arrives from anywhere — a phone, Home Assistant, a
+   * replayed message — must not be able to ask for more heat than the heater
+   * allows.
+   *
+   * `delta` is the stepper's form. Sending a relative change means taps that
+   * outrun the round trip still accumulate; sending absolutes would make each
+   * tap compute from whatever the client last heard, and lose all but one.
+   */
+  async setTarget({ body, degrees, delta }) {
     if (!(body in own.targets)) throw new Error(`unknown body ${body}`);
-    own.targets[body] = degrees;
+    const raw = delta != null ? own.targets[body] + Number(delta) : Number(degrees);
+    if (!Number.isFinite(raw)) throw new Error("target must be a number");
+    own.targets[body] = Math.min(HEATER_CAP[body], Math.max(TARGET_MIN[body], raw));
     publish();
   },
 };

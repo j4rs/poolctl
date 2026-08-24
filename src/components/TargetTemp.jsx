@@ -19,7 +19,10 @@ const BODIES = [
  * A stepper rather than a slider: this is a precise value read at arm's
  * length in sunlight, and a degree of drag error matters.
  */
-export default function TargetTemp({ targets, activeCall, onChange }) {
+/* `onAdjust(body, delta)` rather than an absolute or an updater: the value is
+   owned and clamped by the server, and a relative change is the only form that
+   survives both JSON and taps arriving faster than the round trip. */
+export default function TargetTemp({ targets, activeCall, onAdjust }) {
   return (
     <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, marginBottom: 10 }}>
       {BODIES.map((b, i) => {
@@ -47,7 +50,7 @@ export default function TargetTemp({ targets, activeCall, onChange }) {
 
             <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
               <Step label="−" ariaLabel={`Lower ${b.label} target`}
-                disabled={atMin} onClick={() => onChange(b.id, (v) => v - 1)} />
+                disabled={atMin} onClick={() => onAdjust(b.id, -1)} />
               <div style={{
                 fontFamily: FONT_DATA, fontSize: 22, fontWeight: 500, minWidth: 62,
                 textAlign: "center", color: live ? C.heat : C.stone,
@@ -55,7 +58,7 @@ export default function TargetTemp({ targets, activeCall, onChange }) {
                 {value}<span style={{ fontSize: 12, color: C.muted, marginLeft: 1 }}>°F</span>
               </div>
               <Step label="+" ariaLabel={`Raise ${b.label} target`}
-                disabled={atCap} onClick={() => onChange(b.id, (v) => v + 1)} />
+                disabled={atCap} onClick={() => onAdjust(b.id, +1)} />
             </div>
           </div>
         );
