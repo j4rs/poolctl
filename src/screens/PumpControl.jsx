@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { C, FONT_UI, FONT_DATA } from "../theme";
-import { HEATER_MIN_RPM, CELL_MIN_RPM } from "../lib/sequences";
+import { HEATER_MIN_RPM, CELL_MIN_RPM, POOL_RPM } from "../lib/sequences";
 import {
   RPM_MIN, RPM_MAX, watts, daysLabel, hoursBetween, activeSchedule, clockAt,
 } from "../lib/pump";
@@ -48,7 +48,12 @@ const HOLD_OPTIONS = [
 
 export default function PumpControl({ controller, themeControl }) {
   const { state, setRpm, holdPump, releasePump } = controller;
+  /* null means no reading from the pump — distinct from 0, which means
+     stopped. The slider still needs a position, so it falls back to the
+     filtration speed, but the readout says plainly that we do not know. */
   const rpm = state.pumpRpm;
+  const rpmKnown = rpm != null;
+  const sliderRpm = rpmKnown ? rpm : POOL_RPM;
   const { pumpHold, heaterCall, mode } = state;
   const [schedules, setSchedules] = useState(INITIAL);
   const [editing, setEditing] = useState(null);
@@ -68,10 +73,10 @@ export default function PumpControl({ controller, themeControl }) {
         ? { label: "Schedule", tone: C.water }
         : { label: "Manual", tone: C.muted };
 
-  const w = watts(rpm);
-  const pct = ((rpm - RPM_MIN) / (RPM_MAX - RPM_MIN)) * 100;
-  const activePreset = PRESETS.find((p) => Math.abs(p.rpm - rpm) < 60);
-  const unmet = THRESHOLDS.filter((t) => rpm < t.rpm);
+  const w = rpmKnown ? watts(rpm) : null;
+  const pct = ((sliderRpm - RPM_MIN) / (RPM_MAX - RPM_MIN)) * 100;
+  const activePreset = rpmKnown ? PRESETS.find((p) => Math.abs(p.rpm - rpm) < 60) : null;
+  const unmet = rpmKnown ? THRESHOLDS.filter((t) => rpm < t.rpm) : [];
 
   const daily = useMemo(() => {
     const on = schedules.filter((s) => s.on);
@@ -120,14 +125,15 @@ export default function PumpControl({ controller, themeControl }) {
       <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, padding: "20px 16px 16px", marginBottom: 12 }}>
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 22 }}>
           <div style={{ fontFamily: FONT_DATA, fontSize: 40, fontWeight: 500, lineHeight: 1 }}>
-            {rpm}<span style={{ fontSize: 14, color: C.muted, marginLeft: 4 }}>rpm</span>
+            {rpmKnown ? rpm : "—"}
+            <span style={{ fontSize: 14, color: C.muted, marginLeft: 4 }}>rpm</span>
           </div>
           <div style={{ textAlign: "right" }}>
             <div style={{ fontFamily: FONT_DATA, fontSize: 20, color: C.water, lineHeight: 1 }}>
-              {w}<span style={{ fontSize: 11, color: C.muted, marginLeft: 2 }}>W</span>
+              {w ?? "—"}<span style={{ fontSize: 11, color: C.muted, marginLeft: 2 }}>W</span>
             </div>
             <div style={{ fontFamily: FONT_DATA, fontSize: 11, color: C.muted, marginTop: 5 }}>
-              ${((w / 1000) * 24 * RATE).toFixed(2)}/day if constant
+              {w == null ? "no reading from the pump" : `$${((w / 1000) * 24 * RATE).toFixed(2)}/day if constant`}
             </div>
           </div>
         </div>
@@ -138,7 +144,7 @@ export default function PumpControl({ controller, themeControl }) {
         <div style={{ position: "relative", height: MARKER_H, marginBottom: 2 }}>
           {THRESHOLDS.map((t, i) => {
             const p = ((t.rpm - RPM_MIN) / (RPM_MAX - RPM_MIN)) * 100;
-            const met = rpm >= t.rpm;
+            const met = rpmKnown && rpm >= t.rpm;
             const row = i % 2;
             return (
               <div key={t.label} style={{ position: "absolute", left: `${p}%`, top: row * MARKER_ROW, transform: "translateX(-50%)", textAlign: "center", width: 96 }}>
@@ -149,7 +155,7 @@ export default function PumpControl({ controller, themeControl }) {
           })}
         </div>
 
-        <input type="range" min={RPM_MIN} max={RPM_MAX} step={10} value={rpm}
+        <input type="range" min={RPM_MIN} max={RPM_MAX} step={10} value={sliderRpm}
           aria-label="Pump speed in rpm"
           onChange={(e) => setRpm(Number(e.target.value))}
           style={{ width: "100%", appearance: "none", height: 6, borderRadius: 3, outline: "none", cursor: "pointer",
@@ -226,7 +232,7 @@ export default function PumpControl({ controller, themeControl }) {
             disabled={spaOwnsPump}
             aria-label={spaOwnsPump ? `Hold ${rpm} rpm — not in spa mode` : `Hold ${rpm} rpm`}
             style={{ width: "100%", padding: 13, borderRadius: 10, border: `1px solid ${spaOwnsPump ? C.line : C.water}`, background: spaOwnsPump ? "transparent" : C.water, color: spaOwnsPump ? C.muted : C.ground, fontFamily: FONT_UI, fontSize: 14, fontWeight: 600, cursor: spaOwnsPump ? "not-allowed" : "pointer", opacity: spaOwnsPump ? 0.75 : 1 }}>
-            Hold {rpm} rpm
+            Hold {rpmKnown ? rpm : sliderRpm} rpm
             {/* The reason rides on the control, matching Toggle and PR-3,
                 rather than sitting in a paragraph above it. */}
             {spaOwnsPump && (

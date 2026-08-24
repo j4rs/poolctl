@@ -23,7 +23,7 @@ export default function HeatControl({ controller, onBack }) {
   const busy = Boolean(activeSequence);
   const heatSeq = activeSequence === "heatEngage" || activeSequence === "heatRelease";
   const minsToSetpoint =
-    heaterCall === "spa" && setpoint && !blower
+    heaterCall === "spa" && setpoint && waterTemp != null && !blower
       ? Math.max(0, Math.round(((setpoint - waterTemp) / SPA_HEAT_RATE) * 60))
       : null;
 
@@ -52,7 +52,7 @@ export default function HeatControl({ controller, onBack }) {
           Water now
         </div>
         <div style={{ fontFamily: FONT_DATA, fontSize: 38, fontWeight: 500, lineHeight: 1, color: calling ? C.heat : C.stone }}>
-          {waterTemp.toFixed(1)}<span style={{ fontSize: 15, color: C.muted, marginLeft: 3 }}>°F</span>
+          {waterTemp == null ? "—" : waterTemp.toFixed(1)}<span style={{ fontSize: 15, color: C.muted, marginLeft: 3 }}>°F</span>
         </div>
         {calling && minsToSetpoint > 0 && (
           <div style={{ fontSize: 12.5, color: C.muted, marginTop: 12, lineHeight: 1.5 }}>

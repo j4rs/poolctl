@@ -44,7 +44,7 @@ export default function PoolSpaControl({ controller, themeControl, onOpenHeat })
      any figure would be an artefact of dividing by nearly zero. PR-4 asks
      only that the copy say so. */
   const minsToSetpoint =
-    heaterCall === "spa" && setpoint && !blower
+    heaterCall === "spa" && setpoint && waterTemp != null && !blower
       ? Math.max(0, Math.round(((setpoint - waterTemp) / SPA_HEAT_RATE) * 60))
       : null;
 
@@ -228,7 +228,7 @@ export default function PoolSpaControl({ controller, themeControl, onOpenHeat })
       )}
 
       <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, padding: 16, display: "flex", gap: 12, marginBottom: 10 }}>
-        <Stat label="Water" value={waterTemp.toFixed(1)} unit="°F" tone={heaterCall !== "off" ? C.heat : C.stone} />
+        <Stat label="Water" value={waterTemp == null ? null : waterTemp.toFixed(1)} unit="°F" tone={heaterCall !== "off" ? C.heat : C.stone} />
         <Stat label="Target" value={setpoint ?? "—"} unit={setpoint ? "°F" : ""} />
         <Stat label="Pump" value={pumpRpm} unit="rpm" />
       </div>

@@ -64,7 +64,9 @@ export function toUiState(njs, own) {
       bypass: own.bypass ?? "around",
     },
 
-    pumpRpm: pump.rpm ?? pump.speed ?? 0,
+    /* No `?? 0`. A pump we cannot hear from is not a pump at rest, and
+       collapsing the two here would make it unrecoverable upstream. */
+    pumpRpm: pump.rpm ?? pump.speed ?? null,
     pumpWatts: pump.watts ?? null,
     /* True while njsPC is holding the pump off for a valve move. The UI can
        distinguish "stopped on purpose" from "stopped unexpectedly". */
@@ -72,7 +74,9 @@ export function toUiState(njs, own) {
 
     waterTemp: activeBody.temp ?? null,
     airTemp: njs.temps?.air ?? null,
-    setpoint: activeBody.setPoint ?? null,
+    /* njsPC reports 0 for a body with no heater configured. Zero is not a
+       setpoint anyone ever chose, so it means "unset", not "freezing". */
+    setpoint: activeBody.setPoint || null,
     heaterCall,
     heatStatus,
 
