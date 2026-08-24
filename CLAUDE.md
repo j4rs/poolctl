@@ -3,9 +3,10 @@
 DIY pool/spa controller replacing a Pentair IntelliConnect, built on
 nodejs-poolController.
 
-**Status:** UI prototype on mock data. The Pi 4 is up and thermally
-characterised; the relay HAT has not arrived, so no equipment is connected and
-neither njsPC nor REM is installed.
+**Status:** the UI runs live against njsPC through the supervisor. Pi 4 is up,
+Lite, thermally characterised. The relay HAT has not arrived, so no equipment
+is connected — njsPC runs on a laptop with no serial port, which is enough to
+have settled most of the design questions. 133 tests; `npm test`.
 
 **This file is the operating manual for working in this repo — nothing more.**
 The full record lives elsewhere and is deliberately not duplicated here:
@@ -35,9 +36,20 @@ src/
   lib/rs485.js           Pentair frame decoders — unverified against a real bus
   lib/useController.js   mock equipment state — swap this for real transport
   lib/useBus.js          mock RS-485 feed
-  components/            Schematic, Stat, Toggle, TargetTemp, ScheduleEditor
+  lib/useSupervisor.js   live transport — same surface as useController
+  components/            Schematic, Stat, Toggle, TargetTemp, ScheduleEditor,
+                         HoldButton, PreheatSheet, Toast
   screens/               PoolSpaControl, HeatControl, PumpControl, BusMonitor
+supervisor/              runs on the Pi; plain JS, no build step
+  index.js               njsPC link, intents, WebSocket, serves dist/
+  map.js                 njsPC state -> the shape the UI speaks
+  interlocks.js          the six rules njsPC lacks — pure, tested
+  targets.js             ADR-4 clamping
+  store.js               durable preferences (not positions)
 ```
+
+Tests live beside what they cover (`*.test.js[x]`), run by Vitest from the
+repo root and covering `supervisor/` too. They never reach `dist/`.
 
 ---
 
@@ -148,12 +160,13 @@ is just something to respond to, which is why there is no state to sync.
 Full lists in PRD §10 (open questions) and §11 (backlog). Available without
 hardware, highest value first:
 
-1. **Re-read `sequences.js` against njsPC's body/circuit model.** Some steps
-   are probably njsPC configuration rather than code; what survives that pass
-   is the supervisor's real scope.
-2. **Build the supervisor** — the six interlocks njsPC lacks (ADR-10). Now
-   unblocked: the transition-ownership question is settled (zero flow, priming
-   disabled at the pump), so its scope is no longer in doubt.
+1. **Finish the intents.** `setMode`, `setTarget`, `toggle`, `setPoolHeat`,
+   `holdPump`/`releasePump` are wired. `setRpm` refuses pending the manual
+   pump circuit; `extendSpa` and the preheat pair are unimplemented — every
+   refusal surfaces in the UI rather than being swallowed.
+2. **Integration tests for the socket layer.** The suite covers the client and
+   the supervisor's pure logic, not reconnection or the njsPC link — which is
+   exactly where the heartbeat bug lived.
 3. **Commissioning checklist.** Several settings must be changed on the
    equipment itself, not in software, and forgetting one is a silent fault:
    disable priming at the pump keypad, leave Thermal Mode enabled, set
