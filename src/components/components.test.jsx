@@ -120,6 +120,36 @@ describe("HoldButton", () => {
     expect(screen.getByRole("button").textContent).toMatch(/current/);
   });
 
+  it("does not offer a press on the mode already active", () => {
+    /* It is a readout of where the water is, not a control. Refusing the
+       hold was not enough — the button still took focus and flashed a tap
+       highlight, offering a press that was never going to do anything. */
+    render(<HoldButton label="Pool" active holdMs={100} onConfirm={vi.fn()} />);
+    expect(screen.getByRole("button").disabled).toBe(true);
+  });
+
+  it("keeps the active mode looking prominent, not unavailable", () => {
+    /* Not tappable and not available are different things. The current mode
+       is the most prominent element on the screen; dimming it the way a
+       genuinely disabled control is dimmed would say the wrong thing. */
+    render(<HoldButton label="Pool" active holdMs={100} onConfirm={vi.fn()} />);
+    const b = screen.getByRole("button");
+    expect(b.style.opacity).toBe("1");
+
+    cleanup();
+    render(<HoldButton label="Spa" disabled holdMs={100} onConfirm={vi.fn()} />);
+    expect(Number(screen.getByRole("button").style.opacity)).toBeLessThan(1);
+  });
+
+  it("still lets the other mode be held", async () => {
+    /* Disabling the current one strands nothing, because the pair means the
+       way out is always live. */
+    const onConfirm = vi.fn();
+    render(<HoldButton label="Spa" holdMs={120} onConfirm={onConfirm} />);
+    await hold(screen.getByRole("button"), 300);
+    await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1));
+  });
+
   it("ignores a hold while disabled", async () => {
     const onConfirm = vi.fn();
     render(<HoldButton label="Spa" disabled holdMs={100} onConfirm={onConfirm} />);

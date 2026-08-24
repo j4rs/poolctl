@@ -104,7 +104,15 @@ export default function HoldButton({
          both take the pointer away mid-hold — which arrives as a
          `pointercancel` and reads as another random cancellation. */
       onContextMenu={(e) => e.preventDefault()}
-      disabled={disabled}
+      /* The current mode is not a control, it is a readout of where the
+         water is. `start` already refuses while active, but a bare <button>
+         still takes focus and flashes a tap highlight, which offers a press
+         that was never going to do anything.
+         Disabling it strands nothing: the pair means the other button is
+         always live, so there is always a way out of the current mode. That
+         is what separates this from the blower rule in CLAUDE.md, where the
+         switch that is on is the only switch that can turn it off. */
+      disabled={disabled || active}
       aria-label={
         active ? `${label}, current mode`
           : `Hold to switch to ${label}`
@@ -121,7 +129,11 @@ export default function HoldButton({
         fontSize: 15,
         fontWeight: 600,
         cursor: disabled || active ? "default" : "pointer",
+        /* Keyed to the prop, not to `disabled || active`: the current mode is
+           the most prominent thing on the screen and must not read as
+           unavailable just because it cannot be pressed. */
         opacity: disabled ? 0.45 : 1,
+        WebkitTapHighlightColor: "transparent",
         overflow: "hidden",
         touchAction: "none",
         userSelect: "none",
