@@ -66,7 +66,16 @@ export function toUiState(njs, own) {
 
     /* No `?? 0`. A pump we cannot hear from is not a pump at rest, and
        collapsing the two here would make it unrecoverable upstream. */
-    pumpRpm: pump.rpm ?? pump.speed ?? null,
+    pumpRpm: pump.rpm ?? null,
+
+    /* What njsPC is asking for, derived from whichever pump circuit is on.
+       njsPC deliberately does not put this in `rpm` — that field is what the
+       pump reports back over RS-485. Keeping them apart is what lets the UI
+       tell "idle" from "commanded but silent", which is a wiring fault. */
+    pumpCommandedRpm: (() => {
+      const on = (pump.circuits || []).find((pc) => pc?.circuit?.isOn);
+      return on?.speed ?? null;
+    })(),
     pumpWatts: pump.watts ?? null,
     /* True while njsPC is holding the pump off for a valve move. The UI can
        distinguish "stopped on purpose" from "stopped unexpectedly". */

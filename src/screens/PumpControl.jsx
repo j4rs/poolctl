@@ -36,6 +36,10 @@ export default function PumpControl({ controller, themeControl }) {
      filtration speed, but the readout says plainly that we do not know. */
   const rpm = state.pumpRpm;
   const rpmKnown = rpm != null;
+  /* What the controller is asking for. Present without a reading means the
+     pump is not answering — a fault, not an absence. */
+  const commanded = state.pumpCommandedRpm ?? null;
+  const notResponding = !rpmKnown && commanded != null;
   const sliderRpm = rpmKnown ? rpm : POOL_RPM;
   /* Defaults because the live supervisor legitimately has no programs until
      commissioning creates the circuits, and no panel mode until njsPC
@@ -131,10 +135,24 @@ export default function PumpControl({ controller, themeControl }) {
               {w ?? "—"}<span style={{ fontSize: 11, color: C.muted, marginLeft: 2 }}>W</span>
             </div>
             <div style={{ fontFamily: FONT_DATA, fontSize: 11, color: C.muted, marginTop: 5 }}>
-              {w == null ? "no reading from the pump" : `$${((w / 1000) * 24 * RATE).toFixed(2)}/day if constant`}
+              {w != null ? `$${((w / 1000) * 24 * RATE).toFixed(2)}/day if constant` : "—"}
             </div>
           </div>
         </div>
+
+        {/* A commanded speed with no reading is a fault, not an absence: the
+            pump was told to run and is not answering. Full width, because the
+            sentence matters more than the number beside it. */}
+        {!rpmKnown && (
+          <div style={{
+            fontFamily: FONT_DATA, fontSize: 11, lineHeight: 1.5, marginBottom: 16,
+            color: notResponding ? C.alert : C.muted,
+          }}>
+            {notResponding
+              ? `Pump not responding — asked for ${commanded} rpm`
+              : "No reading from the pump"}
+          </div>
+        )}
 
         {/* Run or stop, which is what "the pump" means to anyone standing at
             the equipment. Speed belongs to a program or a schedule, never to a

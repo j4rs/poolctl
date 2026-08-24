@@ -35,6 +35,24 @@ describe("njsPC -> UI state", () => {
     expect(ui.setpoint).toBeNull();
   });
 
+  it("separates what the pump reports from what it was asked for", () => {
+    /* njsPC puts telemetry in `rpm` and nothing else. A commanded speed with
+       no reading is a pump that is not answering — a wiring fault — and must
+       not look the same as an idle pump. */
+    const ui = toUiState({
+      pumps: [{ id: 1, circuits: [{ speed: 1600, circuit: { id: 6, isOn: true } }] }],
+    }, own);
+    expect(ui.pumpRpm).toBeNull();
+    expect(ui.pumpCommandedRpm).toBe(1600);
+  });
+
+  it("commands nothing when no pump circuit is on", () => {
+    const ui = toUiState({
+      pumps: [{ id: 1, circuits: [{ speed: 1600, circuit: { id: 6, isOn: false } }] }],
+    }, own);
+    expect(ui.pumpCommandedRpm).toBeNull();
+  });
+
   it("maps valve positions and keeps bypass supervisor-owned", () => {
     const ui = toUiState({
       valveMode: { name: "spa" },

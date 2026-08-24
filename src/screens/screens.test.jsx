@@ -71,8 +71,14 @@ describe("unknown is shown as unknown, not as zero", () => {
 
   it("Pump does not claim a speed or a running cost it cannot know", () => {
     const { container } = render(<PumpControl controller={controller} themeControl={null} />);
-    expect(container.textContent).toContain("no reading from the pump");
+    expect(container.textContent).toContain("No reading from the pump");
     expect(container.textContent).not.toMatch(/\$0\.00\/day/);
+  });
+
+  it("Pump distinguishes a silent pump from an idle one", () => {
+    /* Nothing commanded and nothing reported is idle, not a fault. */
+    const { container } = render(<PumpControl controller={controller} themeControl={null} />);
+    expect(container.textContent).not.toMatch(/not responding/);
   });
 
   it("Pump shows no programs rather than inventing some", () => {
