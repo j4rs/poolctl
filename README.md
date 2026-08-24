@@ -50,7 +50,19 @@ Against a real njsPC, with the supervisor serving the built app:
 npm run build && cd supervisor && npm install && npm start
 ```
 
-Then open `http://localhost:4300`. `--host` is on in dev, so you can load it
+Then open `http://localhost:4300`.
+
+Set a password before letting it near a network — there is no way to set one
+through the app, deliberately:
+
+```bash
+node supervisor/passwd.js
+```
+
+Without one the supervisor still runs, warns at startup, and says so on the
+Water screen. It serves plain HTTP, so a password raises the bar from "anyone
+on the wifi" to "anyone who can intercept traffic on it" — it is not a
+substitute for TLS, which is not built. `--host` is on in dev, so you can load it
 on a phone from the same network — worth doing, since this is a phone-first UI.
 
 ## Tests
@@ -113,6 +125,8 @@ supervisor/                runs on the Pi; plain JS, no build step
   schedules.js             njsPC schedules <-> the shape the UI speaks
   targets.js               ADR-4 clamping
   store.js                 durable preferences
+  auth.js                  password hashing and signed sessions
+  passwd.js                CLI to set the password
 docs/architecture.md       system view, state ownership, failure modes
 docs/prds/poolctl-v1.md    full requirements, ADRs, and open questions
 CLAUDE.md                  compressed operating context for agents

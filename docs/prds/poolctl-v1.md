@@ -1328,7 +1328,7 @@ temperature (read from source).
 
 ## 11. Software backlog
 
-- [ ] **Authentication. Nothing has any today.** Anyone who joins the wifi —
+- [~] **Authentication. Two of four parts done.** Anyone who joins the wifi —
       a guest, a compromised smart bulb, a neighbour with the password — can
       reach the supervisor on 4300 and drive 240 V equipment: switch to spa,
       call for heat, stop the pump, rewrite schedules. Owner's requirement,
@@ -1340,16 +1340,36 @@ temperature (read from source).
         and the supervisor probes its own network addresses each commissioning
         review so reopening it raises a warning rather than going unnoticed.
         dashPanel is reached over an SSH tunnel.
-      - **Plain HTTP over the LAN means credentials in clear.** TLS on a Pi
-        with a self-signed certificate is unpleasant on iOS, which is the
-        primary client. Decide between a self-signed cert the phone trusts
-        once, a real certificate via a local domain, or accepting the LAN
-        threat model explicitly and writing down why.
-      - **Phone-first rules out a login every time.** A long-lived token in
-        `localStorage`, revocable from the Pi, is the usual shape. The
-        WebSocket upgrade needs the same check as the HTTP routes — an auth
-        layer that guards only the page is theatre, because every intent
-        travels over the socket.
+      - **Plain HTTP over the LAN means credentials in clear.** Still true,
+        and now the one part deliberately deferred. TLS on a Pi with a
+        self-signed certificate is unpleasant on iOS, which is the primary
+        client. Accepted for now with the reason written down: a password
+        raises the bar from "anyone who joins the wifi" to "anyone who can
+        intercept traffic on it", which addresses the realistic threat — the
+        guest phone, the compromised bulb — and is not a substitute for TLS.
+        The session cookie omits `Secure` for exactly this reason; setting it
+        before TLS would mean the cookie is never stored at all. Decide
+        between a self-signed cert the phone trusts once, a real certificate
+        via a local domain, or continuing to accept this.
+      - [x] **Phone-first rules out a login every time.** A signed session
+        cookie lasting a fortnight, stateless so a Pi restart does not sign
+        the household out, and revoked wholesale by rotating the secret —
+        which is what setting a new password does. `HttpOnly`, so a script
+        on the page cannot read it. The WebSocket upgrade is checked the same
+        as the HTTP routes: `noServer` plus a 401 on the upgrade, verified by
+        spawning a real supervisor and attacking it with no cookie, an
+        invented signature, and a real signature with the expiry edited.
+
+        `SameSite=Lax`, not `Strict`, and this is not a weakening: Chrome
+        withholds a Strict cookie from a `ws://` handshake even same-origin,
+        so Strict authenticates every HTTP route while refusing every socket.
+        Observed directly — the upgrade arrived carrying other localhost
+        cookies and not ours.
+
+        The password is set over SSH with `supervisor/passwd.js`, never
+        through a screen: a first-run "choose a password" page is
+        unauthenticated by definition, so on a shared network it is a race
+        between the owner and everyone else.
       - **Home Assistant (Phase 6) needs its own credential**, not the
         owner's. Whatever is built should issue more than one token.
 

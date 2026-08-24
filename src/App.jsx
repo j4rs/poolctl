@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { C, FONT_UI, FONT_DATA, THEMES, readTheme, applyTheme } from "./theme";
 import { useController } from "./lib/useController";
 import { useSupervisor } from "./lib/useSupervisor";
+import SignIn from "./components/SignIn";
 import Toast from "./components/Toast";
 import PoolSpaControl from "./screens/PoolSpaControl";
 import PumpControl from "./screens/PumpControl";
@@ -77,6 +78,19 @@ export default function App() {
   const live = useSupervisor();
   const controller = LIVE ? live : mock;
   const { Screen } = TABS.find((t) => t.id === tab);
+
+  /* Sign-in comes before the connecting screen, because a refused socket
+     looks exactly like a supervisor that is down — the app would otherwise
+     sit on "Waiting for the controller" forever with the answer one field
+     away. Only shown once the supervisor has actually said it wants a
+     password; never while that is still unknown. */
+  if (LIVE && controller.needsSignIn) {
+    return (
+      <div style={{ background: C.ground, minHeight: "100vh", maxWidth: 460, margin: "0 auto" }}>
+        <SignIn onSignIn={controller.signIn} />
+      </div>
+    );
+  }
 
   /* Live mode has no state until the supervisor sends the first frame. Render
      the wait explicitly rather than letting screens destructure null — and say

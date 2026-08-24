@@ -6,7 +6,7 @@ nodejs-poolController.
 **Status:** the UI runs live against njsPC through the supervisor. Pi 4 is up,
 Lite, thermally characterised. The relay HAT has not arrived, so no equipment
 is connected — njsPC runs on a laptop with no serial port, which is enough to
-have settled most of the design questions. 469 tests; `npm test`.
+have settled most of the design questions. 517 tests; `npm test`.
 
 **This file is the operating manual for working in this repo — nothing more.**
 The full record lives elsewhere and is deliberately not duplicated here:
@@ -41,7 +41,7 @@ src/
   lib/useConfirm.js      two-tap confirmation for equipment-moving taps
   components/            Schematic, Stat, Toggle, TargetTemp, HoldButton, Sheet,
                          ScheduleEditor, ProgramEditor, PreheatSheet, Toast,
-                         DelayProgress
+                         DelayProgress, SignIn
   screens/               PoolSpaControl, HeatControl, PumpControl, BusMonitor
 supervisor/              runs on the Pi; plain JS, no build step
   index.js               njsPC link, intents, WebSocket, serves dist/
@@ -53,6 +53,8 @@ supervisor/              runs on the Pi; plain JS, no build step
   schedules.js           njsPC schedules <-> the shape the UI speaks
   targets.js             ADR-4 clamping
   store.js               durable preferences (not positions)
+  auth.js                password hashing, signed sessions — pure, tested
+  passwd.js              CLI to set the password; there is no network path
 ```
 
 Tests live beside what they cover (`*.test.js[x]`), run by Vitest from the
@@ -141,6 +143,38 @@ honest fix then is to raise njsPC's `valveDelayTime`, not to dead-reckon here.
   decision needs a real number and the PRD lacks one, it is unknown; say so
   rather than reading it off the prototype. An ADR was once justified on mock
   schedule data by mistake.
+
+---
+
+**The password guards the socket, not the page.** Every intent travels over
+the WebSocket, so an auth layer over the HTTP routes alone would be theatre.
+The upgrade gets a plain 401 (`noServer` + a manual `upgrade` handler) so the
+client can tell "sign in" from "the supervisor is down" — a browser cannot
+read the status of a failed upgrade, which is why `/auth/status` exists.
+
+Three things here are easy to "fix" and break:
+
+- **`SameSite=Lax`, never `Strict`.** Chrome withholds a Strict cookie from a
+  `ws://` handshake even same-origin, so Strict authenticates every HTTP
+  route while refusing every socket — the app signs in and then waits for a
+  controller forever. Lax still withholds it from cross-site sub-resources
+  and cross-site POSTs, which covers both ways state can change here.
+- **No `Secure` flag.** The supervisor serves plain HTTP; setting it means
+  the cookie is never stored at all. It belongs with TLS, which is not built.
+- **The password is set over SSH, not in the app.** `node supervisor/passwd.js`.
+  A first-run "choose a password" screen is unauthenticated by definition, so
+  on a shared network it is a race between the owner and everyone else. There
+  is deliberately no network path to setting it.
+
+Sessions are signed rather than stored, so a Pi restart does not sign the
+household out; the signature covers the expiry, so a token cannot be extended
+by editing it. Rotating the secret — which setting a new password does —
+revokes every session at once. `auth.json` is 0600 and gitignored: the
+session secret alone would let anyone mint a valid cookie.
+
+Running without a password still works, because bricking a pool mid-season
+over a missing file is its own kind of failure — but it raises a commissioning
+finding on the Water screen and warns at startup, so it is never silent.
 
 ---
 
@@ -346,11 +380,10 @@ hardware, highest value first:
    Program circuits are no longer on this list — the supervisor creates them
    (see below) — but njsPC does need a **pump** configured before any
    program can bind, because the speed has nowhere else to live.
-2. **Authentication — nothing has any.** Anyone on the wifi can reach the
-   supervisor and drive 240 V equipment. njsPC's own port is the wider hole:
-   protecting 4300 does nothing about 4200, where dashPanel and the REST API
-   accept anything. See PRD §11 for the four parts of this that make it more
-   than adding a password. Owner's requirement, August 2026.
+2. **Authentication — two of four parts done.** njsPC is bound to loopback
+   and the supervisor is behind a password. What remains is TLS (deferred
+   deliberately — see the PRD) and a separate credential for Home Assistant
+   in Phase 6. See PRD §11.
 3. **Scheduled preheat.** Still unimplemented, and still
    refusing with a reason rather than doing nothing. Preheat wants a water
    temperature, which wants the HAT.

@@ -29,7 +29,7 @@ export async function freePort() {
 }
 
 /** Spawn a supervisor and wait until it answers /health. */
-export async function start({ stateFile, njspcUrl } = {}) {
+export async function start({ stateFile, njspcUrl, authFile } = {}) {
   const port = await freePort();
   const proc = spawn(process.execPath, [ENTRY], {
     env: {
@@ -39,6 +39,10 @@ export async function start({ stateFile, njspcUrl } = {}) {
          "njsPC is unreachable" state is reached deterministically. Tests that
          want a reachable njsPC pass their own fake. */
       NJSPC_URL: njspcUrl ?? "http://127.0.0.1:1",
+      /* Points at a file that does not exist unless a test made one, which
+         leaves the supervisor open — the state most tests want, and the
+         reason auth has its own suite. */
+      AUTH_FILE: authFile ?? join(tmpdir(), "poolctl-no-such-auth.json"),
       STATE_FILE: stateFile ?? join(await mkdtemp(join(tmpdir(), "poolctl-")), "state.json"),
     },
     stdio: ["ignore", "pipe", "pipe"],

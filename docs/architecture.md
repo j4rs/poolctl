@@ -304,7 +304,7 @@ Built since: the supervisor and its transport, real connection state with a
 heartbeat, durable preferences, the pure interlocks, manual programs bound to
 njsPC circuits, schedules read from and written through to njsPC, a continuous
 evaluation loop asserting the invariants and enforcing targets-as-cutoffs, and
-469 tests — including the socket layer end to end, with the supervisor spawned
+517 tests — including the socket layer end to end, with the supervisor spawned
 as a real process against a fake njsPC.
 
 Not built: valve relay driving through REM, and scheduled preheat. Both want

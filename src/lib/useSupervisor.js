@@ -64,10 +64,22 @@ export function useSupervisor() {
      from a dead button. */
   const [problem, setProblem] = useState(null);
 
+  /* Whether the supervisor wants a password, and whether we have given it
+     one. Null while unknown, so the app can wait rather than flashing a
+     login screen at somebody who is already signed in.
+
+     A browser cannot read the reason a WebSocket upgrade failed — `onclose`
+     carries no HTTP status — so a refused socket is indistinguishable from a
+     dead supervisor from inside the callback. `/auth/status` is what tells
+     the two apart, and it is asked whenever the socket will not open. */
+  const [auth, setAuth] = useState({ required: null, authenticated: null });
+
   const ws = useRef(null);
   const seq = useRef(0);
   const pending = useRef(new Map());
   const retry = useRef(null);
+  /* Set by the effect below so signing in can reconnect at once. */
+  const reconnect = useRef(() => {});
 
   const send = useCallback((intent, args = {}) => {
     const sock = ws.current;
@@ -98,7 +110,11 @@ export function useSupervisor() {
       const sock = new WebSocket(socketUrl());
       ws.current = sock;
 
-      sock.onopen = () => setLink((l) => ({ ...l, up: true, error: null }));
+      sock.onopen = () => {
+        setLink((l) => ({ ...l, up: true, error: null }));
+        /* Getting in is proof enough; no need to ask. */
+        setAuth((a) => ({ ...a, authenticated: true }));
+      };
 
       sock.onmessage = (ev) => {
         let msg;
@@ -125,15 +141,37 @@ export function useSupervisor() {
 
       const down = () => {
         setLink((l) => ({ ...l, up: false }));
+        /* Ask why. A 401 on the upgrade and a supervisor that has stopped
+           look identical here; only this call separates them. */
+        fetch("/auth/status", { credentials: "same-origin" })
+          .then((r) => r.json())
+          .then((a) => !closed && setAuth(a))
+          .catch(() => {});
         if (!closed) retry.current = setTimeout(connect, 2000);
       };
       sock.onclose = down;
       sock.onerror = () => sock.close();
     };
 
+    /**
+     * Reconnect now rather than waiting out the retry.
+     *
+     * Not `ws.current.close()`: after a refused upgrade the socket is
+     * already closed, so closing it again fires no `onclose` and schedules
+     * nothing. Signing in cleared the pending retry and then waited forever
+     * on a socket that was never going to reopen — the app got past the
+     * login screen and sat on "Waiting for the controller".
+     */
+    reconnect.current = () => {
+      clearTimeout(retry.current);
+      if (ws.current?.readyState === WebSocket.OPEN) return;
+      connect();
+    };
+
     connect();
     return () => {
       closed = true;
+      reconnect.current = () => {};
       clearTimeout(retry.current);
       ws.current?.close();
     };
@@ -179,8 +217,46 @@ export function useSupervisor() {
     [send],
   );
 
+  /**
+   * Sign in, then reconnect immediately rather than waiting out the retry.
+   *
+   * Returns the supervisor's own words on failure — "wrong password" or the
+   * throttle's countdown — because a login screen that says "something went
+   * wrong" is the least useful screen there is.
+   */
+  const signIn = useCallback(async (password) => {
+    let res;
+    try {
+      res = await fetch("/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ password }),
+      });
+    } catch {
+      return "Cannot reach the controller.";
+    }
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok || !body.ok) return body.error ?? "Wrong password.";
+
+    setAuth({ required: true, authenticated: true });
+    reconnect.current();
+    return null;
+  }, []);
+
+  const signOut = useCallback(async () => {
+    await fetch("/auth/logout", { method: "POST", credentials: "same-origin" }).catch(() => {});
+    setAuth({ required: true, authenticated: false });
+    ws.current?.close();
+  }, []);
+
   return {
     state: state ? { ...state, connected, offlineReason: reason } : null,
+    /* True only when we know a password is wanted and we have not given one.
+       Never true while the answer is still unknown. */
+    needsSignIn: auth.required === true && auth.authenticated === false,
+    signIn,
+    signOut,
     linkError: link.error,
     problem,
     dismissProblem: () => setProblem(null),

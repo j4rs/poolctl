@@ -10,3 +10,7 @@ dist
 .claude/
 supervisor/node_modules
 state.json
+
+# The password hash and session secret. Never committed: the session
+# secret alone would let anyone mint a valid session cookie.
+auth.json

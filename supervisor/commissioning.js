@@ -29,12 +29,34 @@ export const NJSPC_DEFAULT_EGG_TIMER = 720;
  * `/config/circuit/:id`. Missing entries produce no findings: not knowing is
  * not the same as knowing something is wrong.
  */
-export function checkCommissioning({ spaCircuit, options, njspcOnLan } = {}) {
+export function checkCommissioning({ spaCircuit, options, njspcOnLan, passwordSet } = {}) {
   return [
+    ...checkPassword(passwordSet),
     ...checkExposure(njspcOnLan),
     ...checkSpaEggTimer(spaCircuit),
     ...checkValveDelay(options),
   ];
+}
+
+/**
+ * Whether anybody has set a password.
+ *
+ * The supervisor still starts without one, because bricking a pool mid-season
+ * over a missing config file is its own kind of failure. But an open door
+ * nobody mentions is exactly the silent fault this file exists to end, so it
+ * is said on the screen as well as logged at startup.
+ */
+export function checkPassword(passwordSet) {
+  if (passwordSet !== false) return [];
+  return [{
+    id: "no-password",
+    severity: "warn",
+    what: "Anyone who can reach this app can run the pool",
+    detail:
+      "No password is set, so any device on the network can switch the spa, " +
+      "call for heat or stop the pump. Set one on the Pi with " +
+      "`node supervisor/passwd.js`, then restart the supervisor.",
+  }];
 }
 
 /**

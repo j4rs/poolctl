@@ -8,6 +8,10 @@ import { NjsPC } from "./njspc.js";
 import { toUiState, SPA_CIRCUIT, POOL_CIRCUIT } from "./map.js";
 import { applyTarget } from "./targets.js";
 import { Store, pickPersisted, applyPersisted } from "./store.js";
+import {
+  verifyPassword, issueToken, verifyToken, parseCookies,
+  sessionCookie, clearedCookie, COOKIE,
+} from "./auth.js";
 import { DEFAULT_PROGRAMS } from "../src/lib/programs.js";
 import {
   floorRpm, bypassFor, mayCallForHeat, mayToggleBlower, shouldStopHeat, refuse,
@@ -66,6 +70,8 @@ const REVIEW_FLOOR_MS = 3000;
 const STATE_FILE = process.env.STATE_FILE
   || fileURLToPath(new URL("./state.json", import.meta.url));
 const WEB_ROOT = fileURLToPath(new URL("../dist", import.meta.url));
+const AUTH_FILE = process.env.AUTH_FILE
+  || fileURLToPath(new URL("./auth.json", import.meta.url));
 
 /* Supervisor-owned state: the things njsPC has no concept of.
    Preferences here are restored from disk at startup; positions are not —
@@ -293,6 +299,7 @@ async function reviewCommissioning() {
       spaCircuit: circuit.value,
       options: config.value?.pool?.options,
       njspcOnLan: onLan.value,
+      passwordSet: authRequired(),
     });
     const changed = JSON.stringify(findings) !== JSON.stringify(own.commissioning);
     own.commissioning = findings;
@@ -655,6 +662,137 @@ async function handleIntent(raw) {
   }
 }
 
+/* ---- who is allowed in ------------------------------------------------- */
+
+/**
+ * The credential, or null if nobody has set a password.
+ *
+ * Read once at startup rather than per request: it is a 0600 file the owner
+ * writes over SSH with `passwd.js`, and re-reading it on every socket upgrade
+ * would put a disk hit on the hot path for a file that changes twice a year.
+ * Changing the password therefore needs a restart, which `passwd.js` says.
+ */
+let credential = null;
+
+async function loadCredential() {
+  try {
+    credential = JSON.parse(await readFile(AUTH_FILE, "utf8"));
+  } catch (err) {
+    if (err.code !== "ENOENT") console.warn(`auth: ignoring unreadable ${AUTH_FILE}: ${err.message}`);
+    credential = null;
+  }
+}
+
+const authRequired = () => Boolean(credential?.hash && credential?.secret);
+
+/** Whether this request carries a valid session. */
+function isAuthed(req) {
+  if (!authRequired()) return true;
+  const token = parseCookies(req.headers?.cookie)[COOKIE];
+  return verifyToken(token, credential.secret);
+}
+
+/**
+ * Login throttling.
+ *
+ * scrypt already costs ~40 ms a guess, which makes an online brute force
+ * hopeless on its own, but it also makes the login endpoint a free way to
+ * pin the Pi's CPU. Five tries then a spreading lockout costs an honest
+ * fat-fingered owner nothing.
+ */
+const attempts = new Map();
+const FREE_TRIES = 5;
+
+function throttle(ip) {
+  const record = attempts.get(ip);
+  if (!record) return 0;
+  return Math.max(0, record.until - Date.now());
+}
+
+function recordFailure(ip) {
+  const record = attempts.get(ip) ?? { fails: 0, until: 0 };
+  record.fails += 1;
+  if (record.fails > FREE_TRIES) {
+    const seconds = Math.min(300, 2 ** (record.fails - FREE_TRIES));
+    record.until = Date.now() + seconds * 1000;
+  }
+  attempts.set(ip, record);
+}
+
+const clearFailures = (ip) => attempts.delete(ip);
+
+/** Read a small JSON body, refusing anything large enough to be an attack. */
+async function readJson(req, limit = 4096) {
+  const chunks = [];
+  let size = 0;
+  for await (const chunk of req) {
+    size += chunk.length;
+    if (size > limit) throw new Error("body too large");
+    chunks.push(chunk);
+  }
+  if (!size) return {};
+  return JSON.parse(Buffer.concat(chunks).toString());
+}
+
+const sendJson = (res, status, body, headers = {}) => {
+  res.writeHead(status, { "Content-Type": "application/json", ...headers });
+  res.end(JSON.stringify(body));
+};
+
+/** The /auth/* routes. Returns true if it handled the request. */
+async function handleAuth(req, res) {
+  const path = req.url.split("?")[0];
+  if (!path.startsWith("/auth/")) return false;
+
+  if (path === "/auth/status" && req.method === "GET") {
+    /* Public on purpose: the client has to know whether to show a login
+       screen before it has a session, and the answer leaks nothing that
+       trying to connect would not. */
+    sendJson(res, 200, { required: authRequired(), authenticated: isAuthed(req) });
+    return true;
+  }
+
+  if (path === "/auth/logout" && req.method === "POST") {
+    sendJson(res, 200, { ok: true }, { "Set-Cookie": clearedCookie() });
+    return true;
+  }
+
+  if (path === "/auth/login" && req.method === "POST") {
+    if (!authRequired()) {
+      sendJson(res, 200, { ok: true, required: false });
+      return true;
+    }
+    const ip = req.socket.remoteAddress ?? "unknown";
+    const wait = throttle(ip);
+    if (wait > 0) {
+      sendJson(res, 429, { ok: false, error: `too many attempts, wait ${Math.ceil(wait / 1000)}s` });
+      return true;
+    }
+    let body;
+    try {
+      body = await readJson(req);
+    } catch {
+      sendJson(res, 400, { ok: false, error: "bad request" });
+      return true;
+    }
+    if (!verifyPassword(body?.password, credential)) {
+      recordFailure(ip);
+      console.warn(`auth: failed login from ${ip}`);
+      /* One message for every failure. "No such user" and "wrong password"
+         are different sentences that tell an attacker which half to work on;
+         here there is only one secret, so there is only one sentence. */
+      sendJson(res, 401, { ok: false, error: "wrong password" });
+      return true;
+    }
+    clearFailures(ip);
+    sendJson(res, 200, { ok: true }, { "Set-Cookie": sessionCookie(issueToken(credential.secret)) });
+    return true;
+  }
+
+  sendJson(res, 404, { ok: false, error: "no such route" });
+  return true;
+}
+
 /* ---- static file serving ---------------------------------------------- */
 
 const MIME = {
@@ -698,20 +836,49 @@ async function serveStatic(req, res) {
 }
 
 const server = createServer(async (req, res) => {
+  if (await handleAuth(req, res)) return;
+
   if (req.url === "/health") {
+    /* Left open, and kept free of pool state for that reason. A watchdog
+       needs to reach this without a session, and "is the process alive" is
+       not worth protecting. */
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ ok: true, njspc: own.connected, lastSeen: own.lastSeen }));
     return;
   }
   if (req.url === "/state") {
+    if (!isAuthed(req)) {
+      sendJson(res, 401, { error: "sign in" });
+      return;
+    }
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify(ui ?? {}));
     return;
   }
+  /* The app shell is public. It is markup and JavaScript with no pool state
+     in it, and it has to load before anyone can sign in. */
   await serveStatic(req, res);
 });
 
-const wss = new WebSocketServer({ server });
+/**
+ * The socket is where every intent travels, so it is the thing that actually
+ * has to be guarded — an auth layer over the page alone would be theatre.
+ *
+ * `noServer` rather than `verifyClient`: this way a refusal is an ordinary
+ * 401 on the upgrade, before any WebSocket exists, and the client can tell
+ * "sign in" apart from "the supervisor is down".
+ */
+const wss = new WebSocketServer({ noServer: true });
+
+server.on("upgrade", (req, socket, head) => {
+  if (!isAuthed(req)) {
+    console.warn(`auth: refused socket from ${req.socket.remoteAddress}`);
+    socket.write("HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n");
+    socket.destroy();
+    return;
+  }
+  wss.handleUpgrade(req, socket, head, (ws) => wss.emit("connection", ws, req));
+});
 
 wss.on("connection", (ws) => {
   if (ui) ws.send(JSON.stringify({ type: "state", state: ui }));
@@ -730,6 +897,7 @@ wss.on("connection", (ws) => {
 /* Restore before the first client can connect, so nobody sees defaults
    flash past on the way to the real values. */
 Object.assign(own, applyPersisted(own, await store.load()));
+await loadCredential();
 
 njs.start();
 
@@ -744,8 +912,10 @@ const recheck = setInterval(reviewCommissioning, COMMISSIONING_MS);
 
 server.listen(PORT, () => {
   console.log(`supervisor v0 on http://localhost:${PORT}  ->  njsPC at ${NJSPC_URL}`);
-  console.log("NOTE: v0 relays state and two intents. None of the six interlocks");
-  console.log("      are implemented yet — this process supervises nothing.");
+  if (!authRequired()) {
+    console.warn("WARNING: no password set. Anyone who can reach this port can");
+    console.warn("         drive the equipment. Run: node supervisor/passwd.js");
+  }
 });
 
 for (const sig of ["SIGINT", "SIGTERM"]) {

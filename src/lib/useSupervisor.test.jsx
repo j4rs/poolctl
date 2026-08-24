@@ -473,3 +473,92 @@ describe("hostile input on the wire", () => {
     expect(view.result.current.state.connected).toBe(true);
   });
 });
+
+describe("signing in", () => {
+  /**
+   * A browser cannot read the status of a failed WebSocket upgrade —
+   * `onclose` carries no HTTP code — so a refused socket and a supervisor
+   * that has stopped look identical from inside the callback. `/auth/status`
+   * is the only thing that tells them apart.
+   */
+
+  const answerWith = (routes) =>
+    vi.stubGlobal("fetch", vi.fn(async (url, init) => {
+      const key = `${init?.method ?? "GET"} ${String(url)}`;
+      const body = routes[key] ?? routes[String(url)];
+      if (!body) throw new Error(`unstubbed ${key}`);
+      return { ok: body.ok !== false, status: body.ok === false ? 401 : 200, json: async () => body };
+    }));
+
+  /** Open, then have the supervisor refuse the socket. */
+  async function refused(status = { required: true, authenticated: false }) {
+    answerWith({ "/auth/status": status });
+    const view = renderHook(() => useSupervisor());
+    await act(async () => sock().close());
+    return view;
+  }
+
+  it("asks why the socket failed rather than assuming the worst", async () => {
+    const view = await refused();
+    expect(fetch).toHaveBeenCalledWith("/auth/status", expect.anything());
+    expect(view.result.current.needsSignIn).toBe(true);
+  });
+
+  it("does not ask for a password when the socket is merely down", async () => {
+    /* A supervisor that has stopped must not produce a login screen — the
+       password would be rejected by nothing and the user would blame it. */
+    const view = await refused({ required: true, authenticated: true });
+    expect(view.result.current.needsSignIn).toBe(false);
+  });
+
+  it("says nothing about signing in while the answer is unknown", async () => {
+    /* Before /auth/status returns, `needsSignIn` must be false rather than
+       flashing a login screen at somebody who is already signed in. */
+    answerWith({ "/auth/status": { required: true, authenticated: false } });
+    const view = renderHook(() => useSupervisor());
+    expect(view.result.current.needsSignIn).toBe(false);
+  });
+
+  it("reconnects at once on success, without waiting out the retry", async () => {
+    /* The bug this pins: signing in cleared the pending retry and then
+       called close() on a socket the server had already closed. No `onclose`
+       fires for an already-closed socket, so nothing was ever scheduled —
+       the app got past the login screen and sat on "Waiting for the
+       controller" indefinitely. */
+    const view = await refused();
+    const before = FakeSocket.live.length;
+
+    answerWith({ "POST /auth/login": { ok: true }, "/auth/status": { required: true, authenticated: true } });
+    let why;
+    await act(async () => {
+      why = await view.result.current.signIn("a-password");
+    });
+
+    expect(why).toBeNull();
+    expect(FakeSocket.live.length, "no new socket was opened").toBeGreaterThan(before);
+    expect(view.result.current.needsSignIn).toBe(false);
+  });
+
+  it("returns the supervisor's own words when it refuses", async () => {
+    /* "too many attempts, wait 32s" is the only clue that somebody else is
+       trying, and a generic message would throw it away. */
+    const view = await refused();
+    answerWith({ "POST /auth/login": { ok: false, error: "too many attempts, wait 32s" } });
+    let why;
+    await act(async () => {
+      why = await view.result.current.signIn("a-password");
+    });
+    expect(why).toBe("too many attempts, wait 32s");
+    expect(view.result.current.needsSignIn).toBe(true);
+  });
+
+  it("stays on the login screen when the controller cannot be reached", async () => {
+    const view = await refused();
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("network"); }));
+    let why;
+    await act(async () => {
+      why = await view.result.current.signIn("a-password");
+    });
+    expect(why).toMatch(/Cannot reach the controller/);
+  });
+});

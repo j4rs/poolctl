@@ -222,6 +222,16 @@ afterEach(async () => {
 /** The state as the supervisor currently sees it. */
 const now = async () => (await (await fetch(sup.url("/state"))).json());
 
+/**
+ * Findings about njsPC's settings, which is what this suite is about.
+ *
+ * The supervisor also reports that no password is set — true of every
+ * spawned test supervisor, and covered properly in `auth.integration.test.js`
+ * rather than asserted around here.
+ */
+const njspcFindings = (state) =>
+  (state.commissioning ?? []).filter((f) => f.id !== "no-password");
+
 /** Wait until `check` holds of a published state frame. */
 const settles = (check, ms = 6000) =>
   client.next((m) => m.type === "state" && check(m.state), ms).then((m) => m.state);
@@ -487,14 +497,14 @@ describe("settings njsPC owns", () => {
      configuration is not much use at the side of a pool. */
 
   it("says nothing when njsPC agrees with us", async () => {
-    expect((await now()).commissioning).toEqual([]);
+    expect(njspcFindings(await now())).toEqual([]);
   });
 
   it("notices a spa session too short to be one", async () => {
     njspc.setSpaEggTimer(1);
-    const state = await settles((s) => s.commissioning.length > 0, 10000);
-    expect(state.commissioning[0].id).toBe("spa-egg-tiny");
-    expect(state.commissioning[0].what).toMatch(/Spa sessions end after 1 minute/);
+    const state = await settles((s) => njspcFindings(s).length > 0, 10000);
+    expect(njspcFindings(state)[0].id).toBe("spa-egg-tiny");
+    expect(njspcFindings(state)[0].what).toMatch(/Spa sessions end after 1 minute/);
   });
 
   it("clears itself once the setting is put right", async () => {
@@ -502,24 +512,24 @@ describe("settings njsPC owns", () => {
        operator has fixed the thing it names is how a warning system teaches
        people to ignore it. */
     njspc.setSpaEggTimer(1);
-    await settles((s) => s.commissioning.length > 0, 10000);
+    await settles((s) => njspcFindings(s).length > 0, 10000);
 
     njspc.setSpaEggTimer(120);
-    const state = await settles((s) => s.commissioning.length === 0, 10000);
-    expect(state.commissioning).toEqual([]);
+    const state = await settles((s) => njspcFindings(s).length === 0, 10000);
+    expect(njspcFindings(state)).toEqual([]);
   });
 
   it("notices njsPC's twelve-hour default", async () => {
     njspc.setSpaEggTimer(720);
-    const state = await settles((s) => s.commissioning.length > 0, 10000);
-    expect(state.commissioning[0].id).toBe("spa-egg-default");
+    const state = await settles((s) => njspcFindings(s).length > 0, 10000);
+    expect(njspcFindings(state)[0].id).toBe("spa-egg-default");
   });
 
   it("does not stop the spa being used while it complains", async () => {
     /* A notice is not a lockout: the spa works with a short egg timer, it
        just does not last. */
     njspc.setSpaEggTimer(1);
-    await settles((s) => s.commissioning.length > 0, 10000);
+    await settles((s) => njspcFindings(s).length > 0, 10000);
     expect((await client.intent("setMode", { mode: "spa" })).ok).toBe(true);
   });
 });
