@@ -15,6 +15,9 @@ The full record lives elsewhere and is deliberately not duplicated here:
   alternatives, measurements, BOM, phasing, risks, open questions, backlog.
 - `docs/architecture.md` — components, state ownership, control flow, failure
   modes.
+- `docs/pi-bringup.md` — what has to happen on the box, in order, from a
+  flashed card to a controller the phones can use. Timezone first, and the
+  reason why.
 
 Read those before changing anything architectural. Four decisions were
 reversed once someone actually read njsPC's source, and the reasoning for each

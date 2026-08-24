@@ -128,6 +128,7 @@ supervisor/                runs on the Pi; plain JS, no build step
   auth.js                  password hashing and signed sessions
   passwd.js                CLI to set the password
 docs/architecture.md       system view, state ownership, failure modes
+docs/pi-bringup.md         flashed card -> running controller, in order
 docs/prds/poolctl-v1.md    full requirements, ADRs, and open questions
 CLAUDE.md                  compressed operating context for agents
 ```
