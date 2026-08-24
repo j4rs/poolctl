@@ -62,6 +62,12 @@ Covers the client, the supervisor's pure logic, the njsPC translation layer,
 and every screen rendered against state where nothing is known — which is the
 case real hardware produces and a mock never does.
 
+It also covers the socket layer end to end. The supervisor is spawned as a
+real process on a real port and driven over a real WebSocket, with njsPC
+pointed at a dead one — reconnection, the heartbeat, ack correlation,
+persistence across a restart, and every refusal. That part takes about 18 s,
+and it is where both of this layer's shipped bugs lived.
+
 ## Screens
 
 - **Water** — mode switching with a live water-path schematic, transition

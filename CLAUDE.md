@@ -6,7 +6,7 @@ nodejs-poolController.
 **Status:** the UI runs live against njsPC through the supervisor. Pi 4 is up,
 Lite, thermally characterised. The relay HAT has not arrived, so no equipment
 is connected — njsPC runs on a laptop with no serial port, which is enough to
-have settled most of the design questions. 158 tests; `npm test`.
+have settled most of the design questions. 259 tests; `npm test`.
 
 **This file is the operating manual for working in this repo — nothing more.**
 The full record lives elsewhere and is deliberately not duplicated here:
@@ -51,6 +51,12 @@ supervisor/              runs on the Pi; plain JS, no build step
 
 Tests live beside what they cover (`*.test.js[x]`), run by Vitest from the
 repo root and covering `supervisor/` too. They never reach `dist/`.
+
+`supervisor/index.test.js` spawns `node index.js` as a real process on a real
+port and drives it over a real WebSocket, rather than importing it. That is
+deliberate: the module's side effects at load — the store, the njsPC link, the
+heartbeat, the listen — are the part that has gone wrong, so importing it
+would test something the Pi never runs. Those tests take ~18 s of the suite.
 
 ---
 
@@ -173,10 +179,7 @@ hardware, highest value first:
    until commissioning creates one, so running it refuses with that reason.
    `extendSpa` and preheat remain unimplemented. Every refusal surfaces in
    the UI rather than being swallowed.
-2. **Integration tests for the socket layer.** The suite covers the client and
-   the supervisor's pure logic, not reconnection or the njsPC link — which is
-   exactly where the heartbeat bug lived.
-3. **Commissioning checklist.** Several settings must be changed on the
+2. **Commissioning checklist.** Several settings must be changed on the
    equipment itself, not in software, and forgetting one is a silent fault:
    disable priming at the pump keypad, leave Thermal Mode enabled, set
    `valveDelayTime` above real valve travel, size the transformer at 100 VA,

@@ -368,6 +368,15 @@ for (const sig of ["SIGINT", "SIGTERM"]) {
     /* Flush synchronously enough to beat the exit: a debounced write in
        flight would otherwise be lost on every restart. */
     await store.flush();
+    /* Close the sockets before the server. `server.close()` waits for every
+       open connection to end, and a phone that left a tab open is an open
+       connection — so without this, shutdown hangs until systemd gives up on
+       TimeoutStopSec and SIGKILLs us. Every `systemctl restart` would take
+       ninety seconds. */
+    for (const client of wss.clients) client.terminate();
+    wss.close();
     server.close(() => process.exit(0));
+    /* Belt and braces: leave regardless if something still holds the loop. */
+    setTimeout(() => process.exit(0), 2000).unref();
   });
 }

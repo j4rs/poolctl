@@ -113,7 +113,11 @@ export function useSupervisor() {
         } else if (msg.type === "ack") {
           const p = pending.current.get(msg.reqId);
           if (p) {
-            pending.current.delete(msg.id);
+            /* `reqId`, not `id` — the envelope has no `id`, so this deleted
+               nothing and left every settled request in the map for the
+               timeout to sweep ten seconds later. Harmless only because
+               rejecting a resolved promise is a no-op. */
+            pending.current.delete(msg.reqId);
             msg.ok ? p.resolve() : p.reject(new Error(msg.error || "refused"));
           }
         }

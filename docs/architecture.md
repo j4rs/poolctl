@@ -301,7 +301,8 @@ rather than code anyone writes. What survives that pass is the supervisor's
 job.
 
 Built since: the supervisor and its transport, real connection state with a
-heartbeat, durable preferences, the pure interlocks, and 158 tests.
+heartbeat, durable preferences, the pure interlocks, and 259 tests — including
+the socket layer end to end, with the supervisor spawned as a real process.
 
 Not built: valve relay driving through REM, scheduled preheat, and the
 `extendSpa` intent. All three want hardware or a water temperature.
