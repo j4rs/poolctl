@@ -34,6 +34,12 @@ const INTENT_LABEL = {
   setTarget: "Set target",
   setRpm: "Set pump speed",
   setPoolHeat: "Pool heat",
+  setPumpRunning: "Run the pump",
+  setPanelMode: "Automation mode",
+  startProgram: "Run program",
+  stopProgram: "Stop program",
+  saveProgram: "Save program",
+  deleteProgram: "Delete program",
   toggle: "Switch",
   extendSpa: "Extend spa",
   schedulePreheat: "Schedule preheat",
@@ -71,7 +77,11 @@ export function useSupervisor() {
       return Promise.reject(new Error("not connected"));
     }
     const id = ++seq.current;
-    sock.send(JSON.stringify({ id, intent, ...args }));
+    /* Arguments are nested, not spread. Flattening them let an intent
+       parameter called `id` overwrite the envelope's correlation id, so acks
+       matched the wrong request — silently, and only for the intents that
+       happen to take an id. */
+    sock.send(JSON.stringify({ reqId: id, intent, args }));
     return new Promise((resolve, reject) => {
       pending.current.set(id, { resolve, reject });
       setTimeout(() => {
@@ -101,7 +111,7 @@ export function useSupervisor() {
           setState(msg.state);
           setLink((l) => ({ ...l, up: true, lastMessage: Date.now() }));
         } else if (msg.type === "ack") {
-          const p = pending.current.get(msg.id);
+          const p = pending.current.get(msg.reqId);
           if (p) {
             pending.current.delete(msg.id);
             msg.ok ? p.resolve() : p.reject(new Error(msg.error || "refused"));
@@ -180,6 +190,12 @@ export function useSupervisor() {
     adjustTarget: (body, delta) => intent("setTarget", { body, delta }),
     setRpm: (rpm) => intent("setRpm", { rpm }),
     setPoolHeat: (on) => intent("setPoolHeat", { on }),
+    setPumpRunning: (on) => intent("setPumpRunning", { on }),
+    setPanelMode: (mode) => intent("setPanelMode", { mode }),
+    startProgram: (id) => intent("startProgram", { id }),
+    stopProgram: () => intent("stopProgram"),
+    saveProgram: (program) => intent("saveProgram", { program }),
+    deleteProgram: (id) => intent("deleteProgram", { id }),
     toggle: (key) => intent("toggle", { key }),
     extendSpa: (minutes) => intent("extendSpa", { minutes }),
     schedulePreheat: (readyAt) => intent("schedulePreheat", { readyAt }),

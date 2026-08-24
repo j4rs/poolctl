@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { watts, hoursBetween, overlaps, activeSchedule, clockAt, RPM_MIN, RPM_MAX } from "./pump";
+import { watts, hoursBetween, overlaps, activeSchedule, clockAt, RPM_MIN, RPM_MAX } from "./pump.js";
 
 const every = [0, 1, 2, 3, 4, 5, 6];
 
@@ -54,8 +54,8 @@ describe("active schedule", () => {
 
 /* ---------------------------------------------------------------------- */
 
-import { validate, speedNotes, blankProgram, remaining, DURATIONS, MAX_MINUTES } from "./programs";
-import { CELL_MIN_RPM, HEATER_MIN_RPM } from "./sequences";
+import { validate, speedNotes, blankProgram, remaining, DURATIONS, MAX_MINUTES } from "./programs.js";
+import { CELL_MIN_RPM, HEATER_MIN_RPM } from "./sequences.js";
 
 describe("program validation", () => {
   const ok = { name: "Skim", rpm: 2100, minutes: 30 };

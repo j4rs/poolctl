@@ -1,4 +1,7 @@
-import { CELL_MIN_RPM, HEATER_MIN_RPM } from "./sequences";
+/* Explicit .js: this module is imported by the supervisor, which runs on
+   Node's ESM loader rather than through Vite. Vite resolves extensionless
+   specifiers; Node does not, and the failure is at startup. */
+import { CELL_MIN_RPM, HEATER_MIN_RPM } from "./sequences.js";
 
 /**
  * Manual pump programs.
@@ -21,8 +24,8 @@ import { CELL_MIN_RPM, HEATER_MIN_RPM } from "./sequences";
 
 /** Offered on a fresh install. Both are real activities, not demonstrations. */
 export const DEFAULT_PROGRAMS = [
-  { id: "filtration", name: "Filtration", rpm: 1600, minutes: 60 },
-  { id: "skimming", name: "Skimming", rpm: 2100, minutes: 30 },
+  { id: "filtration", name: "Filtration", rpm: 1600, minutes: 60, circuit: null },
+  { id: "skimming", name: "Skimming", rpm: 2100, minutes: 30, circuit: null },
 ];
 
 /** Minutes, because a skim is 15–45 of them. Hours would make 60 the floor. */
@@ -56,6 +59,10 @@ export const blankProgram = () => ({
   name: "",
   rpm: 1800,
   minutes: 30,
+  /* The njsPC circuit that carries this program's speed and egg timer.
+     Null until commissioning creates it — a program can be defined and
+     edited before there is any hardware to run it on. */
+  circuit: null,
   isNew: true,
 });
 

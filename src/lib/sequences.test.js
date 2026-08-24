@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   SEQUENCES, INVARIANTS, isSkipped, stepsFor, HEATER_CAP, TARGET_MIN,
   HEATER_MIN_RPM, VALVE_RPM, ABORTABLE,
-} from "./sequences";
+} from "./sequences.js";
 
 /**
  * This file is the spec the supervisor must implement, so these tests are

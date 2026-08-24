@@ -7,6 +7,7 @@ import { NjsPC } from "./njspc.js";
 import { toUiState, SPA_CIRCUIT, POOL_CIRCUIT } from "./map.js";
 import { applyTarget } from "./targets.js";
 import { Store, pickPersisted, applyPersisted } from "./store.js";
+import { DEFAULT_PROGRAMS } from "../src/lib/programs.js";
 import {
   floorRpm, bypassFor, mayCallForHeat, mayToggleBlower, refuse,
 } from "./interlocks.js";
@@ -46,6 +47,12 @@ const WEB_ROOT = fileURLToPath(new URL("../dist", import.meta.url));
 const store = new Store(STATE_FILE);
 const own = {
   bypass: "around",
+  /* Seeded so a fresh install has the two real activities rather than an
+     empty list. Persisted, and editable, but not yet runnable: each needs an
+     njsPC circuit to carry its speed, which commissioning creates. */
+  programs: DEFAULT_PROGRAMS,
+  activeProgram: null,
+  panelMode: "auto",
   targets: { pool: 88, spa: 102 },
   poolHeatDemand: false,
   preheat: null,
@@ -181,6 +188,67 @@ const intents = {
   },
 
 
+  /** Run or stop the pump outright — the Pool circuit being on at all. */
+  async setPumpRunning({ on }) {
+    await njs.setCircuit(POOL_CIRCUIT, Boolean(on));
+    if (!on) own.activeProgram = null;
+    publish();
+  },
+
+  /**
+   * Auto or service. njsPC's endpoint toggles rather than sets, so the
+   * current mode is checked first — sending it twice would otherwise put the
+   * panel in the state you were trying to leave.
+   */
+  async setPanelMode({ mode }) {
+    const want = mode === "service" ? "service" : "auto";
+    if ((ui?.panelMode ?? "auto") === want) return;
+    await njs.put("/state/toggleServiceMode", {});
+  },
+
+  /**
+   * Programs. Each is meant to be an njsPC circuit carrying the speed and the
+   * egg timer; until commissioning creates them a program is definable and
+   * editable but not runnable, and says so rather than pretending.
+   */
+  async startProgram({ id }) {
+    const p = own.programs.find((x) => x.id === id);
+    if (!p) throw refuse(`no program '${id}'`);
+    if (p.circuit == null) {
+      throw refuse(`'${p.name}' has no njsPC circuit yet — see commissioning`);
+    }
+    await njs.setCircuit(p.circuit, true);
+    own.activeProgram = { id: p.id, name: p.name, rpm: p.rpm, endsAt: Date.now() + p.minutes * 60000 };
+    publish();
+  },
+
+  async stopProgram() {
+    const p = own.programs.find((x) => x.id === own.activeProgram?.id);
+    if (p?.circuit != null) await njs.setCircuit(p.circuit, false);
+    own.activeProgram = null;
+    publish();
+  },
+
+  async saveProgram({ program }) {
+    const { isNew, ...clean } = program || {};
+    if (!clean.id) throw refuse("program needs an id");
+    /* Editing the running one stops it: leaving the pump going under a name
+       that no longer describes it is worse than interrupting. */
+    if (own.activeProgram?.id === clean.id) await intents.stopProgram({});
+    own.programs = isNew
+      ? [...own.programs, clean]
+      : own.programs.map((x) => (x.id === clean.id ? clean : x));
+    remember();
+    publish();
+  },
+
+  async deleteProgram({ id }) {
+    if (own.activeProgram?.id === id) await intents.stopProgram({});
+    own.programs = own.programs.filter((x) => x.id !== id);
+    remember();
+    publish();
+  },
+
   async setTarget({ body, degrees, delta }) {
     if (!(body in own.targets)) throw new Error(`unknown body ${body}`);
     own.targets[body] = applyTarget(own.targets[body], body, { degrees, delta });
@@ -190,7 +258,10 @@ const intents = {
 };
 
 async function handleIntent(raw) {
-  const { intent, ...args } = raw;
+  /* `args` is nested rather than spread across the envelope: an intent
+     parameter named `id` would otherwise be indistinguishable from the
+     request's correlation id. */
+  const { intent, args = {} } = raw;
   const fn = intents[intent];
   if (!fn) return { ok: false, error: `intent '${intent}' not implemented in v0` };
   try {
@@ -269,7 +340,7 @@ wss.on("connection", (ws) => {
       return ws.send(JSON.stringify({ type: "error", error: "bad json" }));
     }
     const result = await handleIntent(msg);
-    ws.send(JSON.stringify({ type: "ack", id: msg.id ?? null, ...result }));
+    ws.send(JSON.stringify({ type: "ack", reqId: msg.reqId ?? null, ...result }));
   });
 });
 

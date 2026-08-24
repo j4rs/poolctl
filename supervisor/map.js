@@ -96,7 +96,7 @@ export function toUiState(njs, own) {
     /* Whether the pump circuit is on at all, distinct from its speed. */
     pumpRunning: Boolean(poolCircuit?.isOn || spaCircuit?.isOn),
     /* njsPC panel mode: 'service' stands the schedules down. */
-    panelMode: nameOf(njs.mode) === "service" ? "service" : "auto",
+    panelMode: nameOf(njs.mode) === "service" ? "service" : (own.panelMode ?? "auto"),
 
     /* Not yet mapped — no relay assignment exists until the HAT arrives. */
     blower: own.blower ?? false,

@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from "react";
-import { DEFAULT_PROGRAMS } from "./programs";
+import { DEFAULT_PROGRAMS } from "./programs.js";
 import {
   SEQUENCES, isSkipped, POOL_RPM, SPA_RPM, VALVE_RPM,
   HEATER_MIN_RPM, HEATER_CAP, TARGET_MIN, SPA_TIMEOUT_MIN, SPA_HEAT_RATE,
-} from "./sequences";
+} from "./sequences.js";
 
 /**
  * Apply one step to the local simulation and return the matching state patch.

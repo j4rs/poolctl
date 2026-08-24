@@ -93,7 +93,7 @@ export class Store {
  * as a circuit with an egg timer (ADR-11) and expires it on its own, so a
  * second copy here would be a second answer to one question.
  */
-export const PERSISTED = ["targets", "preheat"];
+export const PERSISTED = ["targets", "preheat", "programs"];
 
 export function pickPersisted(own) {
   return Object.fromEntries(

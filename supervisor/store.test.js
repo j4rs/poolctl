@@ -51,6 +51,7 @@ describe("what persists", () => {
   const own = {
     targets: { pool: 88, spa: 102 },
     preheat: null,
+    programs: [{ id: "skimming", name: "Skimming", rpm: 2100, minutes: 30 }],
     bypass: "flow",
     poolHeatDemand: true,
     activeProgram: { id: "skimming", endsAt: 1 },
@@ -60,6 +61,12 @@ describe("what persists", () => {
   it("keeps preferences", () => {
     expect(Object.keys(pickPersisted(own)).sort()).toEqual([...PERSISTED].sort());
     expect(pickPersisted(own).targets).toEqual({ pool: 88, spa: 102 });
+  });
+
+  it("keeps user-defined programs", () => {
+    /* They are preferences, not positions: no hardware coupling, and losing
+       them on restart would mean redefining them by hand. */
+    expect(pickPersisted(own).programs).toHaveLength(1);
   });
 
   it("never persists a dead-reckoned valve position", () => {
