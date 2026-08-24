@@ -23,7 +23,8 @@ Sections 1–4 can be done today. Section 5 waits for the HAT.
 **Timezone.** Do this first, and do not skip it.
 
 ```bash
-sudo timedatectl set-timezone America/New_York
+timedatectl list-timezones | grep -i <your region>
+sudo timedatectl set-timezone <Region/City>
 ```
 
 njsPC stores schedule times as minutes past midnight and evaluates them
@@ -71,12 +72,16 @@ toolchain — see section 3.
 
 Built on the laptop, copied as artifacts. The Pi runs; it does not build.
 
-On the laptop:
+On the laptop. `$PI` is wherever you can SSH to the box — set it once:
+
+```bash
+export PI=pi@poolctl.local
+```
 
 ```bash
 npm run build
-rsync -a --delete dist/ j4rs@poolctl.local:~/poolctl/dist/
-rsync -a --exclude node_modules supervisor/ j4rs@poolctl.local:~/poolctl/supervisor/
+rsync -a --delete dist/ $PI:~/poolctl/dist/
+rsync -a --exclude node_modules supervisor/ $PI:~/poolctl/supervisor/
 ```
 
 On the Pi, install the two runtime dependencies — `ws` and
@@ -109,8 +114,8 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=j4rs
-WorkingDirectory=/home/j4rs/poolctl/supervisor
+User=pi
+WorkingDirectory=/home/pi/poolctl/supervisor
 ExecStart=/usr/bin/node index.js
 Restart=always
 RestartSec=5
@@ -147,9 +152,9 @@ Every later deploy is the same two rsyncs plus a restart:
 
 ```bash
 npm run build
-rsync -a --delete dist/ j4rs@poolctl.local:~/poolctl/dist/
-rsync -a --exclude node_modules supervisor/ j4rs@poolctl.local:~/poolctl/supervisor/
-ssh j4rs@poolctl.local 'sudo systemctl restart poolctl'
+rsync -a --delete dist/ $PI:~/poolctl/dist/
+rsync -a --exclude node_modules supervisor/ $PI:~/poolctl/supervisor/
+ssh $PI 'sudo systemctl restart poolctl'
 ```
 
 `auth.json` and `state.json` live in the supervisor directory and are
@@ -171,7 +176,7 @@ serial port and the relay configuration.
   Pi's own LAN address, so getting it wrong raises a warning on the Water
   screen rather than going unnoticed.
 - Reach dashPanel over a tunnel instead of exposing it:
-  `ssh -L 4200:localhost:4200 j4rs@poolctl.local`, then browse
+  `ssh -L 4200:localhost:4200 $PI`, then browse
   `http://localhost:4200`.
 - Work through the equipment settings in `CLAUDE.md` under *Next up* — pump
   priming, Thermal Mode, `valveDelayTime`, the Spa egg timer, valve device
