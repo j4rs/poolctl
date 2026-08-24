@@ -42,13 +42,64 @@ describe("HoldButton", () => {
     expect(onConfirm).not.toHaveBeenCalled();
   });
 
-  it("cancels if the pointer leaves the button", async () => {
+  it("survives the pointer drifting off the button", async () => {
+    /* The reported bug: the hold felt pressure-sensitive. Pressing harder
+       spreads the contact patch and moves the centroid the browser reports,
+       so a firmer thumb drifts past the edge — and cancelling on
+       `pointerleave` quietly undid the pointer capture meant to tolerate
+       exactly that. Leaving is not an event this cares about. */
+    const onConfirm = vi.fn();
+    render(<HoldButton label="Spa" holdMs={120} onConfirm={onConfirm} />);
+    const b = screen.getByRole("button");
+    await hold(b, 40);
+    fireEvent.pointerLeave(b);
+    fireEvent.pointerOut(b);
+    await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1));
+  });
+
+  it("still cancels when the finger lifts somewhere else entirely", async () => {
+    /* The counterpart, and why ignoring `pointerleave` is safe: the release
+       is watched on the window, so letting go anywhere ends the hold. */
+    const onConfirm = vi.fn();
+    render(<HoldButton label="Spa" holdMs={400} onConfirm={onConfirm} />);
+    await hold(screen.getByRole("button"), 80);
+    fireEvent.pointerUp(document.body);
+    await new Promise((r) => setTimeout(r, 450));
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it("cancels when the system takes the pointer away", async () => {
+    /* A real `pointercancel` means the finger is gone without a `pointerup`
+       ever arriving. Ignoring it would leave the timer running to a confirm
+       with nobody touching the phone. */
     const onConfirm = vi.fn();
     render(<HoldButton label="Spa" holdMs={400} onConfirm={onConfirm} />);
     const b = screen.getByRole("button");
     await hold(b, 80);
-    fireEvent.pointerLeave(b);
+    fireEvent.pointerCancel(b);
     await new Promise((r) => setTimeout(r, 450));
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it("suppresses the long-press menu that would take the pointer", () => {
+    /* Five seconds is well past every long-press threshold; the callout or
+       context menu arrives as a pointercancel and reads as a random abort. */
+    render(<HoldButton label="Spa" holdMs={400} onConfirm={vi.fn()} />);
+    const b = screen.getByRole("button");
+    const menu = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+    b.dispatchEvent(menu);
+    expect(menu.defaultPrevented).toBe(true);
+  });
+
+  it("lets go of the window when it unmounts mid-hold", async () => {
+    /* The release listeners live on the window, so a component that leaves
+       without detaching them keeps a dead timer reachable. */
+    const onConfirm = vi.fn();
+    const view = render(<HoldButton label="Spa" holdMs={120} onConfirm={onConfirm} />);
+    await hold(screen.getByRole("button"), 40);
+    view.unmount();
+    fireEvent.pointerUp(document.body);
+    await new Promise((r) => setTimeout(r, 200));
     expect(onConfirm).not.toHaveBeenCalled();
   });
 

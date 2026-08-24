@@ -29,10 +29,14 @@ export default function HoldButton({
   const startedAt = useRef(0);
   const held = useRef(false);
 
+  const detach = useRef(null);
+
   const stop = useCallback(() => {
     held.current = false;
     if (raf.current) cancelAnimationFrame(raf.current);
     raf.current = null;
+    detach.current?.();
+    detach.current = null;
     setProgress(0);
   }, []);
 
@@ -43,16 +47,14 @@ export default function HoldButton({
     const p = Math.min(1, (performance.now() - startedAt.current) / holdMs);
     setProgress(p);
     if (p >= 1) {
-      held.current = false;
-      raf.current = null;
-      setProgress(0);
+      stop();
       onConfirm?.();
       /* Haptic where it exists. Silently absent on desktop and iOS Safari. */
       navigator.vibrate?.(30);
       return;
     }
     raf.current = requestAnimationFrame(tick);
-  }, [holdMs, onConfirm]);
+  }, [holdMs, onConfirm, stop]);
 
   const start = useCallback(
     (e) => {
@@ -64,13 +66,31 @@ export default function HoldButton({
       try {
         e.currentTarget.setPointerCapture?.(e.pointerId);
       } catch {
-        /* no capture; the hold still works, it is just less drift-tolerant */
+        /* no capture; the release listeners below still carry the hold */
       }
+
+      /* The release is watched on the window, not on the button.
+       *
+       * This used to cancel on `pointerleave` as well, which quietly undid
+       * the capture above: pressing harder spreads the contact patch and
+       * moves the centroid the browser reports, so a firmer thumb drifts a
+       * pixel past the edge and the hold dies. It read as the button being
+       * pressure-sensitive. Leaving the button is now simply not an event
+       * this cares about — only letting go is, and letting go anywhere
+       * counts. */
+      const end = () => stop();
+      window.addEventListener("pointerup", end);
+      window.addEventListener("pointercancel", end);
+      detach.current = () => {
+        window.removeEventListener("pointerup", end);
+        window.removeEventListener("pointercancel", end);
+      };
+
       held.current = true;
       startedAt.current = performance.now();
       raf.current = requestAnimationFrame(tick);
     },
-    [disabled, active, tick],
+    [disabled, active, tick, stop],
   );
 
   const pct = Math.round(progress * 100);
@@ -79,9 +99,11 @@ export default function HoldButton({
   return (
     <button
       onPointerDown={start}
-      onPointerUp={stop}
-      onPointerCancel={stop}
-      onPointerLeave={stop}
+      /* Five seconds is well past every long-press threshold there is. iOS
+         raises the selection callout, Android raises the context menu, and
+         both take the pointer away mid-hold — which arrives as a
+         `pointercancel` and reads as another random cancellation. */
+      onContextMenu={(e) => e.preventDefault()}
       disabled={disabled}
       aria-label={
         active ? `${label}, current mode`
@@ -104,6 +126,7 @@ export default function HoldButton({
         touchAction: "none",
         userSelect: "none",
         WebkitUserSelect: "none",
+        WebkitTouchCallout: "none",
         transition: "background 160ms ease, border-color 160ms ease",
       }}
     >
