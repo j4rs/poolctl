@@ -63,9 +63,9 @@ flowchart TB
 
 | Component | Responsibility | Status |
 |---|---|---|
-| **poolctl-ui** | Renders state, sends intents (`setMode('spa')`). Holds no authority. | Built, on mock data |
-| **njsPC (Nixie)** | The controller. Bodies, circuits, valves, pumps, schedules, and the delay/interlock manager in `Lockouts.ts`. RS-485 master, chlorinator telemetry, MQTT/REST/WebSocket. | Not installed |
-| **supervisor** | The interlocks njsPC lacks, plus translation, intents and durable preferences. The only external writer. | Built; valve travel and preheat outstanding |
+| **poolctl-ui** | Renders state, sends intents (`setMode('spa')`). Holds no authority. | Built, live against the supervisor; served from the Pi |
+| **njsPC (Nixie)** | The controller. Bodies, circuits, valves, pumps, schedules, and the delay/interlock manager in `Lockouts.ts`. RS-485 master, chlorinator telemetry, MQTT/REST/WebSocket. | Running on a laptop; not on the Pi until the HAT |
+| **supervisor** | The interlocks njsPC lacks, plus translation, intents and durable preferences. The only external writer. | Built and deployed to the Pi behind a password; valve travel and preheat outstanding |
 | **REM** | GPIO and relay I/O for the HAT. | Not installed |
 | **watchdog** | De-energises every relay unless njsPC and the supervisor are both healthy. | Not built |
 
