@@ -173,8 +173,22 @@ function reviewCommissioningSoon() {
 async function reviewCommissioning() {
   lastReview = Date.now();
   try {
-    const spaCircuit = await njs.circuitConfig(SPA_CIRCUIT);
-    const findings = checkCommissioning({ spaCircuit });
+    /* Settled, not all. These are independent reads against a dependency
+       whose endpoints vary by version, and one of them being unavailable
+       should cost us that one check — not every check. Whatever could not be
+       read arrives as undefined, which the rules treat as "not known" rather
+       than "not a problem". */
+    const [circuit, config] = await Promise.allSettled([
+      njs.circuitConfig(SPA_CIRCUIT),
+      njs.configAll(),
+    ]);
+    if (circuit.status === "rejected" && config.status === "rejected") {
+      throw new Error(circuit.reason?.message ?? "no configuration could be read");
+    }
+    const findings = checkCommissioning({
+      spaCircuit: circuit.value,
+      options: config.value?.pool?.options,
+    });
     const changed = JSON.stringify(findings) !== JSON.stringify(own.commissioning);
     own.commissioning = findings;
     if (changed) {

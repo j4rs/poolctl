@@ -125,6 +125,15 @@ export class NjsPC {
   }
 
   /**
+   * The whole configuration. Smaller than `/state/all` (4 KB against 9 KB
+   * on this site) and read only by the commissioning check, never on the
+   * state path.
+   */
+  configAll() {
+    return this.get("/config/all");
+  }
+
+  /**
    * One circuit's configuration. `eggTimer` lives here and not in
    * `/state/all`, which is why the commissioning check needs its own read.
    */

@@ -1,4 +1,4 @@
-import { SPA_TIMEOUT_MIN } from "../src/lib/sequences.js";
+import { SPA_TIMEOUT_MIN, ASSUMED_VALVE_TRAVEL_SEC } from "../src/lib/sequences.js";
 import { DONT_STOP_MINUTES } from "./binding.js";
 
 /**
@@ -29,7 +29,58 @@ export const NJSPC_DEFAULT_EGG_TIMER = 720;
  * `/config/circuit/:id`. Missing entries produce no findings: not knowing is
  * not the same as knowing something is wrong.
  */
-export function checkCommissioning({ spaCircuit } = {}) {
+export function checkCommissioning({ spaCircuit, options } = {}) {
+  return [...checkSpaEggTimer(spaCircuit), ...checkValveDelay(options)];
+}
+
+/**
+ * How long njsPC holds the pump off after diverting a valve.
+ *
+ * njsPC believes a PE24GVA diverts instantly — it flips both valve flags in
+ * the same tick — so this delay is the only thing standing between a valve
+ * command and the pump running again. `NixieBoard` raises it when
+ * `pumpDelay` is on and `valveDelayTime > 0`; `Lockouts` ends it exactly
+ * `valveDelayTime` seconds later.
+ *
+ * The comparison figure is assumed, not measured, and the wording says so.
+ * The point is not to assert that 20 seconds is wrong — it is to stop the
+ * question going unasked until something grinds.
+ */
+export function checkValveDelay(options) {
+  if (!options) return [];
+  const findings = [];
+  const secs = options.valveDelayTime;
+
+  if (options.pumpDelay === false) {
+    findings.push({
+      id: "valve-no-pump-delay",
+      severity: "warn",
+      what: "The pump is not held off while valves move",
+      detail:
+        `njsPC only pauses the pump for a valve move when its pump delay is ` +
+        `on. Without it the actuators turn under load. Enable pumpDelay and ` +
+        `set valveDelayTime above measured valve travel.`,
+    });
+    return findings;
+  }
+
+  if (Number.isFinite(secs) && secs > 0 && secs < ASSUMED_VALVE_TRAVEL_SEC) {
+    findings.push({
+      id: "valve-delay-short",
+      severity: "note",
+      what: `Valve moves get ${secs} s before the pump restarts`,
+      detail:
+        `This repo assumes about ${ASSUMED_VALVE_TRAVEL_SEC} s of travel, ` +
+        `which nobody has measured. If that is right the pump restarts ` +
+        `mid-swing. Time a valve at commissioning and set valveDelayTime ` +
+        `above it.`,
+    });
+  }
+
+  return findings;
+}
+
+function checkSpaEggTimer(spaCircuit) {
   const findings = [];
   if (!spaCircuit) return findings;
 

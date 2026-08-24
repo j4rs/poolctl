@@ -85,6 +85,17 @@ export const SPA_RPM = 2800;
 export const VALVE_RPM = 1000;
 
 /**
+ * One-way actuator travel, in seconds. **UNMEASURED** — see the header: this
+ * is the 45 sec that half the durations below rest on, and nobody has put a
+ * stopwatch on a PE24GVA yet.
+ *
+ * Named rather than left as a literal because the supervisor compares njsPC's
+ * `valveDelayTime` against it, and a figure that decides whether a warning
+ * appears should be findable and obviously provisional.
+ */
+export const ASSUMED_VALVE_TRAVEL_SEC = 45;
+
+/**
  * Named skip conditions.
  *
  * Kept declarative rather than inline so the server and the UI agree on when

@@ -6,6 +6,7 @@ import Stat from "../components/Stat";
 import Toggle from "../components/Toggle";
 import HoldButton from "../components/HoldButton";
 import PreheatSheet from "../components/PreheatSheet";
+import DelayProgress from "../components/DelayProgress";
 import { useConfirm } from "../lib/useConfirm";
 
 /** Coarse relative time. Precision past a minute is noise here. */
@@ -31,7 +32,7 @@ export default function PoolSpaControl({ controller, themeControl, onOpenHeat })
   const {
     mode, target, activeSequence, stepIndex, steps, valves, pumpRpm, waterTemp,
     targets, setpoint, heaterCall, blower, light, saltPpm, cellOutput,
-    connected, lastSeen, spaExpiresAt, preheat,
+    connected, lastSeen, spaExpiresAt, preheat, delays,
   } = state;
 
   const [sheet, setSheet] = useState(false);
@@ -137,6 +138,10 @@ export default function PoolSpaControl({ controller, themeControl, onOpenHeat })
           })}
         </div>
       )}
+
+      {/* What the equipment is waiting on, while it waits. The seconds after
+          a mode change are when this screen most looks broken. */}
+      <DelayProgress delays={delays} />
 
       {/* Settings njsPC owns that disagree with what this app believes.
           Normally absent. A spa that reverts after one minute is not a bug

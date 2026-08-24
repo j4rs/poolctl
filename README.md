@@ -99,7 +99,8 @@ src/
   lib/useSupervisor.js     live transport — same surface as the mock
   lib/useConfirm.js        two-tap confirm for taps that move equipment
   components/              Schematic, Stat, Toggle, TargetTemp, HoldButton,
-                           Sheet, ScheduleEditor, ProgramEditor, PreheatSheet, Toast
+                           Sheet, ScheduleEditor, ProgramEditor, PreheatSheet,
+                           Toast, DelayProgress
   screens/                 PoolSpaControl, HeatControl, PumpControl, BusMonitor
 supervisor/                runs on the Pi; plain JS, no build step
   index.js                 njsPC link, intents, WebSocket, serves dist/

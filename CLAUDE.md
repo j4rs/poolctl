@@ -6,7 +6,7 @@ nodejs-poolController.
 **Status:** the UI runs live against njsPC through the supervisor. Pi 4 is up,
 Lite, thermally characterised. The relay HAT has not arrived, so no equipment
 is connected — njsPC runs on a laptop with no serial port, which is enough to
-have settled most of the design questions. 364 tests; `npm test`.
+have settled most of the design questions. 374 tests; `npm test`.
 
 **This file is the operating manual for working in this repo — nothing more.**
 The full record lives elsewhere and is deliberately not duplicated here:
@@ -40,7 +40,8 @@ src/
   lib/useSupervisor.js   live transport — same surface as useController
   lib/useConfirm.js      two-tap confirmation for equipment-moving taps
   components/            Schematic, Stat, Toggle, TargetTemp, HoldButton, Sheet,
-                         ScheduleEditor, ProgramEditor, PreheatSheet, Toast
+                         ScheduleEditor, ProgramEditor, PreheatSheet, Toast,
+                         DelayProgress
   screens/               PoolSpaControl, HeatControl, PumpControl, BusMonitor
 supervisor/              runs on the Pi; plain JS, no build step
   index.js               njsPC link, intents, WebSocket, serves dist/
@@ -108,7 +109,23 @@ form is here so it never gets skipped.
   An armed control **must not render as switched** — `aria-pressed` stays put
   until the second tap. Arming is not acting, and a toggle that reads as on
   before it is on lies in exactly the way ADR-7 exists to prevent.
-- **`src/lib/sequences.js` is the executable spec.** The server implements the
+- **Live progress comes from njsPC's delay, never from `sequences.js`.**
+njsPC flips every valve flag in the same tick — it believes a PE24GVA
+diverts instantly — so nothing in its state describes a valve part-way
+through travel. What it does report is `delays[]`, with a real `startTime`,
+`endTime` and a duration from its configured `valveDelayTime`, and it
+genuinely holds the pump off for exactly that long (measured: 20.2 s against
+a configured 20). `DelayProgress` renders that and says whose clock it is.
+
+The step-by-step list stays **mock-only**. Replaying `sequences.js` live was
+the obvious way to give feedback during a transition, and it is wrong here:
+every duration in that file is invented, so the bar would look measured while
+being a guess — and the first thing it would teach is to distrust it when the
+valve is still moving at 100%. Worse, gating an interlock on that clock would
+make "purge has elapsed" a fiction. Revisit when travel is measured; the
+honest fix then is to raise njsPC's `valveDelayTime`, not to dead-reckon here.
+
+**`src/lib/sequences.js` is the executable spec.** The server implements the
   same steps in the same order. If they disagree, one of them is a bug.
 - **Every number needs a source.** Two figures in the PRD turned out to be
   invented outright — a pool-heating duration and the exchanger pressure drop

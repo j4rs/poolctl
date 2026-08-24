@@ -161,8 +161,27 @@ export function toUiState(njs, own) {
     connected: own.connected,
     lastSeen: own.lastSeen,
 
-    /* Passed through so the UI can show what njsPC is waiting on. */
-    delays: (njs.delays || []).map((d) => nameOf(d.type) || String(d.type)),
+    /* What njsPC is waiting on, with its own clock attached.
+     *
+     * This is the only honest source of progress during a mode change.
+     * njsPC flips every valve flag in the same tick — it believes a PE24GVA
+     * diverts instantly — so nothing in its state describes a valve part-way
+     * through travel. What it does report is the delay it enforces before
+     * restarting the pump, with a real `startTime`, `endTime` and duration
+     * taken from its configured `valveDelayTime`.
+     *
+     * The alternative was to dead-reckon `sequences.js` here. Every duration
+     * in that file is invented, and animating them would put a confident
+     * progress bar over a guess. */
+    delays: (njs.delays || []).map((d) => ({
+      type: nameOf(d.type) || String(d.type),
+      /* njsPC's own words, e.g. "IntelliFlo will start after valve delay". */
+      message: d.message ?? null,
+      startsAt: d.startTime ? Date.parse(d.startTime) : null,
+      endsAt: d.endTime ? Date.parse(d.endTime) : null,
+      seconds: Number.isFinite(d.duration) ? d.duration : null,
+      canCancel: Boolean(d.canCancel),
+    })),
 
     /* Debug aid: which circuits njsPC thinks are on. */
     _circuits: { spa: Boolean(spaCircuit?.isOn), pool: Boolean(poolCircuit?.isOn) },

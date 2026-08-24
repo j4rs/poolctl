@@ -3,6 +3,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import HoldButton from "./HoldButton";
 import Toggle from "./Toggle";
+import DelayProgress from "./DelayProgress";
 import Toast from "./Toast";
 import Stat from "./Stat";
 import TargetTemp from "./TargetTemp";
@@ -271,5 +272,88 @@ describe("TargetTemp", () => {
   it("marks the body currently calling for heat", () => {
     const { container } = render(<TargetTemp targets={targets} activeCall="spa" onAdjust={vi.fn()} />);
     expect(container.textContent).toMatch(/Calling for heat/);
+  });
+});
+
+describe("DelayProgress", () => {
+  /* The seconds after a mode change are when this screen most looks broken:
+     valves moving, pump deliberately off, nothing visibly happening. Every
+     number here is njsPC's own — its message, its start and end — because a
+     confident progress bar over an invented duration is worse than no bar. */
+
+  const now = 1_000_000;
+  const delay = (over = {}) => ({
+    type: "pumpValveDelay",
+    message: "IntelliFlo will start after valve delay",
+    startsAt: now - 5000,
+    endsAt: now + 15000,
+    seconds: 20,
+    canCancel: true,
+    ...over,
+  });
+
+  it("shows nothing when nothing is waiting", () => {
+    const { container } = render(<DelayProgress delays={[]} now={now} />);
+    expect(container.textContent).toBe("");
+  });
+
+  it("survives a state that has no delays field at all", () => {
+    const { container } = render(<DelayProgress now={now} />);
+    expect(container.textContent).toBe("");
+  });
+
+  it("repeats njsPC's own words rather than inventing a caption", () => {
+    const { container } = render(<DelayProgress delays={[delay()]} now={now} />);
+    expect(container.textContent).toMatch(/IntelliFlo will start after valve delay/);
+  });
+
+  it("counts down against njsPC's end time", () => {
+    const { container } = render(<DelayProgress delays={[delay()]} now={now} />);
+    expect(container.textContent).toMatch(/15s/);
+  });
+
+  it("says whose clock it is", () => {
+    /* The reason this is trustworthy is the reason it has to be stated. */
+    const { container } = render(<DelayProgress delays={[delay()]} now={now} />);
+    expect(container.textContent).toMatch(/njsPC is holding this/);
+  });
+
+  it("fills in proportion to elapsed time", () => {
+    const { container } = render(<DelayProgress delays={[delay()]} now={now} />);
+    const bar = container.querySelector("div[aria-hidden] > div");
+    expect(bar.style.width).toBe("25%");
+  });
+
+  it("shows a message but no bar when njsPC gives no end time", () => {
+    /* Indeterminate is a real case, and inventing an end here would be the
+       same mistake at a smaller scale. */
+    const { container } = render(
+      <DelayProgress delays={[delay({ startsAt: null, endsAt: null, seconds: null })]} now={now} />,
+    );
+    expect(container.textContent).toMatch(/IntelliFlo will start/);
+    expect(container.querySelector("div[aria-hidden]")).toBeNull();
+  });
+
+  it("drops a delay that has already run out", () => {
+    const { container } = render(
+      <DelayProgress delays={[delay({ startsAt: now - 30000, endsAt: now - 1000 })]} now={now} />,
+    );
+    expect(container.textContent).toBe("");
+  });
+
+  it("never overfills when njsPC runs past its own estimate", () => {
+    const { container } = render(
+      <DelayProgress delays={[delay({ startsAt: now - 19000, endsAt: now + 1 })]} now={now} />,
+    );
+    const bar = container.querySelector("div[aria-hidden] > div");
+    expect(parseFloat(bar.style.width)).toBeLessThanOrEqual(100);
+  });
+
+  it("shows every delay njsPC is holding", () => {
+    const { container } = render(
+      <DelayProgress delays={[delay(), delay({ type: "heaterStartDelay", message: "Heater starting" })]} now={now} />,
+    );
+    expect(container.textContent).toMatch(/IntelliFlo/);
+    expect(container.textContent).toMatch(/Heater starting/);
   });
 });

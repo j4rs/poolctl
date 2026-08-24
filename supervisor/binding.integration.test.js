@@ -60,8 +60,12 @@ function fakeNjspc() {
     valves: [], chlorinators: [], delays: [],
   });
 
+  let options = { pumpDelay: true, valveDelayTime: 45 };
+
   const routes = {
     "GET /state/all": () => stateAll(),
+    /* Where njsPC keeps the settings the commissioning check reads. */
+    "GET /config/all": () => ({ pool: { options }, circuits, pumps: [] }),
     "GET /config/options/pumps": () => ({
       pumpTypes: [TYPE],
       pumps: [{
@@ -151,6 +155,10 @@ function fakeNjspc() {
        refetches when it hears. A test that reaches in and edits state has to
        say so, or it is waiting on the 15 s poll and calling that a race. */
     touch: () => io.emit("circuit", {}),
+    setOptions: (patch) => {
+      options = { ...options, ...patch };
+      io.emit("config", {});
+    },
     setSpaEggTimer: (minutes) => {
       circuits.find((c) => c.id === 1).eggTimer = minutes;
       io.emit("circuit", {});
