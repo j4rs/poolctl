@@ -1328,6 +1328,33 @@ temperature (read from source).
 
 ## 11. Software backlog
 
+- [ ] **Authentication. Nothing has any today.** Anyone who joins the wifi —
+      a guest, a compromised smart bulb, a neighbour with the password — can
+      reach the supervisor on 4300 and drive 240 V equipment: switch to spa,
+      call for heat, stop the pump, rewrite schedules. Owner's requirement,
+      August 2026. Four things make it more than "add a password":
+
+      - **njsPC's own port is the wider hole.** Protecting the supervisor
+        does nothing about 4200, where njsPC's REST API and dashPanel accept
+        anything. dashPanel already bypasses every interlock we add
+        deliberately; unauthenticated, it bypasses them for everyone. Bind
+        njsPC to localhost and let only the supervisor reach it.
+      - **Plain HTTP over the LAN means credentials in clear.** TLS on a Pi
+        with a self-signed certificate is unpleasant on iOS, which is the
+        primary client. Decide between a self-signed cert the phone trusts
+        once, a real certificate via a local domain, or accepting the LAN
+        threat model explicitly and writing down why.
+      - **Phone-first rules out a login every time.** A long-lived token in
+        `localStorage`, revocable from the Pi, is the usual shape. The
+        WebSocket upgrade needs the same check as the HTTP routes — an auth
+        layer that guards only the page is theatre, because every intent
+        travels over the socket.
+      - **Home Assistant (Phase 6) needs its own credential**, not the
+        owner's. Whatever is built should issue more than one token.
+
+      Not a reason to delay the interlocks, but it belongs before anything is
+      reachable from outside the LAN, and before the relays are live.
+
 - [x] Stand njsPC up on a laptop and test ADR-10's assumptions. Done — see
       the bench findings under ADR-10. `anslq25` was the wrong tool (it only
       mocks an EasyTouch OCP); Nixie with comms disabled is the way

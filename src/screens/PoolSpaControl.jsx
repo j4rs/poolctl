@@ -143,6 +143,28 @@ export default function PoolSpaControl({ controller, themeControl, onOpenHeat })
           a mode change are when this screen most looks broken. */}
       <DelayProgress delays={delays} />
 
+      {/* Invariants broken right now. Distinct from the settings notices
+          below: those describe configuration, these describe equipment
+          misbehaving, and they are the only thing on this screen that should
+          never appear. */}
+      {(state.violations ?? []).map((v) => (
+        <div key={v.id} style={{
+          border: `1px solid ${C.alert}`, background: C.surface,
+          borderRadius: 12, padding: "11px 14px", marginBottom: 10,
+        }}>
+          <div style={{
+            fontFamily: FONT_DATA, fontSize: 9.5, letterSpacing: "0.09em",
+            color: C.alert, marginBottom: 5,
+          }}>
+            CHECK THE EQUIPMENT
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: C.alert }}>{v.what}</div>
+          <div style={{ fontSize: 11.5, color: C.muted, marginTop: 3, lineHeight: 1.45 }}>
+            {v.detail}
+          </div>
+        </div>
+      ))}
+
       {/* Settings njsPC owns that disagree with what this app believes.
           Normally absent. A spa that reverts after one minute is not a bug
           this code can fix — but it is one it can stop hiding. */}

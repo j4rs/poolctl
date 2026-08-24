@@ -175,6 +175,14 @@ export function toUiState(njs, own) {
     /* Settings on njsPC that disagree with what this repo believes. Empty is
        the normal case; anything here is a silent fault made audible. */
     commissioning: own.commissioning ?? [],
+
+    /* Invariants broken right now, as of the last evaluation. Empty is the
+       normal case and the only one anybody should ever see. */
+    violations: own.violations ?? [],
+
+    /* Why the heater stopped, when it was us that stopped it. Without this a
+       heat call ending at the target looks identical to one that failed. */
+    lastCutoff: own.lastCutoff ?? null,
     /* Whether the pump circuit is on at all, distinct from its speed. */
     pumpRunning: Boolean(poolCircuit?.isOn || spaCircuit?.isOn),
     /* njsPC panel mode: 'service' stands the schedules down. */

@@ -23,6 +23,11 @@ export default function HeatControl({ controller, onBack }) {
   } = state;
 
   const calling = heaterCall !== "off";
+  /* Why the heater stopped, when it was the target that stopped it. Without
+     this, a call ending exactly as designed looks identical to one that
+     failed — and this is the only visible evidence that a target is a cutoff
+     rather than a number in a box. */
+  const cutoff = state.lastCutoff;
   const isolated = valves.bypass === "around";
   const busy = Boolean(activeSequence);
   const heatSeq = activeSequence === "heatEngage" || activeSequence === "heatRelease";
@@ -70,6 +75,21 @@ export default function HeatControl({ controller, onBack }) {
           </div>
         )}
       </div>
+
+      {cutoff && !poolHeatDemand && (
+        <div style={{
+          background: C.surface, border: `1px solid ${C.line}`, borderRadius: 12,
+          padding: "11px 14px", marginBottom: 10,
+        }}>
+          <div style={{ fontSize: 13, color: C.stone }}>
+            Heat stopped at your {cutoff.target}°F cutoff
+          </div>
+          <div style={{ fontSize: 11.5, color: C.muted, marginTop: 3, lineHeight: 1.45 }}>
+            The water reached {Math.round(cutoff.temp)}°F. The heater keeps its
+            own thermostat regardless — this target can only end a call early.
+          </div>
+        </div>
+      )}
 
       {/* Pool heat. Spa mode owns the heater, so this refuses there rather
           than competing with the spa call. */}

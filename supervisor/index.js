@@ -9,8 +9,9 @@ import { applyTarget } from "./targets.js";
 import { Store, pickPersisted, applyPersisted } from "./store.js";
 import { DEFAULT_PROGRAMS } from "../src/lib/programs.js";
 import {
-  floorRpm, bypassFor, mayCallForHeat, mayToggleBlower, refuse,
+  floorRpm, bypassFor, mayCallForHeat, mayToggleBlower, shouldStopHeat, refuse,
 } from "./interlocks.js";
+import { checkInvariants } from "./invariants.js";
 import {
   circuitConfig, withPumpCircuit, withoutPumpCircuit, whyNotBindable, pumpLimits,
 } from "./binding.js";
@@ -81,6 +82,12 @@ const own = {
   /* Settings that live on njsPC and disagree with what we believe. Re-read
      whenever the link comes up, because dashPanel can change them under us. */
   commissioning: [],
+  /* Invariants broken right now. Not persisted: it describes the equipment a
+     moment ago, and a stale alarm is worse than none. */
+  violations: [],
+  /* The last time a target ended a heat call, so the screen can say why the
+     heater stopped rather than leaving it looking like a fault. */
+  lastCutoff: null,
   panelMode: "auto",
   targets: { pool: 88, spa: 102 },
   poolHeatDemand: false,
@@ -108,7 +115,9 @@ const njs = new NjsPC({
   onState: (s) => {
     njsRaw = s;
     own.lastSeen = Date.now();
-    publish();
+    /* Every fresh reading is a chance for an invariant to have broken or a
+       target to have been reached. */
+    evaluate();
   },
   onEvent: () => reviewCommissioningSoon(),
   onLink: (up, why) => {
@@ -131,6 +140,59 @@ function publish() {
   for (const client of wss.clients) {
     if (client.readyState === 1) client.send(msg);
   }
+}
+
+/* ---- continuous evaluation --------------------------------------------- */
+
+/**
+ * Decide, then publish.
+ *
+ * Everything else in this file reacts to somebody tapping something. This is
+ * the part that runs whether or not anyone is looking, which is what makes
+ * the process a supervisor rather than a translator: njsPC acts on its own
+ * timers, dashPanel writes behind our back, and equipment does not always do
+ * what it was told.
+ *
+ * Deliberately small. It asserts the invariants and reports what it finds,
+ * and it acts on exactly one thing — the heat call we own, at the target the
+ * owner set. Correcting equipment on the strength of a snapshot is how a
+ * supervisor makes a bad situation worse.
+ */
+function evaluate() {
+  const view = toUiState(njsRaw, own);
+  applyCutoff(view);
+  own.violations = checkInvariants(toUiState(njsRaw, own));
+  publish();
+}
+
+/**
+ * Targets are cutoffs (ADR-4), and this is the only place that has ever
+ * enforced it.
+ *
+ * Until now `state.targets` was clamped, stored, persisted and displayed, and
+ * nothing ever ended a call when the water reached it — the promise the whole
+ * feature is named for was not kept anywhere.
+ *
+ * Only the pool call, because it is the only one we own: in spa mode njsPC
+ * holds the heater and reaching in would be a second authority on it. And
+ * the bypass is left where it is rather than swung back, because a valve may
+ * only move after a purge has elapsed and the purge duration is unmeasured.
+ * Ending the call is the safe half and the half that matters.
+ */
+function applyCutoff(view) {
+  if (!own.poolHeatDemand || view.mode === "spa") return;
+  if (!shouldStopHeat({ waterTemp: view.waterTemp, target: own.targets.pool })) return;
+
+  own.poolHeatDemand = false;
+  own.lastCutoff = {
+    body: "pool",
+    at: Date.now(),
+    temp: view.waterTemp,
+    target: own.targets.pool,
+  };
+  console.log(
+    `target reached: pool at ${view.waterTemp}\u00b0F, cutting the heat call at ${own.targets.pool}\u00b0F`,
+  );
 }
 
 /* ---- commissioning ----------------------------------------------------- */
@@ -514,6 +576,10 @@ async function handleIntent(raw) {
   if (!fn) return { ok: false, error: `intent '${intent}' not implemented in v0` };
   try {
     await fn(args);
+    /* Re-evaluate straight away rather than waiting for the next beat. A
+       heat call asked for when the water is already at the target should end
+       on the same tap, not up to five seconds later. */
+    evaluate();
     return { ok: true };
   } catch (err) {
     return { ok: false, error: err.message };
@@ -601,7 +667,10 @@ njs.start();
 /* njsPC only talks when something changes, and a quiet system is
    indistinguishable from a dead one over a socket. This makes silence
    meaningful: a client that stops hearing from us really has lost the link. */
-const heartbeat = setInterval(publish, HEARTBEAT_MS);
+/* The heartbeat evaluates rather than merely republishing: njsPC only speaks
+   when something changes, and "nothing changed" is exactly the condition a
+   stuck heat call presents. */
+const heartbeat = setInterval(evaluate, HEARTBEAT_MS);
 const recheck = setInterval(reviewCommissioning, COMMISSIONING_MS);
 
 server.listen(PORT, () => {

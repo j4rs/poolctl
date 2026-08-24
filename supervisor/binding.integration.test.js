@@ -45,13 +45,21 @@ function fakeNjspc() {
   const writes = [];
   let io;
 
+  let temps = { temp: 84, heatStatus: { name: "off" } };
+  let pumpRpm;
+
   const stateAll = () => ({
     circuits,
-    valveMode: { name: "pool" },
-    temps: { bodies: [{ id: 1, isOn: true, temp: 84, heatStatus: { name: "off" } }] },
+    /* Derived, as njsPC does it: turning on the Spa circuit switches the
+       body and the valve mode with it — the nxps shared-body behaviour that
+       ADR-10 is built around. Hardcoding "pool" here made a mode-change test
+       silently unprovable. */
+    valveMode: { name: circuits.find((c) => c.id === 1)?.isOn ? "spa" : "pool" },
+    temps: { bodies: [{ id: 1, isOn: true, ...temps }] },
     pumps: [{
       id: 50, name: "IntelliFlo", isActive: true, minSpeed: 450, maxSpeed: 3450,
       type: TYPE,
+      ...(pumpRpm === undefined ? {} : { rpm: pumpRpm }),
       circuits: pumpCircuits.map((pc) => ({
         ...pc,
         circuit: { id: pc.circuit, isOn: Boolean(circuits.find((c) => c.id === pc.circuit)?.isOn) },
@@ -155,6 +163,14 @@ function fakeNjspc() {
        refetches when it hears. A test that reaches in and edits state has to
        say so, or it is waiting on the 15 s poll and calling that a race. */
     touch: () => io.emit("circuit", {}),
+    setTemps: (patch) => {
+      temps = { ...temps, ...patch };
+      io.emit("body", {});
+    },
+    setPumpRpm: (rpm) => {
+      pumpRpm = rpm;
+      io.emit("pump", {});
+    },
     setOptions: (patch) => {
       options = { ...options, ...patch };
       io.emit("config", {});
@@ -495,5 +511,113 @@ describe("settings njsPC owns", () => {
     njspc.setSpaEggTimer(1);
     await settles((s) => s.commissioning.length > 0, 10000);
     expect((await client.intent("setMode", { mode: "spa" })).ok).toBe(true);
+  });
+});
+
+describe("the evaluation loop", () => {
+  /**
+   * The part that runs whether or not anyone is looking. Everything else in
+   * the supervisor reacts to a tap; this asserts the invariants and enforces
+   * the one thing the owner set — the target.
+   */
+
+  it("reports nothing wrong with a system behaving itself", async () => {
+    expect((await now()).violations).toEqual([]);
+  });
+
+  it("ends a heat call when the water reaches the target", async () => {
+    /* The promise the whole targets feature is named for, and until this
+       loop existed nothing anywhere kept it: the target was clamped, stored,
+       persisted and displayed, and never acted on. */
+    njspc.setTemps({ temp: 70 });
+    await settles((s) => s.waterTemp === 70, 8000);
+
+    /* Cutoff at 72, water at 70 — the call should stand. */
+    await client.intent("setTarget", { body: "pool", degrees: 72 });
+    expect((await client.intent("setPoolHeat", { on: true })).ok).toBe(true);
+    expect((await now()).poolHeatDemand).toBe(true);
+
+    njspc.setTemps({ temp: 73 });
+    const state = await settles((s) => s.poolHeatDemand === false, 8000);
+    expect(state.poolHeatDemand).toBe(false);
+  });
+
+  it("says the target was why, not that something failed", async () => {
+    njspc.setTemps({ temp: 70 });
+    await settles((s) => s.waterTemp === 70, 8000);
+    await client.intent("setTarget", { body: "pool", degrees: 72 });
+    await client.intent("setPoolHeat", { on: true });
+
+    njspc.setTemps({ temp: 75 });
+    const state = await settles((s) => s.lastCutoff != null, 8000);
+    expect(state.lastCutoff).toMatchObject({ body: "pool", target: 72, temp: 75 });
+  });
+
+  it("cuts a call asked for when the water is already there, on the same tap", async () => {
+    njspc.setTemps({ temp: 90 });
+    await settles((s) => s.waterTemp === 90, 8000);
+    await client.intent("setTarget", { body: "pool", degrees: 80 });
+    await client.intent("setPoolHeat", { on: true });
+    expect((await now()).poolHeatDemand).toBe(false);
+  });
+
+  it("never ends a call on a temperature it does not have", async () => {
+    /* The rig's actual state today. Guessing here would cut the heat off for
+       a reading nobody took, and the heater governs itself regardless. */
+    njspc.setTemps({ temp: undefined });
+    await settles((s) => s.waterTemp == null, 8000);
+    await client.intent("setPoolHeat", { on: true });
+    await new Promise((r) => setTimeout(r, 1500));
+    expect((await now()).poolHeatDemand).toBe(true);
+    await client.intent("setPoolHeat", { on: false });
+  });
+
+  it("leaves the spa call alone, because njsPC owns that heater", async () => {
+    njspc.setTemps({ temp: 105 });
+    await settles((s) => s.waterTemp === 105, 8000);
+    await client.intent("setMode", { mode: "spa" });
+    await settles((s) => s.mode === "spa", 8000);
+    /* Well past the spa target, and the supervisor still does not reach in. */
+    expect((await client.intent("setPoolHeat", { on: true })).ok).toBe(false);
+  });
+
+  it("catches a heat call running below the heater's flow minimum", async () => {
+    njspc.setPumpRpm(800);
+    njspc.setTemps({ heatStatus: { name: "heating" } });
+    const state = await settles((s) => s.violations.length > 0, 8000);
+    expect(state.violations.map((v) => v.id)).toContain("heat-below-floor");
+    expect(state.violations[0].severity).toBe("alarm");
+  });
+
+  it("clears the alarm when the equipment comes right", async () => {
+    njspc.setPumpRpm(800);
+    njspc.setTemps({ heatStatus: { name: "heating" } });
+    await settles((s) => s.violations.length > 0, 8000);
+
+    njspc.setPumpRpm(2400);
+    const state = await settles(
+      (s) => !s.violations.some((v) => v.id === "heat-below-floor"), 8000);
+    expect(state.violations.map((v) => v.id)).not.toContain("heat-below-floor");
+  });
+
+  it("does not alarm on a pump that is simply not answering", async () => {
+    /* Which is every pump on this rig right now. A monitor that fires
+       permanently is one nobody reads. */
+    njspc.setTemps({ heatStatus: { name: "heating" } });
+    await new Promise((r) => setTimeout(r, 1500));
+    expect((await now()).violations.map((v) => v.id)).not.toContain("heat-below-floor");
+  });
+
+  it("keeps checking while njsPC says nothing at all", async () => {
+    /* njsPC only speaks when something changes, and "nothing changed" is
+       exactly what a stuck heat call looks like. The heartbeat evaluates
+       rather than merely republishing. */
+    njspc.setPumpRpm(800);
+    njspc.setTemps({ heatStatus: { name: "heating" } });
+    await settles((s) => s.violations.length > 0, 8000);
+    /* No further njsPC events from here — the alarm must persist on our own
+       clock rather than needing to be re-provoked. */
+    const later = await settles((s) => s.violations.length > 0, 8000);
+    expect(later.violations.map((v) => v.id)).toContain("heat-below-floor");
   });
 });

@@ -6,7 +6,7 @@ nodejs-poolController.
 **Status:** the UI runs live against njsPC through the supervisor. Pi 4 is up,
 Lite, thermally characterised. The relay HAT has not arrived, so no equipment
 is connected — njsPC runs on a laptop with no serial port, which is enough to
-have settled most of the design questions. 428 tests; `npm test`.
+have settled most of the design questions. 455 tests; `npm test`.
 
 **This file is the operating manual for working in this repo — nothing more.**
 The full record lives elsewhere and is deliberately not duplicated here:
@@ -48,6 +48,7 @@ supervisor/              runs on the Pi; plain JS, no build step
   map.js                 njsPC state -> the shape the UI speaks
   interlocks.js          the rules njsPC lacks — pure, tested
   commissioning.js       njsPC's own settings, checked against what we believe
+  invariants.js          the invariants, checked against what is true now
   binding.js             program -> njsPC circuit + pump speed — pure, tested
   schedules.js           njsPC schedules <-> the shape the UI speaks
   targets.js             ADR-4 clamping
@@ -155,6 +156,31 @@ mode !== 'spa'             ⟹  blower === false
 spa mode auto-reverts to pool after SPA_TIMEOUT_MIN
 an actuator may not be re-driven within ACTUATOR_COOLDOWN_MIN (8) of its last move
 ```
+
+`supervisor/invariants.js` checks these on every njsPC reading and on the
+heartbeat, and `evaluate()` in `index.js` is the loop — the only part of the
+supervisor that runs when nobody is tapping anything. It **reports**: breaches
+land in `state.violations` and render on the Water screen under CHECK THE
+EQUIPMENT. It does not correct, because reaching into equipment on the
+strength of a snapshot is how a supervisor makes things worse.
+
+Two disciplines keep it worth reading. **Unknown is never a violation** — a
+null pump speed is a pump not answering, which is every pump on this rig
+today, and alarming on it would make the display permanent noise. **Expected
+states are not violations** — njsPC holds the pump off during a valve delay
+on purpose.
+
+Only the snapshot-checkable invariants are implemented. The rest — no valve
+command while another is in flight, actuator cooldown, purge before a bypass
+move — describe transitions, cannot be seen in a single state, and belong
+with valve driving.
+
+`evaluate()` acts on exactly one thing: **the cutoff**. If the water reaches
+`targets.pool` it ends our own heat call, which is the promise the targets
+feature is named for and which nothing kept before. Pool only — in spa mode
+njsPC holds the heater and reaching in would be a second authority on it. It
+ends the call and leaves the bypass alone, because a valve may only move once
+a purge has elapsed and the purge duration is unmeasured.
 
 The two bypass implications are converses and both are needed: one stops a
 call being made into a bypassed exchanger, the other stops the valve swinging
@@ -300,7 +326,16 @@ hardware, highest value first:
    Program circuits are no longer on this list — the supervisor creates them
    (see below) — but njsPC does need a **pump** configured before any
    program can bind, because the speed has nowhere else to live.
-2. **`extendSpa` and scheduled preheat.** Still unimplemented, and still
+2. **`extendSpa`.** The button is on screen and refuses. Needs no hardware,
+   and the spa is used at night against a 120-minute egg timer, so it is the
+   one unimplemented intent with a daily use. Check how njsPC prefers an egg
+   timer extended before committing to an approach.
+3. **Authentication — nothing has any.** Anyone on the wifi can reach the
+   supervisor and drive 240 V equipment. njsPC's own port is the wider hole:
+   protecting 4300 does nothing about 4200, where dashPanel and the REST API
+   accept anything. See PRD §11 for the four parts of this that make it more
+   than adding a password. Owner's requirement, August 2026.
+4. **Scheduled preheat.** Still unimplemented, and still
    refusing with a reason rather than doing nothing. Preheat wants a water
    temperature, which wants the HAT.
 
