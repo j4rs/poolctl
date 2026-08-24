@@ -82,4 +82,17 @@ export class NjsPC {
   setCircuit(id, state) {
     return this.put("/state/circuit/setState", { id, state });
   }
+
+  /** Suspends schedules for a circuit — njsPC's ManualPriorityDelay. */
+  setManualPriority(id) {
+    return this.put("/state/manualOperationPriority", { id });
+  }
+
+  setHeatMode(id, mode) {
+    return this.put("/state/body/heatMode", { id, mode });
+  }
+
+  setSetPoint(id, setPoint) {
+    return this.put("/state/body/setPoint", { id, setPoint });
+  }
 }

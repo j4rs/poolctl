@@ -7,6 +7,9 @@ import { NjsPC } from "./njspc.js";
 import { toUiState, SPA_CIRCUIT, POOL_CIRCUIT } from "./map.js";
 import { applyTarget } from "./targets.js";
 import { Store, pickPersisted, applyPersisted } from "./store.js";
+import {
+  floorRpm, bypassFor, mayCallForHeat, mayToggleBlower, refuse,
+} from "./interlocks.js";
 
 /**
  * poolctl supervisor — v0.
@@ -80,6 +83,9 @@ const njs = new NjsPC({
   },
 });
 
+/* Current heat call, as njsPC reports it — the input to the pump floor. */
+const heatCall = () => ui?.heaterCall ?? "off";
+
 function publish() {
   ui = toUiState(njsRaw, own);
   const msg = JSON.stringify({ type: "state", state: ui });
@@ -97,6 +103,29 @@ function publish() {
  * to work and does nothing is worse than one that says no.
  */
 const intents = {
+  /**
+   * Pump speed.
+   *
+   * Refused, and the reason is architectural rather than unfinished work.
+   * njsPC has no runtime endpoint for pump speed at all: it drives the pump
+   * from circuit assignments, so the only lever is `/config/pumpCircuit`,
+   * which rewrites the speed a circuit runs at permanently — including for
+   * every schedule using it. Setting 1800 rpm now would silently redefine
+   * what "filtration" means.
+   *
+   * The idiomatic fix is a dedicated manual circuit the supervisor owns and
+   * rewrites, turned on with manual priority. That is a commissioning
+   * decision, not something to improvise here. The floor is applied first
+   * regardless, so the refusal reports the speed that would have been used.
+   */
+  async setRpm({ rpm }) {
+    const { rpm: floored, clamped } = floorRpm(rpm, heatCall());
+    throw refuse(
+      `pump speed needs a dedicated manual circuit in njsPC` +
+        (clamped ? ` (${rpm} would floor to ${floored} while heat is called)` : ""),
+    );
+  },
+
   async setMode({ mode }) {
     if (mode !== "pool" && mode !== "spa") throw new Error(`unknown mode ${mode}`);
     /* njsPC's shared-body model does the whole switch off one circuit. */
@@ -113,6 +142,59 @@ const intents = {
    * outrun the round trip still accumulate; sending absolutes would make each
    * tap compute from whatever the client last heard, and lose all but one.
    */
+  /**
+   * Blower and light. The blower gate is enforced here rather than only in
+   * the client — a rule that lives on the wrong side of the wire is not a
+   * rule, and Home Assistant will be sending these too (Phase 6).
+   */
+  async toggle({ key }) {
+    if (key !== "blower" && key !== "light") throw refuse(`cannot switch '${key}'`);
+    const turningOn = !own[key];
+    if (key === "blower" && !mayToggleBlower({ turningOn, mode: ui?.mode })) {
+      throw refuse("the blower only starts in spa mode");
+    }
+    /* No relay is assigned until the HAT is fitted, so this is supervisor
+       state for now. It becomes a circuit call at commissioning. */
+    own[key] = turningOn;
+    publish();
+  },
+
+  /**
+   * Pool heat. The bypass must be open before any call is made — the valve is
+   * binary, so a call with it around is zero flow through the exchanger, not
+   * reduced flow (ADR-5, invariants 2 and 3).
+   */
+  async setPoolHeat({ on }) {
+    if (ui?.mode === "spa") throw refuse("spa mode owns the heater");
+    const want = Boolean(on);
+    if (want) {
+      const bypass = bypassFor("pool", true);
+      if (!mayCallForHeat(bypass)) throw refuse("bypass is not in flow position");
+      /* Ordering matters and is not negotiable: valve first, contact second. */
+      own.bypass = bypass;
+      own.poolHeatDemand = true;
+    } else {
+      own.poolHeatDemand = false;
+      own.bypass = bypassFor("pool", false);
+    }
+    publish();
+  },
+
+  /**
+   * Manual pump hold — njsPC's ManualPriorityDelay, per ADR-11. njsPC owns
+   * and persists it, which is why nothing here is written to our own store.
+   */
+  async holdPump() {
+    const circuit = ui?.mode === "spa" ? SPA_CIRCUIT : POOL_CIRCUIT;
+    if (ui?.mode === "spa") throw refuse("spa mode already ignores schedules");
+    await njs.setManualPriority(circuit);
+  },
+
+  async releasePump() {
+    /* Re-issuing clears it: njsPC toggles manual priority on the circuit. */
+    await njs.setManualPriority(POOL_CIRCUIT);
+  },
+
   async setTarget({ body, degrees, delta }) {
     if (!(body in own.targets)) throw new Error(`unknown body ${body}`);
     own.targets[body] = applyTarget(own.targets[body], body, { degrees, delta });
