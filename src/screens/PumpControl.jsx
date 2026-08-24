@@ -7,6 +7,7 @@ import {
 import ScheduleEditor from "../components/ScheduleEditor";
 import ProgramEditor from "../components/ProgramEditor";
 import { blankProgram, remaining } from "../lib/programs";
+import { useConfirm } from "../lib/useConfirm";
 
 const RATE = 0.15;        // $/kWh — set to your own utility rate
 
@@ -52,6 +53,8 @@ export default function PumpControl({ controller, themeControl }) {
   /* What the pump will accept, as njsPC reports it. Null before a pump is
      configured, which the editor falls back from rather than inventing. */
   const pumpLimits = state.pumpLimits ?? null;
+  /* Anything that starts or stops equipment asks twice. See useConfirm. */
+  const confirm = useConfirm();
   const [schedules, setSchedules] = useState(INITIAL);
   const [editing, setEditing] = useState(null);
   const [editingProgram, setEditingProgram] = useState(null);
@@ -162,15 +165,23 @@ export default function PumpControl({ controller, themeControl }) {
             live slider — njsPC drives the pump from circuits, and an arbitrary
             rpm had neither a user nor an expiry. */}
         <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={() => setPumpRunning(!pumpRunning)}
+          <button
+            onClick={confirm.guard("pump", () => setPumpRunning(!pumpRunning))}
+            aria-label={
+              confirm.isArmed("pump")
+                ? `Confirm: ${pumpRunning ? "stop" : "run"} the pump`
+                : pumpRunning ? "Stop the pump" : "Run the pump"
+            }
             style={{
               flex: 1, padding: "15px 8px", borderRadius: 11,
-              border: `1px solid ${pumpRunning ? C.alert : C.water}`,
-              background: pumpRunning ? "transparent" : C.water,
-              color: pumpRunning ? C.alert : C.ground,
+              border: `1px solid ${confirm.isArmed("pump") ? C.heat : pumpRunning ? C.alert : C.water}`,
+              background: confirm.isArmed("pump") ? "transparent" : pumpRunning ? "transparent" : C.water,
+              color: confirm.isArmed("pump") ? C.heat : pumpRunning ? C.alert : C.ground,
               fontFamily: FONT_UI, fontSize: 15, fontWeight: 600, cursor: "pointer",
             }}>
-            {pumpRunning ? "Stop the pump" : "Run the pump"}
+            {confirm.isArmed("pump")
+              ? `Tap again to ${pumpRunning ? "stop" : "run"} the pump`
+              : pumpRunning ? "Stop the pump" : "Run the pump"}
           </button>
         </div>
         {!pumpRunning && (
@@ -211,9 +222,14 @@ export default function PumpControl({ controller, themeControl }) {
               borderRadius: 11, padding: "12px 12px 12px 14px",
             }}>
               <button
-                onClick={() => (running ? stopProgram() : startProgram(p.id))}
+                onClick={confirm.guard(`program:${p.id}`, () =>
+                  running ? stopProgram() : startProgram(p.id))}
                 disabled={blocked}
-                aria-label={running ? `Stop ${p.name}` : `Run ${p.name}`}
+                aria-label={
+                  confirm.isArmed(`program:${p.id}`)
+                    ? `Confirm: ${running ? "stop" : "run"} ${p.name}`
+                    : running ? `Stop ${p.name}` : `Run ${p.name}`
+                }
                 style={{
                   flex: 1, minWidth: 0, textAlign: "left", background: "transparent",
                   border: "none", padding: 0,
@@ -221,7 +237,9 @@ export default function PumpControl({ controller, themeControl }) {
                   opacity: blocked ? 0.45 : 1,
                 }}>
                 <div style={{ fontFamily: FONT_UI, fontSize: 14, fontWeight: 600, color: running ? C.heat : C.stone }}>
-                  {running ? `${p.name} — stop` : p.name}
+                  {confirm.isArmed(`program:${p.id}`)
+                    ? `${p.name} — tap again to ${running ? "stop" : "run"}`
+                    : running ? `${p.name} — stop` : p.name}
                 </div>
                 <div style={{ fontFamily: FONT_DATA, fontSize: 11, color: C.muted, marginTop: 3 }}>
                   {p.rpm} rpm · {watts(p.rpm)} W ·{" "}
@@ -282,15 +300,26 @@ export default function PumpControl({ controller, themeControl }) {
               : "Schedules run as configured."}
           </div>
         </div>
-        <button onClick={() => setPanelMode(panelMode === "service" ? "auto" : "service")}
+        {/* Both directions ask twice. Entering service stands the schedules
+            down; leaving it can start the pump on the next boundary. */}
+        <button
+          onClick={confirm.guard("panel", () =>
+            setPanelMode(panelMode === "service" ? "auto" : "service"))}
+          aria-label={
+            confirm.isArmed("panel")
+              ? `Confirm: ${panelMode === "service" ? "resume automation" : "enter service mode"}`
+              : panelMode === "service" ? "Resume automation" : "Enter service mode"
+          }
           style={{
             flexShrink: 0, padding: "10px 14px", borderRadius: 9,
-            border: `1px solid ${panelMode === "service" ? C.water : C.line}`,
+            border: `1px solid ${confirm.isArmed("panel") ? C.heat : panelMode === "service" ? C.water : C.line}`,
             background: "transparent",
-            color: panelMode === "service" ? C.water : C.muted,
+            color: confirm.isArmed("panel") ? C.heat : panelMode === "service" ? C.water : C.muted,
             fontFamily: FONT_UI, fontSize: 13, fontWeight: 600, cursor: "pointer",
           }}>
-          {panelMode === "service" ? "Resume" : "Service"}
+          {confirm.isArmed("panel")
+            ? "Tap again"
+            : panelMode === "service" ? "Resume" : "Service"}
         </button>
       </div>
 

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { C, FONT_UI, FONT_DATA } from "../theme";
 import { Sheet, Row, Action } from "./Sheet";
+import { useConfirm } from "../lib/useConfirm";
 import { HEATER_MIN_RPM, CELL_MIN_RPM } from "../lib/sequences";
 import {
   RPM_MIN, RPM_MAX, watts, DAYS, daysLabel, hoursBetween, overlaps,
@@ -16,6 +17,7 @@ import {
  */
 export default function ScheduleEditor({ value, others, onSave, onDelete, onCancel }) {
   const [draft, setDraft] = useState(value);
+  const confirm = useConfirm();
   const set = (patch) => setDraft((d) => ({ ...d, ...patch }));
 
   const hours = hoursBetween(draft.start, draft.end);
@@ -122,7 +124,13 @@ export default function ScheduleEditor({ value, others, onSave, onDelete, onCanc
 
         <div style={{ display: "flex", gap: 8 }}>
           <Action label="Cancel" onClick={onCancel} />
-          {!value.isNew && <Action label="Delete" tone={C.alert} onClick={() => onDelete(draft.id)} />}
+          {!value.isNew && (
+            <Action
+              label={confirm.isArmed("delete") ? "Tap again" : "Delete"}
+              tone={confirm.isArmed("delete") ? C.heat : C.alert}
+              onClick={confirm.guard("delete", () => onDelete(draft.id))}
+            />
+          )}
           <Action label="Save" primary disabled={invalid} onClick={() => onSave(draft)} />
         </div>
     </Sheet>

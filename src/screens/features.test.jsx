@@ -1,10 +1,11 @@
 import React from "react";
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup, within } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, within, act } from "@testing-library/react";
 import PoolSpaControl from "./PoolSpaControl";
 import PumpControl from "./PumpControl";
 import HeatControl from "./HeatControl";
 import ScheduleEditor from "../components/ScheduleEditor";
+import ProgramEditor from "../components/ProgramEditor";
 import { SEQUENCES, HEATER_MIN_RPM } from "../lib/sequences";
 
 afterEach(cleanup);
@@ -41,6 +42,18 @@ const makeController = (over = {}, fns = {}) => ({
   stopProgram: vi.fn(), saveProgram: vi.fn(), deleteProgram: vi.fn(),
   bindProgram: vi.fn(), ...fns,
 });
+
+/**
+ * Tap a control that asks twice.
+ *
+ * Everything that starts or stops equipment arms on the first tap and acts
+ * on the second — see `useConfirm`. Taking the element rather than a label
+ * matters, because the label changes once it is armed.
+ */
+const confirmTap = (el) => {
+  fireEvent.click(el);
+  fireEvent.click(el);
+};
 
 const water = (c) => render(<PoolSpaControl controller={c} themeControl={null} onOpenHeat={vi.fn()} />);
 const pump = (c) => render(<PumpControl controller={c} themeControl={null} />);
@@ -262,7 +275,7 @@ describe("Schedule editor", () => {
   it("deletes an existing schedule", () => {
     const onDelete = vi.fn();
     editor(base, [], { onDelete });
-    fireEvent.click(screen.getByText("Delete"));
+    confirmTap(screen.getByText("Delete"));
     expect(onDelete).toHaveBeenCalledWith(base.id);
   });
 
@@ -281,14 +294,14 @@ describe("Pump — run and stop", () => {
   it("stops the pump", () => {
     const c = makeController();
     pump(c);
-    fireEvent.click(screen.getByText("Stop the pump"));
+    confirmTap(screen.getByText("Stop the pump"));
     expect(c.setPumpRunning).toHaveBeenCalledWith(false);
   });
 
   it("offers to run it again once stopped, and says what that blocks", () => {
     const c = makeController({ pumpRunning: false });
     const { container } = pump(c);
-    fireEvent.click(screen.getByText("Run the pump"));
+    confirmTap(screen.getByText("Run the pump"));
     expect(c.setPumpRunning).toHaveBeenCalledWith(true);
     expect(container.textContent).toMatch(/cannot run the pump while it is stopped/);
   });
@@ -309,7 +322,7 @@ describe("Pump — programs", () => {
   it("runs one", () => {
     const c = makeController();
     pump(c);
-    fireEvent.click(screen.getByLabelText("Run Skimming"));
+    confirmTap(screen.getByLabelText("Run Skimming"));
     expect(c.startProgram).toHaveBeenCalledWith("skimming");
   });
 
@@ -319,7 +332,7 @@ describe("Pump — programs", () => {
     });
     const { container } = pump(c);
     expect(container.textContent).toMatch(/min left/);
-    fireEvent.click(screen.getByLabelText("Stop Skimming"));
+    confirmTap(screen.getByLabelText("Stop Skimming"));
     expect(c.stopProgram).toHaveBeenCalled();
   });
 
@@ -405,11 +418,110 @@ describe("Pump — programs that are not bound to njsPC", () => {
   });
 });
 
+describe("Confirming anything that moves equipment", () => {
+  /* A pump that stops because a thumb landed while scrolling is circulation
+     ending with nobody aware of it. One extra tap, in place — see
+     `useConfirm` for why this is not a modal. */
+
+  it("does nothing on the first tap", () => {
+    const c = makeController();
+    pump(c);
+    fireEvent.click(screen.getByText("Stop the pump"));
+    expect(c.setPumpRunning).not.toHaveBeenCalled();
+  });
+
+  it("says what the second tap will do", () => {
+    pump(makeController());
+    const b = screen.getByText("Stop the pump");
+    fireEvent.click(b);
+    expect(b.textContent).toMatch(/Tap again to stop the pump/);
+  });
+
+  it("renames itself for a screen reader too, not only on screen", () => {
+    pump(makeController());
+    const b = screen.getByLabelText("Stop the pump");
+    fireEvent.click(b);
+    expect(b.getAttribute("aria-label")).toBe("Confirm: stop the pump");
+  });
+
+  it("acts on the second tap", () => {
+    const c = makeController();
+    pump(c);
+    confirmTap(screen.getByText("Stop the pump"));
+    expect(c.setPumpRunning).toHaveBeenCalledWith(false);
+  });
+
+  it("lapses, so an armed control cannot sit waiting for a stray tap", () => {
+    vi.useFakeTimers();
+    try {
+      const c = makeController();
+      pump(c);
+      const b = screen.getByText("Stop the pump");
+      fireEvent.click(b);
+      act(() => vi.advanceTimersByTime(5000));
+      expect(b.textContent).toBe("Stop the pump");
+      fireEvent.click(b);
+      expect(c.setPumpRunning).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("arms one control at a time", () => {
+    /* Arming the pump and then a program must not leave the pump primed to
+       fire on a later unrelated tap. */
+    const c = makeController();
+    pump(c);
+    const pumpBtn = screen.getByText("Stop the pump");
+    fireEvent.click(pumpBtn);
+    fireEvent.click(screen.getByLabelText("Run Skimming"));
+    expect(pumpBtn.textContent).toBe("Stop the pump");
+
+    fireEvent.click(pumpBtn);
+    expect(c.setPumpRunning).not.toHaveBeenCalled();
+    expect(c.startProgram).not.toHaveBeenCalled();
+  });
+
+  it("guards starting a program as well as stopping one", () => {
+    const c = makeController();
+    pump(c);
+    const b = screen.getByLabelText("Run Skimming");
+    fireEvent.click(b);
+    expect(c.startProgram).not.toHaveBeenCalled();
+    expect(b.textContent).toMatch(/tap again to run/i);
+    fireEvent.click(b);
+    expect(c.startProgram).toHaveBeenCalledWith("skimming");
+  });
+
+  it("guards deleting a program, which also deletes its njsPC circuit", () => {
+    const onDelete = vi.fn();
+    render(
+      <ProgramEditor
+        value={{ id: "skimming", name: "Skimming", rpm: 2100, minutes: 30, circuit: 2 }}
+        onSave={vi.fn()} onDelete={onDelete} onCancel={vi.fn()}
+      />,
+    );
+    const b = screen.getByText("Delete");
+    fireEvent.click(b);
+    expect(onDelete).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText("Tap again"));
+    expect(onDelete).toHaveBeenCalledWith("skimming");
+  });
+
+  it("does not guard the taps that only open a sheet", () => {
+    /* Confirming everything trains people to tap twice without reading,
+       which is worse than confirming nothing. Editing is not destructive. */
+    pump(makeController());
+    fireEvent.click(screen.getByLabelText("Edit Skimming"));
+    expect(screen.getByRole("dialog")).toBeDefined();
+  });
+});
+
 describe("Pump — service mode", () => {
   it("stands the schedules down", () => {
     const c = makeController();
     pump(c);
-    fireEvent.click(screen.getByText("Service"));
+    confirmTap(screen.getByText("Service"));
     expect(c.setPanelMode).toHaveBeenCalledWith("service");
   });
 
@@ -421,7 +533,7 @@ describe("Pump — service mode", () => {
   it("resumes", () => {
     const c = makeController({ panelMode: "service" });
     pump(c);
-    fireEvent.click(screen.getByText("Resume"));
+    confirmTap(screen.getByText("Resume"));
     expect(c.setPanelMode).toHaveBeenCalledWith("auto");
   });
 });

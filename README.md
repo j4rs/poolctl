@@ -97,6 +97,7 @@ src/
   lib/rs485.js             Pentair frame decoders — unverified against a real bus
   lib/useController.js     mock state, for running standalone
   lib/useSupervisor.js     live transport — same surface as the mock
+  lib/useConfirm.js        two-tap confirm for taps that move equipment
   components/              Schematic, Stat, Toggle, TargetTemp, HoldButton,
                            Sheet, ScheduleEditor, ProgramEditor, PreheatSheet, Toast
   screens/                 PoolSpaControl, HeatControl, PumpControl, BusMonitor

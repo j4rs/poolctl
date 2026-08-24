@@ -6,7 +6,7 @@ nodejs-poolController.
 **Status:** the UI runs live against njsPC through the supervisor. Pi 4 is up,
 Lite, thermally characterised. The relay HAT has not arrived, so no equipment
 is connected — njsPC runs on a laptop with no serial port, which is enough to
-have settled most of the design questions. 319 tests; `npm test`.
+have settled most of the design questions. 328 tests; `npm test`.
 
 **This file is the operating manual for working in this repo — nothing more.**
 The full record lives elsewhere and is deliberately not duplicated here:
@@ -38,6 +38,7 @@ src/
   lib/useController.js   mock equipment state — swap this for real transport
   lib/useBus.js          mock RS-485 feed
   lib/useSupervisor.js   live transport — same surface as useController
+  lib/useConfirm.js      two-tap confirmation for equipment-moving taps
   components/            Schematic, Stat, Toggle, TargetTemp, HoldButton, Sheet,
                          ScheduleEditor, ProgramEditor, PreheatSheet, Toast
   screens/               PoolSpaControl, HeatControl, PumpControl, BusMonitor
@@ -78,6 +79,14 @@ form is here so it never gets skipped.
 - **Disabled controls state their reason, and never render an active state.**
   If a control is on, its toggle must be actionable. Reasons render as text,
   never as `title` tooltips — phone-first, no hover. (PR-3)
+- **Anything that starts or stops equipment asks twice.** `useConfirm` arms on
+  the first tap and acts on the second, in place — not a modal, which would
+  move the target and put Cancel under the thumb that was already reaching.
+  Applies to pump run/stop, program run/stop, service mode and both deletes.
+  Mode changes keep `HoldButton` instead: two minutes of uncancellable valve
+  travel earns a five-second hold. Do **not** extend this to controls that
+  only open a sheet or edit a draft — confirming everything teaches people to
+  tap twice without reading, which is worse than confirming nothing.
 - **`src/lib/sequences.js` is the executable spec.** The server implements the
   same steps in the same order. If they disagree, one of them is a bug.
 - **Every number needs a source.** Two figures in the PRD turned out to be

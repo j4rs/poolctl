@@ -3,6 +3,7 @@ import { C, FONT_UI, FONT_DATA } from "../theme";
 import { RPM_MIN, RPM_MAX, watts } from "../lib/pump";
 import { DURATIONS, speedNotes, validate } from "../lib/programs";
 import { Sheet, Row, Action } from "./Sheet";
+import { useConfirm } from "../lib/useConfirm";
 
 /**
  * Add or edit a manual pump program.
@@ -19,6 +20,7 @@ import { Sheet, Row, Action } from "./Sheet";
 export default function ProgramEditor({ value, onSave, onDelete, onCancel, running, limits }) {
   const [draft, setDraft] = useState(value);
   const set = (patch) => setDraft((d) => ({ ...d, ...patch }));
+  const confirm = useConfirm();
 
   /* The pump's own range when njsPC knows of a pump, the IntelliFlo figures
      otherwise. They agree on this site, but they are not the same claim: one
@@ -112,8 +114,14 @@ export default function ProgramEditor({ value, onSave, onDelete, onCancel, runni
 
       <div style={{ display: "flex", gap: 8 }}>
         <Action label="Cancel" onClick={onCancel} />
+        {/* Deleting takes the njsPC circuit with it, so this one is not
+            recoverable by re-adding a program with the same name. */}
         {!value.isNew && (
-          <Action label="Delete" tone={C.alert} onClick={() => onDelete(value.id)} />
+          <Action
+            label={confirm.isArmed("delete") ? "Tap again" : "Delete"}
+            tone={confirm.isArmed("delete") ? C.heat : C.alert}
+            onClick={confirm.guard("delete", () => onDelete(value.id))}
+          />
         )}
         <Action label="Save" primary disabled={Boolean(problem)} onClick={() => onSave(draft)} />
       </div>
