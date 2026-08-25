@@ -1035,12 +1035,12 @@ telemetry, not marketing copy.
 | **100 VA** 120→24 VAC Class 2 transformer | ~$40 |
 | Eaton C25CNB130T contactor, 30 A, 24 V coil | ~$20 |
 | 5 V DIN-rail supply, 5 A (Mean Well HDR/MDR) | ~$25 |
-| Non-metallic NEMA 4X enclosure ~14×12×6 | ~$60 |
+| Non-metallic enclosure ~14×12×6 or larger | $50–250, see below |
 | DIN rail, terminal blocks, ferrules, wire | ~$40 |
 | Liquid-tight cable glands / cord grips, ~8 | ~$20 |
 | Enclosure breather-drain vent | ~$12 |
 
-**Total ~$955.**
+**Total ~$955–1,150**, the spread being the enclosure decision below.
 
 **Against an IntelliCenter, compared honestly.** An earlier draft of this
 table put ~$650 against "$1,300–2,000 for a factory IntelliCenter i5PS",
@@ -1060,6 +1060,24 @@ Note also that the actuator line was ~$300 for a long time, which was ~$100
 each. They are ~$194. That single line is most of the difference between the
 old total and this one, and it is the one item worth ordering early —
 stock is intermittent.
+
+**On the enclosure, which was budgeted at ~$60 and cannot be.** A genuinely
+UL-listed NEMA 4X *polycarbonate* box in this size is an industrial part at
+$150–250; the $60 figure was never checked against a real listing. Three
+honest positions, decided by whether the pad is shaded and whether the
+install is inspected:
+
+| | ~cost | gives up |
+|---|---|---|
+| UL-listed NEMA 4X polycarbonate | $150–250 | nothing |
+| IP65/IP67 ABS, unlisted | $50–90 | UV stability, third-party listing |
+| UL-listed PVC, NEMA 3R | $40–80 | watertight and corrosion rating |
+
+**Non-metallic is not a preference.** Steel NEMA 4 enclosures are often
+cheaper than polycarbonate and will dominate any price search. A metal box is
+a Faraday cage and the Pi reaches the house over WiFi, so choosing one means
+adding an external antenna and a bulkhead gland — spending money and adding a
+leak path to save less than the antenna costs.
 
 **On the two smallest lines.** A NEMA 4X rating is a property of the whole
 assembly, not the box: every cable entry needs a liquid-tight gland or the
