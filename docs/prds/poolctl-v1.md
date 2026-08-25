@@ -1034,13 +1034,13 @@ telemetry, not marketing copy.
 | Intermatic PE24GVA valve actuator × 3 | ~$580 |
 | **100 VA** 120→24 VAC Class 2 transformer | ~$40 |
 | Eaton C25CNB130T contactor, 30 A, 24 V coil | ~$20 |
-| 5 V DIN-rail supply, 5 A (Mean Well HDR/MDR) | ~$25 |
-| Non-metallic enclosure ~14×12×6 or larger | $50–250, see below |
+| Mean Well HDR-60-5 DIN-rail supply, 5 V 6.5 A | ~$25 |
+| VEVOR outdoor junction box, 16.93×12.99×7.09 in — ABS, IP67, hinged, stainless latch, backplate included | ~$70 |
 | DIN rail, terminal blocks, ferrules, wire | ~$40 |
 | Liquid-tight cable glands / cord grips, ~8 | ~$20 |
 | Enclosure breather-drain vent | ~$12 |
 
-**Total ~$955–1,150**, the spread being the enclosure decision below.
+**Total ~$965.**
 
 **Against an IntelliCenter, compared honestly.** An earlier draft of this
 table put ~$650 against "$1,300–2,000 for a factory IntelliCenter i5PS",
@@ -1050,7 +1050,7 @@ an IntelliCenter needs the same three actuators bolted to the same valves.
 
 | | control system | + 3 actuators |
 |---|---|---|
-| This build | ~$375 | ~$955 |
+| This build | ~$385 | ~$965 |
 | IntelliCenter i5PS | $1,300–2,000 | ~$1,900–2,600 |
 
 Either row is a fair comparison; mixing them is not. The case is strong
@@ -1061,17 +1061,50 @@ each. They are ~$194. That single line is most of the difference between the
 old total and this one, and it is the one item worth ordering early —
 stock is intermittent.
 
-**On the enclosure, which was budgeted at ~$60 and cannot be.** A genuinely
-UL-listed NEMA 4X *polycarbonate* box in this size is an industrial part at
-$150–250; the $60 figure was never checked against a real listing. Three
-honest positions, decided by whether the pad is shaded and whether the
-install is inspected:
+**On the enclosure, and why this one.** The line said "non-metallic NEMA 4X,
+~$60", which was never priced: a genuinely UL-listed NEMA 4X *polycarbonate*
+box in this size is an industrial part at $150–250. Three honest positions
+existed, decided by whether the pad is shaded and whether the install is
+inspected:
 
 | | ~cost | gives up |
 |---|---|---|
 | UL-listed NEMA 4X polycarbonate | $150–250 | nothing |
-| IP65/IP67 ABS, unlisted | $50–90 | UV stability, third-party listing |
+| IP67 ABS, unlisted | $50–90 | UV stability, third-party listing |
 | UL-listed PVC, NEMA 3R | $40–80 | watertight and corrosion rating |
+
+**Chosen: IP67 ABS, one size up from the spec.** A shaded pad and an
+uninspected panel make the listing worth less than the room and the money.
+IP67 with a PU gasket, 304 stainless latch and an included backplate is
+adequate hardware; ABS under UV is the accepted risk, and it is accepted
+because of the shade rather than in spite of the sun.
+
+**Sized for thermals, not for wiring comfort.** This is the part worth
+recording, because a future reader will otherwise see an oversized box and
+trim it. §10 still carries *enclosure thermals* as open: the bench measured
++14 °C over ambient **without** the HAT and **unsealed**, and the assembled
+box holds four heat sources — Pi, relay HAT, 100 VA transformer, 5 V supply.
+A sealed enclosure sheds heat only through its walls, so dissipation tracks
+external surface area:
+
+| VEVOR size | internal | plate | ext. surface |
+|---|---|---|---|
+| 13.78×9.84×5.90 | 12.51 × 8.58 × 4.96 | 107 in² | 550 in² |
+| **16.93×12.99×7.09** | **15.12 × 11.18 × 4.84** | **169 in²** | **864 in²** |
+| 20.87×16.92×7.87 | 19.01 × 15.08 × 7.12 | 287 in² | 1300 in² |
+
+The middle size buys 1.6× the smallest box's dissipating area for a few
+dollars — the cheapest mitigation available for the one thermal risk still
+untested, and cheaper than discovering at commissioning that it needs a vent
+or a fan. The largest was rejected as 21×17 inches of wall for benefit beyond
+what the load needs. Its internal footprint also slightly exceeds the
+original 14×12×6, so this is ahead of the spec rather than a compromise.
+
+**Check the internal depth on arrival.** VEVOR publishes 4.84 in internal
+against 7.09 external here, but 7.12 against 7.87 for the larger box. Those
+are not measured the same way, so one figure is sloppy. 4.84 in clears a
+~3.5 in transformer but leaves little room to route conductors over it —
+measure the base before committing to a layout.
 
 **Non-metallic is not a preference.** Steel NEMA 4 enclosures are often
 cheaper than polycarbonate and will dominate any price search. A metal box is
