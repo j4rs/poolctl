@@ -29,13 +29,101 @@ export const NJSPC_DEFAULT_EGG_TIMER = 720;
  * `/config/circuit/:id`. Missing entries produce no findings: not knowing is
  * not the same as knowing something is wrong.
  */
-export function checkCommissioning({ spaCircuit, options, njspcOnLan, passwordSet } = {}) {
+export function checkCommissioning({
+  spaCircuit, options, njspcOnLan, passwordSet, rs485, clock,
+} = {}) {
   return [
     ...checkPassword(passwordSet),
     ...checkExposure(njspcOnLan),
+    ...checkSerialPort(rs485),
+    ...checkClock(clock),
     ...checkSpaEggTimer(spaCircuit),
     ...checkValveDelay(options),
   ];
+}
+
+/**
+ * Whether njsPC's RS-485 port actually exists on this box.
+ *
+ * The bus is how the pump and the chlorinator are reached at all, and the
+ * failure is silent in the worst way: njsPC logs "cannot open" every ten
+ * seconds and carries on serving a perfectly healthy-looking API, while
+ * every reading stays null and nothing on any screen says why.
+ *
+ * On this hardware the relay HAT puts RS-485 on the Pi's GPIO UART, which is
+ * `/dev/serial0` — not `/dev/ttyUSB0`, which is what njsPC ships pointing at
+ * and what a USB dongle would be. Getting there also needs `enable_uart=1`
+ * and the serial console removed from `cmdline.txt`, so there are three ways
+ * to arrive at a port that does not exist. Hence a check rather than a line
+ * in a document.
+ *
+ * `exists` is resolved by the caller, which is the only part that touches a
+ * filesystem. Undefined means it could not be established — njsPC across a
+ * network, say — and undefined is never a finding.
+ */
+export function checkSerialPort(rs485) {
+  if (!rs485 || rs485.enabled === false || rs485.mock) return [];
+  /* A port reached over the network is not this box's to check. */
+  if (rs485.netConnect) return [];
+  if (!rs485.port || rs485.exists !== false) return [];
+
+  const usb = /ttyUSB|ttyACM/.test(rs485.port);
+  return [{
+    id: "rs485-missing",
+    severity: "warn",
+    what: `njsPC cannot open ${rs485.port}`,
+    detail: usb
+      ? `That is a USB adapter path and no such device is present. The relay ` +
+        `HAT puts RS-485 on the GPIO UART — set njsPC's port to /dev/serial0, ` +
+        `set enable_uart=1 in config.txt, and remove console=serial0 from ` +
+        `cmdline.txt so the console stops holding it.`
+      : `The port does not exist. Check enable_uart=1 in config.txt and that ` +
+        `the serial console has been removed from cmdline.txt.`,
+  }];
+}
+
+/**
+ * Whether this box knows what time it is.
+ *
+ * The bring-up notes promised to compare njsPC's idea of local time against
+ * ours. That turns out to be worthless: they run on the same Pi, so they
+ * always agree — including when both are wrong, which is the entire failure
+ * being guarded against.
+ *
+ * What can actually be established is whether the clock has been
+ * synchronised and whether anybody chose a timezone. Both matter because
+ * schedules are minutes past midnight and egg timers are wall-clock
+ * deadlines, and a Pi has no battery-backed clock.
+ */
+export function checkClock({ synchronized, timeZone } = {}) {
+  const findings = [];
+
+  if (synchronized === false) {
+    findings.push({
+      id: "clock-unsynced",
+      severity: "warn",
+      what: "The clock has not been set from the network",
+      detail:
+        "A Pi has no battery-backed clock, so it boots with whatever time " +
+        "was last written to disk. Schedules and egg timers are both " +
+        "wall-clock, so they are running against a guess until NTP answers.",
+    });
+  }
+
+  if (timeZone === "UTC" || timeZone === "Etc/UTC") {
+    findings.push({
+      id: "clock-utc",
+      severity: "note",
+      what: "This box is set to UTC",
+      detail:
+        "Almost certainly nobody chose that. Schedules are stored as minutes " +
+        "past midnight and evaluated in local time, so an 08:00 filtration " +
+        "window will run hours from when it reads. " +
+        "`sudo timedatectl set-timezone <Region/City>`.",
+    });
+  }
+
+  return findings;
 }
 
 /**

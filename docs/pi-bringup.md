@@ -43,7 +43,10 @@ Check rather than assume.
 timedatectl
 ```
 
-Want `System clock synchronized: yes` and a sensible local time. Observed on
+Want `System clock synchronized: yes` and a sensible local time. The
+supervisor checks both now — an unsynchronised clock and a box left on UTC
+each raise a finding on the Water screen — but it can only tell you the zone
+looks unset, never which zone is right. That part stays here. Observed on
 this box: seconds after boot it reported a time **two days behind**, restored
 from the last timestamp written to the filesystem, and corrected itself about
 thirty seconds later once NTP answered. Nothing warns you about that window —
@@ -285,6 +288,52 @@ it keeps the supervisor's program-to-circuit bindings valid.
 
 ## 6. When the HAT arrives
 
+### The serial bus, before anything else
+
+The pump and the iChlor are reached over RS-485. The heater is not — it is
+dry contacts on terminals 22/23/24, which is a relay job — so the bus matters
+for exactly two devices, and without it both stay silent while everything
+else looks healthy.
+
+The relay HAT carries the RS-485 transceiver (with TVS diodes and a
+resettable fuse), and it presents on the **Pi's GPIO UART**, not on USB.
+Three things have to be true, and none of them are by default:
+
+**1. The DIP switches.** TX and RX **ON**, so the Pi drives the bus directly.
+With them off the card is a MODBUS RTU slave and the Pi cannot talk to the
+pump at all.
+
+**2. Enable the UART and take the console off it.** Linux claims
+`/dev/serial0` as a login console out of the box, so njsPC cannot open it:
+
+```bash
+# add to /boot/firmware/config.txt
+enable_uart=1
+
+# remove console=serial0,115200 from /boot/firmware/cmdline.txt,
+# leaving the rest of that single line intact
+sudo sed -i 's/console=serial0,[0-9]* //' /boot/firmware/cmdline.txt
+sudo reboot
+```
+
+Afterwards `/dev/serial0` should exist and nothing should be holding it:
+
+```bash
+ls -l /dev/serial0 && sudo fuser -v /dev/serial0 || echo "free"
+```
+
+**3. Point njsPC at it.** njsPC ships configured for `/dev/ttyUSB0` — the
+path a USB dongle would take, not the HAT's. In dashPanel this is under
+RS-485 settings, or set `rs485Port` to `/dev/serial0` in its `config.json`
+and restart.
+
+The supervisor checks the result rather than trusting it: if njsPC's
+configured port does not exist on the box, it raises **"njsPC cannot open
+/dev/…"** on the Water screen and names the three fixes. Today, with no HAT
+fitted, that finding is expected.
+
+### The rest
+
 - Install REM per its own documentation.
 - Work through the equipment settings in `CLAUDE.md` under *Next up* — pump
   priming, Thermal Mode, `valveDelayTime`, the Spa egg timer, valve device
@@ -300,9 +349,11 @@ it keeps the supervisor's program-to-circuit bindings valid.
   PRD §11 has the options and the reasoning.
 - **No watchdog.** Nothing de-energises the relays when njsPC or the
   supervisor is unhealthy. `docs/architecture.md` carries it as not built.
-- **No automatic timezone check.** The supervisor could compare njsPC's idea
-  of local time against its own and say so, the way it does for the spa egg
-  timer. It does not yet, which is why section 1 leads with it.
+- **The watchdog may already be in silicon.** The relay HAT has a hardware
+  watchdog that resets the Pi if software stops feeding it.
+  `docs/architecture.md` carries a watchdog as a separate unbuilt component
+  whose job is de-energising the relays; the two are not the same thing, but
+  the overlap is worth working out before building anything.
 
 ---
 

@@ -22,6 +22,7 @@ import {
   whyNotBindable, pumpLimits,
 } from "./binding.js";
 import { checkCommissioning } from "./commissioning.js";
+import { access } from "node:fs/promises";
 import { scheduleConfig, whyNotSchedulable } from "./schedules.js";
 
 /**
@@ -251,6 +252,68 @@ async function njspcOnLan() {
   return false;
 }
 
+/**
+ * njsPC's RS-485 port, and whether it is actually there.
+ *
+ * Only asked when njsPC is on this box — the device node is local, so the
+ * question is meaningless across a network and `exists` stays undefined,
+ * which the rule treats as "not established" rather than "fine".
+ */
+async function rs485Status() {
+  let target;
+  try {
+    target = new URL(NJSPC_URL);
+  } catch {
+    return null;
+  }
+  const local = ["localhost", "127.0.0.1", "::1"].includes(target.hostname);
+
+  const opts = await njs.rs485Options();
+  const port = (opts?.ports ?? [])[0];
+  if (!port) return null;
+
+  const status = {
+    port: port.rs485Port,
+    enabled: port.enabled,
+    mock: port.mock,
+    netConnect: port.netConnect,
+  };
+  if (!local || !status.port || status.netConnect) return status;
+
+  try {
+    await access(status.port);
+    status.exists = true;
+  } catch {
+    status.exists = false;
+  }
+  return status;
+}
+
+/**
+ * What this box believes about the time.
+ *
+ * `synchronized` comes from the file systemd-timesyncd touches once NTP has
+ * answered — cheaper and more honest than shelling out to `timedatectl`, and
+ * absent rather than false on a box that does not run timesyncd, which the
+ * rule reads as "not established".
+ */
+async function clockStatus() {
+  const status = { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone };
+  try {
+    await access("/run/systemd/timesync/synchronized");
+    status.synchronized = true;
+  } catch (err) {
+    /* Only a definite answer when timesyncd is present at all. */
+    try {
+      await access("/run/systemd/timesync");
+      status.synchronized = false;
+    } catch {
+      /* not a systemd-timesyncd box; say nothing */
+    }
+  }
+  return status;
+}
+
 let lastReview = 0;
 let reviewTimer = null;
 
@@ -287,10 +350,12 @@ async function reviewCommissioning() {
        should cost us that one check — not every check. Whatever could not be
        read arrives as undefined, which the rules treat as "not known" rather
        than "not a problem". */
-    const [circuit, config, onLan] = await Promise.allSettled([
+    const [circuit, config, onLan, rs485, clock] = await Promise.allSettled([
       njs.circuitConfig(SPA_CIRCUIT),
       njs.configAll(),
       njspcOnLan(),
+      rs485Status(),
+      clockStatus(),
     ]);
     if (circuit.status === "rejected" && config.status === "rejected") {
       throw new Error(circuit.reason?.message ?? "no configuration could be read");
@@ -300,6 +365,8 @@ async function reviewCommissioning() {
       options: config.value?.pool?.options,
       njspcOnLan: onLan.value,
       passwordSet: authRequired(),
+      rs485: rs485.value,
+      clock: clock.value,
     });
     const changed = JSON.stringify(findings) !== JSON.stringify(own.commissioning);
     own.commissioning = findings;

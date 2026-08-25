@@ -1,6 +1,9 @@
 // @vitest-environment node
 import { describe, it, expect } from "vitest";
-import { checkCommissioning, checkExposure, NJSPC_DEFAULT_EGG_TIMER } from "./commissioning.js";
+import {
+  checkCommissioning, checkExposure, checkSerialPort, checkClock,
+  NJSPC_DEFAULT_EGG_TIMER,
+} from "./commissioning.js";
 import { SPA_TIMEOUT_MIN } from "../src/lib/sequences.js";
 
 /**
@@ -131,5 +134,124 @@ describe("njsPC answering to the whole network", () => {
       options: { pumpDelay: true, valveDelayTime: 5 },
     });
     expect(found[0].id).toBe("njspc-exposed");
+  });
+});
+
+describe("the RS-485 port", () => {
+  /**
+   * How the pump and the chlorinator are reached at all. The failure is
+   * silent in the worst way: njsPC logs "cannot open" every ten seconds and
+   * keeps serving a healthy-looking API while every reading stays null.
+   */
+  const ok = { port: "/dev/serial0", enabled: true, mock: false, netConnect: false, exists: true };
+
+  it("says nothing when the port is there", () => {
+    expect(checkSerialPort(ok)).toEqual([]);
+  });
+
+  it("catches a port that does not exist", () => {
+    const [f] = checkSerialPort({ ...ok, exists: false });
+    expect(f.id).toBe("rs485-missing");
+    expect(f.what).toMatch(/cannot open \/dev\/serial0/);
+  });
+
+  it("recognises the USB path njsPC ships with, and names the HAT's port", () => {
+    /* The exact trap on this hardware: the relay HAT puts RS-485 on the GPIO
+       UART, and njsPC's default points at a USB dongle that is not fitted. */
+    const [f] = checkSerialPort({ ...ok, port: "/dev/ttyUSB0", exists: false });
+    expect(f.detail).toMatch(/\/dev\/serial0/);
+    expect(f.detail).toMatch(/enable_uart/);
+    expect(f.detail).toMatch(/console=serial0/);
+  });
+
+  it("says nothing when the port could not be established", () => {
+    /* Undefined is "not asked", not "fine" — njsPC across a network. */
+    expect(checkSerialPort({ ...ok, exists: undefined })).toEqual([]);
+  });
+
+  it("says nothing about a bus reached over the network", () => {
+    expect(checkSerialPort({ ...ok, netConnect: true, exists: false })).toEqual([]);
+  });
+
+  it("says nothing when the port is disabled or mocked", () => {
+    expect(checkSerialPort({ ...ok, enabled: false, exists: false })).toEqual([]);
+    expect(checkSerialPort({ ...ok, mock: true, exists: false })).toEqual([]);
+  });
+
+  it("says nothing when njsPC reported no port at all", () => {
+    expect(checkSerialPort(null)).toEqual([]);
+    expect(checkSerialPort(undefined)).toEqual([]);
+    expect(checkSerialPort({ enabled: true })).toEqual([]);
+  });
+});
+
+describe("the clock", () => {
+  /**
+   * The bring-up notes promised to compare njsPC's local time against ours.
+   * That is worthless — they share a Pi, so they agree even when both are
+   * wrong, which is the whole failure. These check what can actually be
+   * established.
+   */
+
+  it("says nothing when the clock is set and a zone was chosen", () => {
+    expect(checkClock({ synchronized: true, timeZone: "America/New_York" })).toEqual([]);
+  });
+
+  it("catches a clock that has never been set from the network", () => {
+    const [f] = checkClock({ synchronized: false, timeZone: "America/New_York" });
+    expect(f.id).toBe("clock-unsynced");
+    expect(f.severity).toBe("warn");
+  });
+
+  it("notices a box still on UTC", () => {
+    /* Schedules are minutes past midnight in local time, so this runs the
+       pool hours out and throws nothing. */
+    const [f] = checkClock({ synchronized: true, timeZone: "UTC" });
+    expect(f.id).toBe("clock-utc");
+    expect(f.detail).toMatch(/set-timezone/);
+  });
+
+  it("treats Etc/UTC the same, because it is the same thing", () => {
+    expect(checkClock({ synchronized: true, timeZone: "Etc/UTC" })[0].id).toBe("clock-utc");
+  });
+
+  it("reports both when both are wrong", () => {
+    expect(checkClock({ synchronized: false, timeZone: "UTC" }).map((f) => f.id))
+      .toEqual(["clock-unsynced", "clock-utc"]);
+  });
+
+  it("says nothing when sync could not be established", () => {
+    /* Not a systemd-timesyncd box: absent is not false. */
+    expect(checkClock({ timeZone: "America/New_York" })).toEqual([]);
+    expect(checkClock({})).toEqual([]);
+    expect(checkClock()).toEqual([]);
+  });
+});
+
+describe("all the findings together", () => {
+  it("leads with the ones that mean the pool is not under control", () => {
+    const found = checkCommissioning({
+      passwordSet: false,
+      njspcOnLan: true,
+      rs485: { port: "/dev/ttyUSB0", enabled: true, exists: false },
+      clock: { synchronized: false, timeZone: "UTC" },
+      spaCircuit: { id: 1, name: "Spa", eggTimer: 1 },
+    });
+    expect(found[0].id).toBe("no-password");
+    expect(found[1].id).toBe("njspc-exposed");
+    expect(found.map((f) => f.id)).toContain("rs485-missing");
+    expect(found.map((f) => f.id)).toContain("clock-unsynced");
+    expect(found.map((f) => f.id)).toContain("spa-egg-tiny");
+  });
+
+  it("is silent on a properly commissioned system", () => {
+    expect(checkCommissioning({
+      passwordSet: true,
+      njspcOnLan: false,
+      rs485: { port: "/dev/serial0", enabled: true, exists: true },
+      clock: { synchronized: true, timeZone: "America/New_York" },
+      spaCircuit: { id: 1, name: "Spa", eggTimer: 120, dontStop: false },
+      options: { pumpDelay: true, valveDelayTime: 60 },
+    })).toEqual([]);
   });
 });

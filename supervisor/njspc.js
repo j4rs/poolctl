@@ -124,6 +124,11 @@ export class NjsPC {
     return this.get("/config/options/pumps");
   }
 
+  /** The RS-485 port configuration — where the pump and cell are reached. */
+  rs485Options() {
+    return this.get("/config/options/rs485");
+  }
+
   /**
    * The whole configuration. Smaller than `/state/all` (4 KB against 9 KB
    * on this site) and read only by the commissioning check, never on the
