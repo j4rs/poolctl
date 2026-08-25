@@ -50,6 +50,9 @@ function fakeNjspc() {
 
   const stateAll = () => ({
     circuits,
+    /* njsPC's panel mode — what `toggleServiceMode` flips and what the
+       supervisor reads back to decide whether a toggle is even needed. */
+    mode: { val: panelMode === "service" ? 1 : 0, name: panelMode, desc: panelMode },
     /* Derived, as njsPC does it: turning on the Spa circuit switches the
        body and the valve mode with it — the nxps shared-body behaviour that
        ADR-10 is built around. Hardcoding "pool" here made a mode-change test
@@ -69,6 +72,7 @@ function fakeNjspc() {
   });
 
   let options = { pumpDelay: true, valveDelayTime: 45 };
+  let panelMode = "auto";
 
   const routes = {
     "GET /state/all": () => stateAll(),
@@ -118,6 +122,26 @@ function fakeNjspc() {
          there, and an absent `circuits` key blanks the list. */
       pumpCircuits = (body.circuits ?? []).map((c, i) => ({ ...c, id: i + 1 }));
       return { id: 50, circuits: pumpCircuits };
+    },
+    /**
+     * Service mode, with njsPC's own defect reproduced.
+     *
+     * The real handler works out the mode into a local object and then calls
+     * `setPanelModeAsync(req.body)` — the untouched body — so an empty body
+     * fails validation even though the endpoint is a toggle. The supervisor
+     * sent `{}` for months and every tap returned 400 against real njsPC
+     * while passing here, because this fake did not have the route at all.
+     *
+     * Faithful beats convenient: a fake that accepts what the real thing
+     * rejects is not a test, it is a second implementation that agrees with
+     * you.
+     */
+    "PUT /state/toggleServiceMode": (body) => {
+      if (!body || typeof body.mode === "undefined") {
+        throw Object.assign(new Error("Invalid mode value cannot set mode"), { status: 400 });
+      }
+      panelMode = panelMode === "auto" ? "service" : "auto";
+      return { mode: { val: panelMode === "service" ? 1 : 0, name: panelMode } };
     },
     "PUT /state/circuit/setState": (body) => {
       const c = circuits.find((x) => x.id === Number(body.id));
@@ -487,6 +511,51 @@ describe("when binding cannot happen", () => {
     const ack = await client.intent("bindProgram", { id: "skimming" });
     expect(ack.ok).toBe(false);
     expect(ack.error).toMatch(/8/);
+  });
+});
+
+describe("service mode", () => {
+  /**
+   * The maintenance switch, and it was broken against real njsPC for months.
+   *
+   * The supervisor sent an empty body to `toggleServiceMode`. njsPC works the
+   * mode out into a local object and then validates `req.body` instead, so an
+   * empty body is rejected with "Invalid mode value cannot set mode" — every
+   * tap a 400. Nothing failed here because the fake njsPC had no such route
+   * and the intent was never exercised end to end.
+   */
+
+  const toggles = () =>
+    njspc.writes().filter((w) => w.path === "/state/toggleServiceMode");
+
+  it("actually reaches service mode", async () => {
+    const ack = await client.intent("setPanelMode", { mode: "service" });
+    expect(ack.ok, ack.error).toBe(true);
+    expect((await settles((s) => s.panelMode === "service")).panelMode).toBe("service");
+  });
+
+  it("sends a mode, because an empty body is refused", async () => {
+    /* The assertion that pins the bug. njsPC rejects a body without one, and
+       the fake now rejects it too. */
+    await client.intent("setPanelMode", { mode: "service" });
+    expect(toggles()).toHaveLength(1);
+    expect(toggles()[0].body).toHaveProperty("mode");
+  });
+
+  it("comes back to auto", async () => {
+    await client.intent("setPanelMode", { mode: "service" });
+    await settles((s) => s.panelMode === "service");
+
+    const ack = await client.intent("setPanelMode", { mode: "auto" });
+    expect(ack.ok, ack.error).toBe(true);
+    expect((await settles((s) => s.panelMode === "auto")).panelMode).toBe("auto");
+  });
+
+  it("does nothing when it is already in the mode asked for", async () => {
+    /* The endpoint is a toggle, so a redundant call would put the panel into
+       exactly the state the operator was trying to stay out of. */
+    expect((await client.intent("setPanelMode", { mode: "auto" })).ok).toBe(true);
+    expect(toggles()).toHaveLength(0);
   });
 });
 

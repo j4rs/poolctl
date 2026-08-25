@@ -115,7 +115,16 @@ ssh "$PI" "cd $REMOTE_DIR/supervisor && npm install --omit=dev --no-audit --no-f
 
 say "Restarting $SERVICE"
 if ssh "$PI" "systemctl list-unit-files ${SERVICE}.service" >/dev/null 2>&1; then
-  ssh "$PI" "sudo systemctl restart $SERVICE"
+  # -t so sudo can prompt. Without a TTY this fails with "a terminal is
+  # required", and only after everything has already been copied — which is
+  # the worst place to stop, because the Pi is then running new files under
+  # an old process.
+  #
+  # To make deploys non-interactive, allow just this one command without a
+  # password:
+  #   echo 'j4rs ALL=(root) NOPASSWD: /usr/bin/systemctl restart poolctl' \
+  #     | sudo tee /etc/sudoers.d/poolctl-restart
+  ssh -t "$PI" "sudo systemctl restart $SERVICE"
 else
   echo "No $SERVICE service on the Pi yet — see docs/pi-bringup.md section 3." >&2
   echo "Files are in place; nothing is running them." >&2

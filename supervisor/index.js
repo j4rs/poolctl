@@ -498,7 +498,21 @@ const intents = {
   async setPanelMode({ mode }) {
     const want = mode === "service" ? "service" : "auto";
     if ((ui?.panelMode ?? "auto") === want) return;
-    await njs.put("/state/toggleServiceMode", {});
+    /* The body has to carry a mode even though the endpoint is a toggle.
+     *
+     * njsPC's handler builds a local `data`, sets `data.mode` on it, and then
+     * calls `setPanelModeAsync(req.body)` — the original body, not the object
+     * it just prepared. So the mode it worked out is thrown away and an empty
+     * body fails validation with "Invalid mode value cannot set mode".
+     *
+     * We sent `{}` for months and every service-mode tap returned a 400
+     * against real njsPC. Nothing caught it because the fake njsPC in the
+     * tests accepted any body; it now rejects one without a mode, exactly as
+     * the real thing does.
+     *
+     * Sending "service" is right in both directions: leaving service is
+     * handled by the `state.mode !== 0` branch, which ignores the body. */
+    await njs.put("/state/toggleServiceMode", { mode: "service" });
   },
 
   /**
