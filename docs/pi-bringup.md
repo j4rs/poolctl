@@ -190,7 +190,7 @@ and confirm you get the sign-in screen rather than the app.
 ## 4. Deploying again
 
 ```bash
-PI=j4rs@poolctl.local ./scripts/deploy.sh
+./scripts/deploy.sh          # $PI from section 3
 ```
 
 The same script, every time. It ends by asking the Pi for `/health` and
@@ -258,8 +258,8 @@ Wants=network-online.target time-sync.target
 
 [Service]
 Type=simple
-User=j4rs
-WorkingDirectory=/home/j4rs/njspc
+User=pi
+WorkingDirectory=/home/pi/njspc
 ExecStart=/usr/bin/node dist/app.js
 Restart=always
 RestartSec=5

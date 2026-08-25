@@ -122,7 +122,7 @@ if ssh "$PI" "systemctl list-unit-files ${SERVICE}.service" >/dev/null 2>&1; the
   #
   # To make deploys non-interactive, allow just this one command without a
   # password:
-  #   echo 'j4rs ALL=(root) NOPASSWD: /usr/bin/systemctl restart poolctl' \
+  #   echo "$USER ALL=(root) NOPASSWD: /usr/bin/systemctl restart poolctl" \
   #     | sudo tee /etc/sudoers.d/poolctl-restart
   ssh -t "$PI" "sudo systemctl restart $SERVICE"
 else
