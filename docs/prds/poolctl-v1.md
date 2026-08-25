@@ -1337,16 +1337,30 @@ temperature (read from source).
       no expiry, a pump about to restart into an open filter housing. A screen
       is the wrong channel for those.
 
-      The reason it is not built is infrastructure, not doubt. Web push needs
-      a service worker, VAPID keys and a push service, which is a lot of
-      moving parts for a box on a home LAN — and iOS only delivers web push to
-      an installed PWA, so it also constrains how the app is opened.
+      **Blocked on TLS, not on push infrastructure.** Measured against the
+      Pi's own origin rather than assumed: over plain HTTP,
+      `isSecureContext` is false, `navigator.serviceWorker` is absent
+      entirely, and `Notification.requestPermission()` returns `denied`
+      without even prompting. Browsers refuse notifications from an insecure
+      origin — so there is no cheap in-page first version to ship ahead of
+      TLS. Every form of this needs a secure context first.
 
-      Worth waiting for Phase 6 rather than solving twice: Home Assistant
-      already has notifications, per-device and reliable, and the supervisor
-      will be speaking to it anyway. The likely shape is that the supervisor
-      publishes these as events and HA decides who gets told, so this may cost
-      almost nothing once that link exists.
+      That reorders the list: TLS is not a separate nicety, it is the
+      prerequisite for the notification channel, and it brings the `Secure`
+      cookie flag with it. Two decisions turn out to be one, which also makes
+      TLS considerably easier to justify than when it was weighed on
+      interception risk alone.
+
+      After TLS, the remaining cost is real but smaller: a manifest, a
+      service worker and VAPID keys. Note that iOS delivers web push only to
+      a site installed to the Home Screen, so the phone needs that step;
+      desktop and Android get notifications from TLS alone.
+
+      Home Assistant remains the cheaper route for the phone specifically:
+      it already has notifications, per-device and reliable, and the
+      supervisor will be speaking to it in Phase 6 anyway. Publishing these
+      as events and letting HA decide who gets told avoids building a second
+      delivery path — worth weighing against a PWA install once TLS exists.
 
 - [~] **Authentication. Two of four parts done.** Anyone who joins the wifi —
       a guest, a compromised smart bulb, a neighbour with the password — can
@@ -1360,12 +1374,23 @@ temperature (read from source).
         and the supervisor probes its own network addresses each commissioning
         review so reopening it raises a warning rather than going unnoticed.
         dashPanel is reached over an SSH tunnel.
-      - **Plain HTTP over the LAN means credentials in clear.** Still true,
-        and now the one part deliberately deferred. TLS on a Pi with a
-        self-signed certificate is unpleasant on iOS, which is the primary
-        client. Accepted for now with the reason written down: a password
-        raises the bar from "anyone who joins the wifi" to "anyone who can
-        intercept traffic on it", which addresses the realistic threat — the
+      - **Plain HTTP over the LAN means credentials in clear.** Deferred once
+        on interception risk alone, and now reopened: a secure origin turns
+        out to be the prerequisite for notifications as well, so this buys
+        two things rather than one. Owner is buying a domain for it,
+        August 2026. The route is a real certificate over a **DNS-01**
+        challenge — the Pi has no inbound internet access and should not —
+        which makes the DNS provider's API the thing that matters when
+        choosing a registrar, more than the name. Terminate in a reverse
+        proxy with the supervisor moved to loopback beside njsPC, so
+        renewal and reload stay out of this codebase, and add `Secure` to
+        the session cookie once it holds. Note if the name is under `.app`:
+        that TLD is HSTS-preloaded, so there is no `http://` fallback on it
+        ever — a failed renewal means reaching the Pi by raw IP instead.
+        The original reasoning still stands for why it waited this long: a
+        password raises the bar from "anyone who joins the wifi" to "anyone
+        who can intercept traffic on it", which addresses the realistic
+        threat — the
         guest phone, the compromised bulb — and is not a substitute for TLS.
         The session cookie omits `Secure` for exactly this reason; setting it
         before TLS would mean the cookie is never stored at all. Decide
