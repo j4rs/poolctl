@@ -383,7 +383,7 @@ next-generation successor and should be confirmed against its own sheet):**
 |---|---|---|
 | Supply | 24 VAC, 60 Hz, **0.75 A** | PRD previously said ~0.7 A. Three sequenced actuators draw 18 VA at a time; 75 VA is ample |
 | **Duty cycle** | **1 min ON max, 8 min OFF min** | **New constraint — see below** |
-| Circuit rating | Class 2, 24 V, 4 A / 100 VA max | 75 VA transformer complies |
+| Circuit rating | Class 2, 24 V, 4 A / 100 VA max | the 100 VA transformer sits exactly at the Class 2 ceiling, which is where it must stay |
 | Operating temp | −10 °C to 75 °C | Actuators sit outside the enclosure; not a factor |
 | Wiring | black common, red/white switched; rear toggle AUTO 1 / OFF / AUTO 2 | Matches the SPDT selection design |
 
@@ -721,9 +721,13 @@ fails it will be that one; remap in software rather than replacing the board.
 
 ### Power budget
 
-- 24 VAC transformer, 75 VA: 3 actuators × ~0.7 A (sequenced, never
-  simultaneous) + contactor coil. If contactor nameplate inrush VA is high,
-  step to 100 VA.
+- 24 VAC transformer, **100 VA**: 3 actuators × ~0.7 A + contactor coil.
+  75 VA works only if the actuators are strictly sequenced, and njsPC
+  diverts both valves at once — measured on the bench, not assumed. 54 VA of
+  simultaneous actuators plus contactor inrush plausibly exceeds 75 VA, and
+  the contactor's inrush figure is still unread. 100 VA is ~$10 more, is
+  still within the Class 2 limit the PE24GVA requires, and removes the
+  dependency on both the datasheet and on njsPC never doing that again.
 - 5 V DIN supply, 5 A minimum: Pi 4 (3 A) + 8 relays × 80 mA + margin. The
   relay HAT accepts 5 V on its own connector and feeds the Pi over the GPIO
   bus, so no separate USB-C brick is needed in the finished enclosure.
@@ -1026,13 +1030,25 @@ telemetry, not marketing copy.
 | Item | Est. |
 |---|---|
 | Intermatic PE24GVA valve actuator × 3 | ~$300 |
-| 75 VA 120→24 VAC Class 2 transformer | ~$30 |
+| **100 VA** 120→24 VAC Class 2 transformer | ~$40 |
 | Eaton C25CNB130T contactor, 30 A, 24 V coil | ~$20 |
 | 5 V DIN-rail supply, 5 A (Mean Well HDR/MDR) | ~$25 |
 | Non-metallic NEMA 4X enclosure ~14×12×6 | ~$60 |
 | DIN rail, terminal blocks, ferrules, wire | ~$40 |
+| Liquid-tight cable glands / cord grips, ~8 | ~$20 |
+| Enclosure breather-drain vent | ~$12 |
 
-**Total ~$650** against $1,300–2,000 for a factory IntelliCenter i5PS.
+**Total ~$690** against $1,300–2,000 for a factory IntelliCenter i5PS.
+
+**On the two smallest lines.** A NEMA 4X rating is a property of the whole
+assembly, not the box: every cable entry needs a liquid-tight gland or the
+rating is void, and this panel has a lot of entries — 120 V supply, RS-485 to
+the pump and cell, 24 VAC to three actuators, the heater's three-wire, the
+blower contactor and the light. And a sealed box outdoors in Florida
+breathes: it warms in sun, cools at night, and pulls in humid air through
+whatever gap it has. A breather-drain equalises that and lets condensate out
+while keeping the rating. Both are the kind of $15 part that holds up an
+install for a week because nobody listed it.
 
 ### Storage note
 

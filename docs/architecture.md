@@ -105,7 +105,7 @@ wearing a disguise. This is where each piece belongs.
 | `pumpRpm`, watts | njsPC | telemetry off the bus |
 | salt ppm, cell output | njsPC | telemetry, if ADR-6 lands on Path A |
 | relay positions | REM | driven by njsPC |
-| `waterTemp` | **undecided** | no sensor in the BOM — see open questions |
+| `waterTemp` | njsPC, from the iChlor | case 22 assigns the cell's own probe to the current body in Nixie mode, so no sensor is needed. 1 °F resolution, read at the cell on the return line. Confirm it appears in Phase 1; the fallback is a REM probe |
 | tab, expanded rows, filters | client | genuinely client state |
 
 ---
