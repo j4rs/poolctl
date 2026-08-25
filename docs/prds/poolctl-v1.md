@@ -36,8 +36,10 @@ panel-based system.
 4. Control blower and light remotely.
 5. Preserve the chlorinator visibility the owner values today (salt level
    alerts, output percentage).
-6. Cost meaningfully less than a factory IntelliCenter i5PS
-   (~$1,300–2,000 installed).
+6. Cost meaningfully less than a factory IntelliCenter i5PS. That is
+   $1,300–2,000 for the control system alone — valve actuators are extra
+   and it needs the same three this build does. Compare like for like; §7
+   has both rows.
 
 ### Non-goals
 
@@ -1029,7 +1031,7 @@ telemetry, not marketing copy.
 
 | Item | Est. |
 |---|---|
-| Intermatic PE24GVA valve actuator × 3 | ~$300 |
+| Intermatic PE24GVA valve actuator × 3 | ~$580 |
 | **100 VA** 120→24 VAC Class 2 transformer | ~$40 |
 | Eaton C25CNB130T contactor, 30 A, 24 V coil | ~$20 |
 | 5 V DIN-rail supply, 5 A (Mean Well HDR/MDR) | ~$25 |
@@ -1038,7 +1040,26 @@ telemetry, not marketing copy.
 | Liquid-tight cable glands / cord grips, ~8 | ~$20 |
 | Enclosure breather-drain vent | ~$12 |
 
-**Total ~$690** against $1,300–2,000 for a factory IntelliCenter i5PS.
+**Total ~$955.**
+
+**Against an IntelliCenter, compared honestly.** An earlier draft of this
+table put ~$650 against "$1,300–2,000 for a factory IntelliCenter i5PS",
+which flattered this project by mixing two different things: our figure
+includes three valve actuators, and that one is the control system alone —
+an IntelliCenter needs the same three actuators bolted to the same valves.
+
+| | control system | + 3 actuators |
+|---|---|---|
+| This build | ~$375 | ~$955 |
+| IntelliCenter i5PS | $1,300–2,000 | ~$1,900–2,600 |
+
+Either row is a fair comparison; mixing them is not. The case is strong
+enough on the honest numbers that it never needed the flattering ones.
+
+Note also that the actuator line was ~$300 for a long time, which was ~$100
+each. They are ~$194. That single line is most of the difference between the
+old total and this one, and it is the one item worth ordering early —
+stock is intermittent.
 
 **On the two smallest lines.** A NEMA 4X rating is a property of the whole
 assembly, not the box: every cable entry needs a liquid-tight gland or the
