@@ -67,7 +67,7 @@ flowchart TB
 | **njsPC (Nixie)** | The controller. Bodies, circuits, valves, pumps, schedules, and the delay/interlock manager in `Lockouts.ts`. RS-485 master, chlorinator telemetry, MQTT/REST/WebSocket. | Running on a laptop; not on the Pi until the HAT |
 | **supervisor** | The interlocks njsPC lacks, plus translation, intents and durable preferences. The only external writer. | Built and deployed to the Pi behind a password; valve travel and preheat outstanding |
 | **REM** | GPIO and relay I/O for the HAT. | Not installed |
-| **watchdog** | De-energises every relay unless njsPC and the supervisor are both healthy. | Not built |
+| **watchdog** | De-energises every relay unless njsPC and the supervisor are both healthy. | Not built, and deliberately so — the HAT's own watchdog cuts Pi power rather than dropping relays, and whether relay state survives that decides the design. ADR-12 has the bench test |
 
 **njsPC is not a bus library and cannot be treated as one.** Nixie mode is a
 full controller: `HeaterCooldownDelay` drives circuits from its own timer,

@@ -349,11 +349,12 @@ fitted, that finding is expected.
   PRD §11 has the options and the reasoning.
 - **No watchdog.** Nothing de-energises the relays when njsPC or the
   supervisor is unhealthy. `docs/architecture.md` carries it as not built.
-- **The watchdog may already be in silicon.** The relay HAT has a hardware
-  watchdog that resets the Pi if software stops feeding it.
-  `docs/architecture.md` carries a watchdog as a separate unbuilt component
-  whose job is de-energising the relays; the two are not the same thing, but
-  the overlap is worth working out before building anything.
+- **The watchdog is unbuilt, deliberately, pending one measurement.** The HAT
+  has a hardware watchdog, but it works by cutting power to the Pi rather than
+  by dropping relays, and nothing documents what relay state does while that
+  happens. ADR-12 has the test — energise a relay, stop feeding the watchdog,
+  see whether it drops — and which way it goes decides whether anything needs
+  building at all. First thing to try with the card fitted.
 
 ---
 

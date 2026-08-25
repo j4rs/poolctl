@@ -657,6 +657,34 @@ buys false confidence. Tie the heartbeat to the invariants actually holding.
 **Consequence:** Phase 2 bench testing kills each process in turn. Both cases
 must end with every relay de-energised.
 
+**Open, and it decides whether this is already built.** The relay HAT has a
+hardware watchdog on board. It does not de-energise anything directly — it
+**cuts power to the Pi** for a configurable off-period and then restores it,
+forcing a restart. Sequent's documentation does not say what happens to relay
+state while that happens, and the answer determines the whole design:
+
+- **If the relays drop**, the HAT's watchdog *is* this ADR. Feed it from the
+  health condition above and there is nothing else to build.
+- **If the relays hold**, it is not. The card gates power to the Pi, so it
+  must stay powered itself — which makes holding the more likely outcome, and
+  means a wedged system keeps its relays energised through the trip.
+
+Measure it before building anything: fit the card, start feeding the
+watchdog, energise a relay, stop feeding, and watch whether the relay drops
+when the Pi is power-cycled. Ten minutes on a bench, and it is the difference
+between wiring a heartbeat and designing a second interlock.
+
+**What softens the bad case.** A trip reboots the Pi, and boot re-drives the
+valves to pool and leaves the heater off — so even if relays hold through the
+trip, a safe state is re-established within a boot. That turns the question
+from "is this unsafe" into "how long is too long to hold a bad combination",
+which is answerable: the dangerous one is a heat call with the pump stopped,
+and it wants a number rather than a shrug.
+
+Do not build a feeder before that measurement. The health condition already
+exists in `evaluate()` and the invariant check; what is missing is the relay
+it would act on, and code that feeds nothing cannot be tested by anything.
+
 ---
 
 ## 4. Hardware design
