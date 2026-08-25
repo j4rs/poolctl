@@ -310,10 +310,13 @@ as a real process against a fake njsPC.
 Not built: valve relay driving through REM, and scheduled preheat. Both want
 hardware or a water temperature.
 
-**On the Pi now**: Node 20 from Debian trixie, and the supervisor as a
-systemd service behind a password, deployed by `scripts/deploy.sh`.
+**On the Pi now**: Node 22.23.2 from NodeSource — njsPC requires `>=22`, and
+Debian trixie only packages 20 — plus njsPC v10.0.1 and the supervisor, both
+systemd services that survive a reboot. njsPC is bound to `127.0.0.1` and was
+configured that way before its first start; the supervisor is the only thing
+on the network, and it is behind a password. Deployed by `scripts/deploy.sh`.
 
-Still not installed there: njsPC and REM. Deliberate — njsPC in Nixie mode
-wants its serial port and relay configuration, which arrive with the HAT. It
-runs on a laptop meanwhile, which has been enough to settle the design, and
-the Pi's supervisor reports njsPC unreachable rather than pretending.
+Still not installed there: REM, which wants the relay configuration arriving
+with the HAT. njsPC logs a `/dev/ttyUSB0` error every ten seconds meanwhile
+and works regardless — bodies, circuits, valves, schedules and the delay
+manager need no serial port.

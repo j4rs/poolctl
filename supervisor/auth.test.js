@@ -94,10 +94,19 @@ describe("session tokens", () => {
     expect(verifyToken(forged, secret, { now: 2000 })).toBe(false);
   });
 
-  it("rejects a tampered signature", () => {
+  it("rejects a tampered signature, whichever character is changed", () => {
+    /* Written first as `sig.slice(0, -1) + "A"`, which is a one-in-sixty-four
+       flake: base64url has 64 characters, so when the signature already
+       ended in "A" the "tampered" token was the original and verified fine.
+       Substitute a character that is guaranteed to differ, and check every
+       position rather than just the last. */
     const token = issueToken(secret);
     const [exp, sig] = token.split(".");
-    expect(verifyToken(`${exp}.${sig.slice(0, -1)}A`, secret)).toBe(false);
+    for (let i = 0; i < sig.length; i++) {
+      const swapped = sig[i] === "A" ? "B" : "A";
+      const forged = `${exp}.${sig.slice(0, i)}${swapped}${sig.slice(i + 1)}`;
+      expect(verifyToken(forged, secret), `character ${i}`).toBe(false);
+    }
   });
 
   it("rejects malformed tokens without throwing", () => {
