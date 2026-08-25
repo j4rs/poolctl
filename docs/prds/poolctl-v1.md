@@ -1328,6 +1328,26 @@ temperature (read from source).
 
 ## 11. Software backlog
 
+- **Warnings should reach the phone, not wait on the screen.** Owner's
+      call, August 2026: deferred deliberately, not rejected. Everything the
+      supervisor has learned to notice — commissioning findings, invariant
+      breaches, "a schedule will start the pump at 15:24" — is only visible to
+      someone already looking at the app. The alarming cases are exactly the
+      ones where nobody is: a valve delay too short for the travel, a spa with
+      no expiry, a pump about to restart into an open filter housing. A screen
+      is the wrong channel for those.
+
+      The reason it is not built is infrastructure, not doubt. Web push needs
+      a service worker, VAPID keys and a push service, which is a lot of
+      moving parts for a box on a home LAN — and iOS only delivers web push to
+      an installed PWA, so it also constrains how the app is opened.
+
+      Worth waiting for Phase 6 rather than solving twice: Home Assistant
+      already has notifications, per-device and reliable, and the supervisor
+      will be speaking to it anyway. The likely shape is that the supervisor
+      publishes these as events and HA decides who gets told, so this may cost
+      almost nothing once that link exists.
+
 - [~] **Authentication. Two of four parts done.** Anyone who joins the wifi —
       a guest, a compromised smart bulb, a neighbour with the password — can
       reach the supervisor on 4300 and drive 240 V equipment: switch to spa,
