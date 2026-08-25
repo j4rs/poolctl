@@ -3,6 +3,7 @@ import { C, FONT_UI, FONT_DATA } from "../theme";
 import { HEATER_MIN_RPM, CELL_MIN_RPM, POOL_RPM } from "../lib/sequences";
 import {
   RPM_MIN, RPM_MAX, watts, daysLabel, hoursBetween, activeSchedule, clockAt,
+  nextScheduledStart,
 } from "../lib/pump";
 import ScheduleEditor from "../components/ScheduleEditor";
 import ProgramEditor from "../components/ProgramEditor";
@@ -53,6 +54,12 @@ export default function PumpControl({ controller, themeControl }) {
      daily total says so rather than confidently reporting $0.00. */
   const schedulesKnown = Array.isArray(state.schedules);
   const schedules = state.schedules ?? [];
+  /* What will start the pump next if nobody intervenes.
+     Only computed when the pump is stopped and the schedules are live — in
+     service mode nothing starts, which is the entire point of it. */
+  const upNext = !pumpRunning && panelMode !== "service"
+    ? nextScheduledStart(schedules)
+    : null;
   /* What a schedule can be pointed at — the circuits the pump has a speed
      for. Empty before commissioning, which the editor says rather than
      offering an empty picker. */
@@ -189,9 +196,35 @@ export default function PumpControl({ controller, themeControl }) {
               : pumpRunning ? "Stop the pump" : "Run the pump"}
           </button>
         </div>
-        {!pumpRunning && (
+        {/* This used to claim "Schedules and programs cannot run the pump
+            while it is stopped." That is false, and measurably so: njsPC
+            leaves a manual stop alone for the rest of the current window and
+            then starts the pump at the next one — timed at 09:06:02 against a
+            window opening at 09:06. Someone stops the pump to clean the
+            filter, reads that sentence, opens the housing, and the schedule
+            starts it. Saying when it will restart, and how to prevent it, is
+            the whole job of this line. */}
+        {!pumpRunning && upNext && (
+          <div style={{
+            marginTop: 10, padding: "10px 12px", borderRadius: 9,
+            border: `1px solid ${C.heat}`, background: C.surface,
+            fontSize: 12, color: C.stone, lineHeight: 1.5,
+          }}>
+            <strong style={{ color: C.heat }}>
+              A schedule will start the pump at {upNext.at}
+            </strong>
+            {upNext.inMinutes < 60
+              ? ` — in ${upNext.inMinutes} min.`
+              : ` — in about ${Math.round(upNext.inMinutes / 60)} h.`}
+            {" "}Working on the equipment? Use service mode above; it holds the
+            schedules down until you resume.
+          </div>
+        )}
+        {!pumpRunning && !upNext && (
           <div style={{ fontSize: 11.5, color: C.faint, marginTop: 10, lineHeight: 1.5 }}>
-            Schedules and programs cannot run the pump while it is stopped.
+            {panelMode === "service"
+              ? "Service mode is on, so nothing will start the pump on its own."
+              : "No schedule is due to start the pump."}
           </div>
         )}
       </div>
@@ -315,16 +348,25 @@ export default function PumpControl({ controller, themeControl }) {
               ? `Confirm: ${panelMode === "service" ? "resume automation" : "enter service mode"}`
               : panelMode === "service" ? "Resume automation" : "Enter service mode"
           }
+          /* Outlined and named in full, because this was unfindable.
+             Muted grey on a card that reads as a status line made the one
+             control that matters for working on the equipment safely look
+             like a label — the owner went looking for it and could not see
+             it. It still must not shout: an alert-coloured button here would
+             compete with the commissioning findings and the offline banner,
+             which are the things that should raise the pulse. Calm, but
+             obviously pressable. */
           style={{
             flexShrink: 0, padding: "10px 14px", borderRadius: 9,
-            border: `1px solid ${confirm.isArmed("panel") ? C.heat : panelMode === "service" ? C.water : C.line}`,
+            border: `1px solid ${confirm.isArmed("panel") ? C.heat : C.water}`,
             background: "transparent",
-            color: confirm.isArmed("panel") ? C.heat : panelMode === "service" ? C.water : C.muted,
+            color: confirm.isArmed("panel") ? C.heat : C.water,
             fontFamily: FONT_UI, fontSize: 13, fontWeight: 600, cursor: "pointer",
+            whiteSpace: "nowrap",
           }}>
           {confirm.isArmed("panel")
             ? "Tap again"
-            : panelMode === "service" ? "Resume" : "Service"}
+            : panelMode === "service" ? "Resume automation" : "Service mode"}
         </button>
       </div>
 

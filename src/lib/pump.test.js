@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { watts, hoursBetween, overlaps, activeSchedule, clockAt, RPM_MIN, RPM_MAX } from "./pump.js";
+import { watts, hoursBetween, overlaps, activeSchedule, clockAt, nextScheduledStart, RPM_MIN, RPM_MAX } from "./pump.js";
 
 const every = [0, 1, 2, 3, 4, 5, 6];
 
@@ -135,5 +135,62 @@ describe("durations offered", () => {
   });
   it("stays within the cap", () => {
     expect(Math.max(...DURATIONS.map((d) => d.minutes))).toBeLessThanOrEqual(MAX_MINUTES);
+  });
+});
+
+describe("next scheduled start", () => {
+  /**
+   * The computation behind the filter-cleaning warning. Someone stops the
+   * pump, and this is what says when it will come back.
+   */
+  const every = [0, 1, 2, 3, 4, 5, 6];
+  const at = (dow, h, m = 0) => {
+    /* 2026-08-23 is a Sunday, so +dow lands on the weekday wanted. */
+    const d = new Date(2026, 7, 23 + dow, h, m);
+    return d;
+  };
+  const daily = { id: 1, start: "08:00", end: "18:00", days: every, enabled: true };
+
+  it("finds today's window when it has not started yet", () => {
+    const next = nextScheduledStart([daily], at(1, 6, 30));
+    expect(next.at).toBe("08:00");
+    expect(next.inMinutes).toBe(90);
+  });
+
+  it("rolls to tomorrow once today's start has passed", () => {
+    /* The case that matters: you are inside or past the window, stopped the
+       pump, and want to know when it comes back. */
+    const next = nextScheduledStart([daily], at(1, 9, 0));
+    expect(next.at).toBe("08:00");
+    expect(next.inMinutes).toBe(23 * 60);
+  });
+
+  it("picks the soonest of several", () => {
+    const later = { id: 2, start: "12:00", end: "16:00", days: every, enabled: true };
+    expect(nextScheduledStart([later, daily], at(1, 6, 0)).at).toBe("08:00");
+    expect(nextScheduledStart([later, daily], at(1, 9, 0)).at).toBe("12:00");
+  });
+
+  it("skips a disabled schedule", () => {
+    expect(nextScheduledStart([{ ...daily, enabled: false }], at(1, 6))).toBeNull();
+  });
+
+  it("looks a whole week ahead for a weekends-only schedule", () => {
+    /* Monday morning, a Saturday schedule: five days out, and still the
+       honest answer rather than null. */
+    const weekend = { id: 3, start: "10:00", end: "12:00", days: [0, 6], enabled: true };
+    const next = nextScheduledStart([weekend], at(1, 9, 0));
+    expect(next.at).toBe("10:00");
+    expect(next.inMinutes).toBe(5 * 1440 + 60);
+  });
+
+  it("returns nothing when there are no schedules at all", () => {
+    expect(nextScheduledStart([], at(1, 9))).toBeNull();
+    expect(nextScheduledStart(undefined, at(1, 9))).toBeNull();
+  });
+
+  it("ignores a schedule with no days or a broken time", () => {
+    expect(nextScheduledStart([{ ...daily, days: [] }], at(1, 6))).toBeNull();
+    expect(nextScheduledStart([{ ...daily, start: "nonsense" }], at(1, 6))).toBeNull();
   });
 });

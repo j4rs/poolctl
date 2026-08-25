@@ -452,12 +452,47 @@ describe("Pump — run and stop", () => {
     expect(c.setPumpRunning).toHaveBeenCalledWith(false);
   });
 
-  it("offers to run it again once stopped, and says what that blocks", () => {
+  it("offers to run it again once stopped", () => {
     const c = makeController({ pumpRunning: false });
-    const { container } = pump(c);
+    pump(c);
     confirmTap(screen.getByText("Run the pump"));
     expect(c.setPumpRunning).toHaveBeenCalledWith(true);
-    expect(container.textContent).toMatch(/cannot run the pump while it is stopped/);
+  });
+
+  it("warns that a schedule will restart the pump, and how to prevent it", () => {
+    /* The hazard this replaces: the screen used to say "Schedules and
+       programs cannot run the pump while it is stopped", which is false.
+       Measured against real njsPC — stop the pump, and the next window turns
+       it back on, timed at 09:06:02 against a window opening at 09:06. Read
+       that sentence, open the filter housing, and the schedule starts the
+       pump into it. */
+    const { container } = pump(makeController({
+      pumpRunning: false,
+      panelMode: "auto",
+      schedules: [{ id: 1, circuit: 6, circuitName: "Pool", rpm: 1600,
+                    start: "08:00", end: "18:00", days: [0,1,2,3,4,5,6], enabled: true }],
+    }));
+    expect(container.textContent).toMatch(/A schedule will start the pump at 08:00/);
+    expect(container.textContent).toMatch(/service mode/i);
+    expect(container.textContent).not.toMatch(/cannot run the pump while it is stopped/);
+  });
+
+  it("says nothing alarming when service mode already holds them down", () => {
+    const { container } = pump(makeController({
+      pumpRunning: false,
+      panelMode: "service",
+      schedules: [{ id: 1, circuit: 6, circuitName: "Pool", rpm: 1600,
+                    start: "08:00", end: "18:00", days: [0,1,2,3,4,5,6], enabled: true }],
+    }));
+    expect(container.textContent).not.toMatch(/A schedule will start the pump/);
+    expect(container.textContent).toMatch(/nothing will start the pump on its own/i);
+  });
+
+  it("says so plainly when no schedule is due", () => {
+    const { container } = pump(makeController({
+      pumpRunning: false, panelMode: "auto", schedules: [],
+    }));
+    expect(container.textContent).toMatch(/No schedule is due to start the pump/);
   });
 
   it("names the pump as stopped", () => {
@@ -764,7 +799,7 @@ describe("Pump — service mode", () => {
   it("stands the schedules down", () => {
     const c = makeController();
     pump(c);
-    confirmTap(screen.getByText("Service"));
+    confirmTap(screen.getByText("Service mode"));
     expect(c.setPanelMode).toHaveBeenCalledWith("service");
   });
 
@@ -773,10 +808,20 @@ describe("Pump — service mode", () => {
     expect(container.textContent).toMatch(/Nothing will start on its own/);
   });
 
+  it("names itself in full, because a bare 'Service' was not findable", () => {
+    /* The owner went looking for this control and could not see it. It was
+       muted grey on a card that reads as a status line, so the one thing you
+       reach for before working on the equipment looked like a label. */
+    const { container } = pump(makeController());
+    expect(container.textContent).toMatch(/Service mode/);
+    const btn = screen.getByText("Service mode").closest("button");
+    expect(btn.style.border, "must read as pressable").not.toMatch(/transparent|none/);
+  });
+
   it("resumes", () => {
     const c = makeController({ panelMode: "service" });
     pump(c);
-    confirmTap(screen.getByText("Resume"));
+    confirmTap(screen.getByText("Resume automation"));
     expect(c.setPanelMode).toHaveBeenCalledWith("auto");
   });
 });

@@ -89,6 +89,46 @@ export function activeSchedule(schedules, date = new Date()) {
   return hits.reduce((best, s) => ((s.rpm ?? 0) > (best.rpm ?? 0) ? s : best));
 }
 
+/**
+ * The next scheduled start after `date`, or null.
+ *
+ * Exists because of a hazard rather than a feature request: stop the pump to
+ * clean the filter, and the next window starts it again with the housing
+ * open. njsPC will not fight a manual stop *within* the current window — that
+ * is measured — but the next window turns it straight back on, and nothing on
+ * screen said so. A control that lets you believe the pump is off while
+ * something is going to start it is the failure this whole UI exists to
+ * avoid.
+ *
+ * Looks up to a week ahead so a weekends-only schedule still reports.
+ */
+export function nextScheduledStart(schedules, date = new Date()) {
+  const nowMins = date.getHours() * 60 + date.getMinutes();
+  const today = date.getDay();
+  let best = null;
+
+  for (const s of schedules ?? []) {
+    if (s.enabled === false) continue;
+    const start = toMin(s.start);
+    /* `toMin` returns NaN rather than null for a malformed time — it is a
+       bare split-and-multiply — so this has to test for a finite number.
+       Otherwise a broken time yields NaN minutes and the warning renders as
+       "will start the pump at NaN". */
+    if (!Number.isFinite(start) || !s.days?.length) continue;
+
+    for (let ahead = 0; ahead < 8; ahead++) {
+      if (!s.days.includes((today + ahead) % 7)) continue;
+      const inMinutes = ahead * 1440 + start - nowMins;
+      /* Strictly ahead: a window that started earlier today has already had
+         its chance, and it is the *next* one that will restart the pump. */
+      if (inMinutes <= 0) continue;
+      if (!best || inMinutes < best.inMinutes) best = { schedule: s, inMinutes, at: s.start };
+      break;
+    }
+  }
+  return best;
+}
+
 /** 24h clock for a timestamp, matching the schedule fields. */
 export const clockAt = (ms) => {
   const d = new Date(ms);
