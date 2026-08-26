@@ -711,7 +711,7 @@ it would act on, and code that feeds nothing cannot be tested by anything.
 | 5 | Heater SPA | dry, isolated | terminal 24 |
 | 6 | Blower | NO → contactor coil | 30 A DP contactor |
 | 7 | Light | NO, direct 120 V | LED, <1 A |
-| 8 | Chlorinator gate | NO, direct 120 V | Path A only |
+| 8 | *spare* | — | gate dropped, see below |
 
 Channels 1–3 require **changeover (COM/NO/NC) contacts**: the actuators keep
 one of two lines energized at all times, and an SPDT relay selects which.
@@ -720,6 +720,44 @@ relays are useless for valves.
 
 Channels 4–5 must be **isolated from the 24 VAC transformer**; the Raypak
 supplies its own low voltage on that terminal block.
+
+**Before wiring any 120 V channel, see the blocking open question in §10.**
+The board's silkscreen rates the channels 5 A/48 VAC while the product page
+says 4 A/120 VAC. If the former holds, CH7 cannot drive the light directly.
+
+**Channel 8 is spare: the chlorinator gate is dropped.** *Owner's answer on the
+existing wiring:* the chlorinator has its own transformer fed from the
+Intermatic subpanel, and **the only thing entering this panel from it is the
+RS-485 cable**. So there is no 120 V circuit here to gate, and adding one would
+mean a new cable pull, a gland, and possibly a second contactor.
+
+Its only stated purpose was ADR-6's *"relay-gate the power center to suppress
+chlorination during spa mode"* — not flow protection and not safety, since the
+cell has its own supply and its own flow detection. ADR-6 already records the
+cheaper alternatives: command a low output percentage over the bus, *"or accept
+it, since a short soak barely moves the needle."*
+
+**Owner's call:** if njsPC and the iChlor cannot hold separate pool and spa
+percentages, or cannot change output on demand per mode, then we simply do not
+change it. Either way the channel comes out of the hardware. Whether njsPC
+exposes a writable chlorinator setpoint is unverified and no longer blocking —
+and if it turns out to be missing, ADR-13's standing commitment applies: patch
+it and open a PR.
+
+**This panel switches; it does not distribute.** Light and blower are branch
+circuits from the **Intermatic T40004RT3** — a 100 A subpanel with eight
+breaker spaces — looped out to a contact here and back, exactly as they are
+looped through the IntelliConnect today. Each load keeps its breaker and its
+protection there. The consequence for this panel is that its own 120 V feed
+carries only the transformer and the 5 V supply, about **2.6 A**, rather than
+the ~11 A it would need if the blower's 7.3 A ran through it.
+
+*Two things this leaves open.* The T40004RT3 also contains a **300 W
+transformer**; it is tempting as a substitute for the TR100VA001, but 300 VA is
+three times the Class 2 ceiling ADR-8 requires for the PE24GVA, so read its
+nameplate before assuming anything. And CH7 drives the light directly from a
+HAT relay, which drags a 120 V pair up into the logic band — within the card's
+4 A rating, but the one place the voltage-band layout breaks down.
 
 The blower is 7.3 A running but 30–45 A locked-rotor inrush. Relay-board
 contacts are rated for resistive loads; a motor needs a definite-purpose
@@ -1234,6 +1272,39 @@ eyes on bonding.
 ---
 
 ## 10. Open questions
+
+- [ ] **BLOCKING — the relay HAT's actual contact rating. Do not land 120 V on
+      the card until this is answered.** Two sources disagree, and this repo
+      has been carrying the wrong one.
+
+      | Source | Rating |
+      |---|---|
+      | Sequent product page and this BOM | 4 A at 120 VAC / 24 VDC, all eight channels |
+      | Silkscreen on the v6.0 board itself | `RELAYS 1–3: 5A/48VAC/DC`, `RELAYS 5–8: 5A/48VAC/DC`, `RELAY4: 3A/48V` |
+
+      The silkscreen is the more conservative and the more specific — it
+      singles out relay 4 at a different figure, which reads as a real layout
+      constraint rather than a slip. Markings like that usually reflect the
+      pluggable terminal block's rating or certified creepage on the mains
+      side, either of which binds regardless of what the relay part inside is
+      rated for. The Songle SRD-05VDC-SL-C relays are themselves 10 A/250 VAC,
+      so the part is not the limit; the board is.
+
+      **If 48 V is the real limit, no 120 V load may land on this board at
+      all**, and **CH7 — the light, wired direct — becomes non-compliant.** It
+      would need an interposing relay or its own contactor, which is a part
+      this BOM does not have.
+
+      What is *not* affected: CH1–3 at 24 VAC, CH4–5 as dry contacts on the
+      Raypak's own low voltage, and CH6 pulling a 24 V coil. All sit under
+      48 V already, so the contactor decision for the blower happens to have
+      put most of the design on the safe side of the stricter reading. CH7 is
+      the sole exposure — and independently it is also the channel that drags
+      a 120 V pair up into the logic band to reach the HAT.
+
+      **Resolve with Sequent**, not from a photograph or a product page.
+      Ask what the per-channel rating is, what the silkscreen refers to, and
+      why relay 4 differs.
 
 - [x] **Chlorinator path.** *Resolved* — Path A (ADR-6). What remains is
       narrower and tracked there: whether an iChlor 30 emits the case-18 salt
