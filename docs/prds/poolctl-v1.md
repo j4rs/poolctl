@@ -777,6 +777,15 @@ fails it will be that one; remap in software rather than replacing the board.
   the contactor's inrush figure is still unread. 100 VA is ~$10 more, is
   still within the Class 2 limit the PE24GVA requires, and removes the
   dependency on both the datasheet and on njsPC never doing that again.
+
+  *Settled by the part.* The chosen TR100VA001 is **Class 2 UL5085-3 listed**
+  and carries its own manual-reset circuit breaker, so the ADR-8 requirement
+  is met by the transformer's own listing rather than by arithmetic about
+  where 100 VA sits. Its datasheet also adds a number the thermal work will
+  need: **operating range -30 to 140 °F (-34 to 60 °C)**. That is a second
+  documented ceiling inside the sealed box. The Pi's 50 °C is still the
+  tighter of the two, so it stays the binding constraint — but the margin
+  between them is 10 °C, not the comfortable gap one might assume.
 - 5 V DIN supply, 5 A minimum: Pi 4 (3 A) + 8 relays × 80 mA + margin. The
   relay HAT accepts 5 V on its own connector and feeds the Pi over the GPIO
   bus, so no separate USB-C brick is needed in the finished enclosure.
@@ -800,6 +809,27 @@ ADR-10.
 
 Non-metallic NEMA 4X. A metal enclosure would trigger NEC 680 equipotential
 bonding requirements. Sealed, no vents, passive cooling only.
+
+**The backplate is ABS too, and that changes how grounding works.** Nothing
+inside the box is bonded by accident: there is no metal can and no steel
+plate, so a DIN rail mounted on that plate is floating. Equipment grounding
+conductors — line feed in, blower out, light out — land on a ground bar that
+must be **deliberately** wired back to the incoming EGC.
+
+The failure mode is quiet. Every conductor on the bar is continuous with every
+other one whether or not the bar reaches earth, so a continuity check between
+EGCs proves nothing. The only check that means anything is bar-to-incoming-
+ground.
+
+The enclosure's own metal is 304 stainless hinge pins, two latches and four
+wall brackets, all isolated from live parts by 3.5 mm of ABS. Whether NEC 680
+wants any of it bonded depends on proximity to the water and on the AHJ; it is
+a question for the electrician, not a decision this document makes.
+
+Mount to the detachable plate, never through the enclosure body — the only
+holes in that shell should be the bottom-face entries and the breather. Heavy
+parts (transformer, contactor) want through-bolts or threaded inserts rather
+than self-tappers: the plate is ABS, and it will sit hot.
 
 ---
 
@@ -1074,20 +1104,36 @@ telemetry, not marketing copy.
 | Raspberry Pi 4 heatsink kit | $6.99 |
 | 5V 3A USB-C supply with inline switch (bench + diagnostics) | $9.85 |
 
-### Later — not yet ordered
+### Later — in the cart, priced
 
-| Item | Est. |
+*Actual prices, August 2026. Lines still marked ~ are estimates.*
+
+| Item | Price |
 |---|---|
-| Intermatic PE24GVA valve actuator × 3 | ~$580 |
-| **100 VA** 120→24 VAC Class 2 transformer | ~$40 |
-| Eaton C25CNB130T contactor, 30 A, 24 V coil | ~$20 |
-| Mean Well HDR-60-5 DIN-rail supply, 5 V 6.5 A | ~$25 |
-| VEVOR outdoor junction box, 16.93×12.99×7.09 in — ABS, IP67, hinged, stainless latch, backplate included | ~$70 |
+| Intermatic PE24GVA valve actuator × 3 | **$473.10** |
+| Functional Devices **TR100VA001**, 100 VA 120→24 VAC, Class 2 UL5085-3, breaker | **$61.01** |
+| Eaton C25CNB130T contactor, 30 A, 24 V coil | **$32.50** |
+| Mean Well HDR-60-5 DIN-rail supply, 5 V 6.5 A | **$24.46** |
+| IP68 breather screw, M12×1.5, dual-port, 2-pack | **$6.99** |
+| VEVOR outdoor junction box **SP-CAG-334318**, 16.93×12.99×7.09 in — ABS, IP67/IK08, hinged, 304 stainless latches, detachable **ABS** backplate | ~$70 |
 | DIN rail, terminal blocks, ferrules, wire | ~$40 |
-| Liquid-tight cable glands / cord grips, ~8 | ~$20 |
-| Enclosure breather-drain vent | ~$12 |
+| Liquid-tight cable glands / cord grips, ~9 | ~$22 |
+| Ground bar / PE terminal strip, plus the jumper to the incoming EGC | ~$10 |
 
-**Total ~$965.**
+**Total ~$898**, plus $2.40 shipping on the HDR-60-5; every other line ships free.
+
+**The estimates were wrong in both directions, and it is worth seeing how.**
+The actuators came in at $157.70 rather than the ~$193 assumed — that one line
+is $107 under, and it is most of the saving. Against it, the transformer ran
+$21 over and the contactor $12.50 over. So the **total dropped ~$79 while the
+control system alone rose ~$28**: the part that got cheaper was the part that
+is not the control system. An estimate that had been right on the total would
+still have been wrong about both halves.
+
+*Two notes on quantities.* The enclosure ships with one cable sealing sleeve
+(3/8 / 1/2 in); it does not displace any of the nine glands above, being one
+part offered in two sizes and smaller than the 3/4 in entries. The breather
+comes two to a pack, so there is a spare.
 
 **Against an IntelliCenter, compared honestly.** An earlier draft of this
 table put ~$650 against "$1,300–2,000 for a factory IntelliCenter i5PS",
@@ -1097,7 +1143,7 @@ an IntelliCenter needs the same three actuators bolted to the same valves.
 
 | | control system | + 3 actuators |
 |---|---|---|
-| This build | ~$385 | ~$965 |
+| This build | ~$425 | ~$898 |
 | IntelliCenter i5PS | $1,300–2,000 | ~$1,900–2,600 |
 
 Either row is a fair comparison; mixing them is not. The case is strong
@@ -1137,7 +1183,7 @@ external surface area:
 | VEVOR size | internal | plate | ext. surface |
 |---|---|---|---|
 | 13.78×9.84×5.90 | 12.51 × 8.58 × 4.96 | 107 in² | 550 in² |
-| **16.93×12.99×7.09** | **15.12 × 11.18 × 4.84** | **169 in²** | **864 in²** |
+| **16.93×12.99×7.09** | **15.12 × 11.18 × 6.29** | **169 in²** | **864 in²** |
 | 20.87×16.92×7.87 | 19.01 × 15.08 × 7.12 | 287 in² | 1300 in² |
 
 The middle size buys 1.6× the smallest box's dissipating area for a few
@@ -1147,11 +1193,18 @@ or a fan. The largest was rejected as 21×17 inches of wall for benefit beyond
 what the load needs. Its internal footprint also slightly exceeds the
 original 14×12×6, so this is ahead of the spec rather than a compromise.
 
-**Check the internal depth on arrival.** VEVOR publishes 4.84 in internal
-against 7.09 external here, but 7.12 against 7.87 for the larger box. Those
-are not measured the same way, so one figure is sloppy. 4.84 in clears a
-~3.5 in transformer but leaves little room to route conductors over it —
-measure the base before committing to a layout.
+**Internal depth: 6.29 in, not 4.84.** *Resolved against the manufacturer
+datasheet for SP-CAG-334318, which gives 384 × 284 × 160 mm internal.* The
+retail listing's 4.84 in was the sloppy figure this document suspected, and
+the arithmetic says which one to believe: against a 180 mm external depth and
+3.5 mm walls, 160 mm leaves 20 mm for the base wall and the lid, while 123 mm
+leaves 57 mm unaccounted for on a flat-top cover.
+
+That is 1.45 in more than was assumed, and it matters where it was assumed to
+hurt: a ~3.5 in transformer now leaves ~2.8 in to route conductors over rather
+than ~1.3. **Still measure the base on arrival** — the two figures may differ
+because one is base-only and the other base-plus-lid, and a layout committed
+to vendor copy is a layout committed to marketing.
 
 **Non-metallic is not a preference.** Steel NEMA 4 enclosures are often
 cheaper than polycarbonate and will dominate any price search. A metal box is
