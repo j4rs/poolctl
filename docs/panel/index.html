@@ -1,0 +1,1476 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Panel build plan for poolctl: every part, where it sits on the backplate, and what connects to what.">
+<title>Poolctl Panel Build</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+
+<style>
+  /* Tokens lifted from src/theme.css so the plan matches the app it builds.
+     Dark is the default here for the same reason it is there: this gets read
+     at the pad. */
+  :root {
+    --ground: #0c1618;
+    --surface: #132325;
+    --surface-up: #1b2f32;
+    --line: #27454a;
+    --water: #4fbfb4;
+    --water-dim: #2a6b68;
+    --heat: #e08b4c;
+    --stone: #e6e2d7;
+    --muted: #7b9295;
+    --faint: #4e6669;
+    --alert: #d9705c;
+    --wash-water: rgba(79, 191, 180, 0.12);
+    --wash-heat: rgba(224, 139, 76, 0.13);
+    /* 24 VAC gets its own token rather than reusing --heat: measured as a
+       categorical pair against --alert, the old amber was dE2000 14.6, and
+       9.6 under deuteranopia. This reads 38.0 / 22.3. Stroke weight carries
+       the same distinction a second time, so colour is never load-bearing
+       on its own. --heat still means warning, which is a different job. */
+    --v24: #eac645;
+    --wash-v24: rgba(234, 198, 69, 0.13);
+    --wash-alert: rgba(217, 112, 92, 0.13);
+    --plate: #16292c;
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --ground: #f2f5f4;
+      --surface: #ffffff;
+      --surface-up: #e7ecea;
+      --line: #c2d0cd;
+      --water: #0f7a70;
+      --water-dim: #6ba8a2;
+      --heat: #a9530c;
+      --stone: #14201f;
+      --muted: #465957;
+      --faint: #677876;
+      --alert: #a8321f;
+      --wash-water: rgba(15, 122, 112, 0.10);
+      --wash-heat: rgba(169, 83, 12, 0.10);
+      --v24: #876a00;
+      --wash-v24: rgba(135, 106, 0, 0.10);
+      --wash-alert: rgba(168, 50, 31, 0.10);
+      --plate: #eef2f1;
+    }
+  }
+
+  :root[data-theme="light"] {
+    --ground: #f2f5f4;
+    --surface: #ffffff;
+    --surface-up: #e7ecea;
+    --line: #c2d0cd;
+    --water: #0f7a70;
+    --water-dim: #6ba8a2;
+    --heat: #a9530c;
+    --stone: #14201f;
+    --muted: #465957;
+    --faint: #677876;
+    --alert: #a8321f;
+    --wash-water: rgba(15, 122, 112, 0.10);
+    --wash-heat: rgba(169, 83, 12, 0.10);
+    --v24: #876a00;
+    --wash-v24: rgba(135, 106, 0, 0.10);
+    --wash-alert: rgba(168, 50, 31, 0.10);
+    --plate: #eef2f1;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--stone);
+    font-family: 'Archivo', ui-sans-serif, -apple-system, system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 48px 22px 96px;
+    display: flex;
+    flex-direction: column;
+    gap: 44px;
+  }
+
+  .mono {
+    font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+  .eyebrow {
+    font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+    font-size: 11px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 8px;
+  }
+
+  h1 {
+    font-size: clamp(30px, 5vw, 42px);
+    line-height: 1.12;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin: 0 0 14px;
+    text-wrap: balance;
+  }
+
+  h2 {
+    font-size: 21px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 0 0 4px;
+    text-wrap: balance;
+  }
+
+  h3 {
+    font-size: 15px;
+    font-weight: 600;
+    margin: 0 0 6px;
+  }
+
+  p { margin: 0 0 12px; max-width: 68ch; }
+  p:last-child { margin-bottom: 0; }
+
+  .lede { font-size: 17.5px; color: var(--muted); max-width: 62ch; }
+
+  section { display: flex; flex-direction: column; gap: 14px; }
+
+  .rule {
+    height: 1px;
+    background: var(--line);
+    border: 0;
+    margin: 0;
+  }
+
+  /* ---- voltage class, the organising idea ------------------------------ */
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 11px 6px 8px;
+    border-radius: 7px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    font-size: 12.5px;
+    font-weight: 500;
+  }
+
+  .chip::before {
+    content: "";
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    background: var(--muted);
+    flex-shrink: 0;
+  }
+
+  .chip.v-line { border-color: var(--alert); background: var(--wash-alert); }
+  .chip.v-line::before { background: var(--alert); }
+  .chip.v-24::before { background: var(--v24); }
+  .chip.v-24 { border-color: var(--v24); background: var(--wash-v24); }
+  .chip.v-lv::before { background: var(--water); }
+  .chip.v-lv { border-color: var(--water); background: var(--wash-water); }
+
+  /* ---- figures --------------------------------------------------------- */
+
+  figure {
+    margin: 0;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 18px 18px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .scroll { overflow-x: auto; }
+
+  figure svg { display: block; width: 100%; height: auto; min-width: 520px; }
+
+  figcaption {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.55;
+    max-width: 70ch;
+  }
+
+  /* SVG paints via CSS - var() does not resolve in presentation attributes */
+  .plate-bg { fill: var(--plate); stroke: var(--line); stroke-width: 2; }
+  .band-line { fill: var(--wash-alert); stroke: var(--alert); stroke-width: 1; stroke-dasharray: 4 4; }
+  .band-24 { fill: var(--wash-v24); stroke: var(--v24); stroke-width: 1; stroke-dasharray: 4 4; }
+  .band-lv { fill: var(--wash-water); stroke: var(--water); stroke-width: 1; stroke-dasharray: 4 4; }
+  .part { fill: var(--surface-up); stroke: var(--stone); stroke-width: 1.5; }
+  .part-line { fill: var(--surface-up); stroke: var(--alert); stroke-width: 2; }
+  .part-24 { fill: var(--surface-up); stroke: var(--v24); stroke-width: 2; }
+  .part-lv { fill: var(--surface-up); stroke: var(--water); stroke-width: 2; }
+  .rail { fill: none; stroke: var(--muted); stroke-width: 3; stroke-dasharray: 2 5; }
+  .lbl { fill: var(--stone); font-family: 'Archivo', sans-serif; font-size: 13px; font-weight: 600; }
+  .lbl-sm { fill: var(--muted); font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; }
+  .lbl-band { fill: var(--muted); font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; letter-spacing: 0.1em; }
+  .dim { stroke: var(--faint); stroke-width: 1; }
+  .dim-t { fill: var(--faint); font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; }
+  .flow { stroke: currentColor; stroke-width: 2; fill: none; }
+  .flow-line { stroke: var(--alert); stroke-width: 3.2; fill: none; }
+  .flow-24 { stroke: var(--v24); stroke-width: 2.4; fill: none; }
+  .flow-lv { stroke: var(--water); stroke-width: 2.0; fill: none; }
+  .gland { fill: var(--surface); stroke: var(--muted); stroke-width: 1.5; }
+  .gland-line { fill: var(--wash-alert); stroke: var(--alert); stroke-width: 1.5; }
+  .mk-line { fill: var(--alert); }
+  .mk-24 { fill: var(--v24); }
+  .mk-lv { fill: var(--water); }
+
+  /* ---- tables ---------------------------------------------------------- */
+
+  .tbl-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+    min-width: 520px;
+  }
+
+  th {
+    text-align: left;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+
+  tr:last-child td { border-bottom: 0; }
+
+  td.num, th.num { font-variant-numeric: tabular-nums; }
+
+  .tag {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 5px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    white-space: nowrap;
+    border: 1px solid var(--line);
+    color: var(--muted);
+  }
+  .tag.v-line { color: var(--alert); border-color: var(--alert); background: var(--wash-alert); }
+  .tag.v-24 { color: var(--v24); border-color: var(--v24); background: var(--wash-v24); }
+  .tag.v-lv { color: var(--water); border-color: var(--water); background: var(--wash-water); }
+
+  code {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.92em;
+    background: var(--surface-up);
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+
+  /* ---- callouts -------------------------------------------------------- */
+
+  .note {
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--water);
+    background: var(--surface);
+    border-radius: 0 10px 10px 0;
+    padding: 14px 16px;
+  }
+  .note.warn { border-left-color: var(--heat); }
+  .note.stop { border-left-color: var(--alert); }
+  .note h3 { color: var(--water); }
+  .note.warn h3 { color: var(--heat); }
+  .note.stop h3 { color: var(--alert); }
+  .note p { font-size: 14px; margin-bottom: 8px; }
+
+  /* ---- assembly sequence - numbered because it genuinely is one -------- */
+
+  ol.steps {
+    list-style: none;
+    counter-reset: step;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  ol.steps li {
+    counter-increment: step;
+    display: grid;
+    grid-template-columns: 34px 1fr;
+    /* row-gap must stay small: the title and its body are now two grid rows
+       in the same column, and a shared `gap` spaced them like siblings. */
+    column-gap: 14px;
+    row-gap: 3px;
+    padding: 13px 0;
+    border-bottom: 1px solid var(--line);
+    align-items: start;
+  }
+  ol.steps li:last-child { border-bottom: 0; }
+
+  ol.steps li::before {
+    content: counter(step, decimal-leading-zero);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--water);
+    padding-top: 2px;
+  }
+
+  ol.steps strong {
+    grid-column: 2;
+    display: block;
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+  ol.steps span {
+    grid-column: 2;
+    font-size: 14px;
+    color: var(--muted);
+    line-height: 1.55;
+  }
+
+  .grid2 {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 12px;
+  }
+
+  .card {
+    border: 1px solid var(--line);
+    background: var(--surface);
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .card p { font-size: 13.5px; color: var(--muted); margin: 0; }
+  .card .k {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: block;
+    margin-bottom: 3px;
+  }
+  .card .v { font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  a { color: var(--water); }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--water); outline-offset: 2px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+
+  /* ---- parts gallery ---- */
+  .parts {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 18px;
+    margin-top: 20px;
+  }
+  .part {
+    margin: 0;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  /* Product shots are photographed on white. Give them a fixed light plate in
+     both themes rather than letting each one float on its own background --
+     they read as spec-sheet swatches, and the row stays even. */
+  .shot {
+    background: #f6f7f6;
+    border-bottom: 1px solid var(--line);
+    height: 186px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px;
+  }
+  .shot img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    display: block;
+  }
+  .shot-open {
+    background: repeating-linear-gradient(
+      45deg, transparent, transparent 7px,
+      var(--wash-alert) 7px, var(--wash-alert) 14px);
+    border-bottom: 1px dashed var(--line);
+    color: var(--muted);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .part figcaption { padding: 14px 15px 16px; }
+  .part h3 { margin: 8px 0 3px; font-size: 15px; }
+  .part .cat {
+    font-size: 12px;
+    color: var(--water);
+    margin: 0 0 8px;
+    letter-spacing: 0.01em;
+  }
+  .part .role { font-size: 13.5px; color: var(--muted); margin: 0; line-height: 1.55; }
+  .part .why {
+    font-size: 13px;
+    color: var(--muted);
+    margin: 10px 0 0;
+    padding-top: 10px;
+    border-top: 1px solid var(--line);
+    line-height: 1.5;
+  }
+  .part .why strong { color: var(--stone); font-weight: 600; }
+  .part .credit {
+    font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+    font-size: 10.5px;
+    color: var(--faint);
+    margin: 12px 0 0;
+  }
+  .part-open { border-style: dashed; }
+
+  /* ---- figure 3: channel wiring ---- */
+  .w-src   { fill: var(--surface); stroke: var(--muted); stroke-width: 1.5; }
+  .w-src-24   { fill: var(--surface); stroke: var(--v24); stroke-width: 1.5; }
+  .w-src-line { fill: var(--surface); stroke: var(--alert); stroke-width: 1.5; }
+  .w-none  { fill: none; stroke: var(--faint); stroke-width: 1.5; stroke-dasharray: 3 3; }
+  .w-iso   { fill: none; stroke: var(--stone); stroke-width: 1.5; stroke-dasharray: 6 4; }
+  .mk-24   { fill: var(--v24); }
+  .mk-line { fill: var(--alert); }
+  .mk-lv   { fill: var(--water); }
+  .mk-n    { fill: var(--muted); }
+  .flow-n  { stroke: var(--muted); stroke-width: 2.5; fill: none; }
+  .lbl-t   { fill: var(--stone); font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 500; }
+
+  /* ---- figure 4: wiring on the plate ---- */
+  .w4-line { fill: none; stroke: var(--alert); stroke-width: 3.2; stroke-linejoin: round; stroke-linecap: round; }
+  .w4-24   { fill: none; stroke: var(--v24);   stroke-width: 2.4; stroke-linejoin: round; stroke-linecap: round; }
+  .w4-lv   { fill: none; stroke: var(--water); stroke-width: 2.0; stroke-linejoin: round; stroke-linecap: round; }
+  .w4-dry  { fill: none; stroke: var(--muted); stroke-width: 2.4; stroke-linejoin: round; stroke-linecap: round; stroke-dasharray: 7 4; }
+  .note { font-size: 13.5px; color: var(--muted); margin-top: 18px; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow">Poolctl &middot; equipment pad</p>
+    <h1>Panel build</h1>
+    <p class="lede">
+      Every part, where it sits on the backplate, and what connects to what &mdash;
+      inside a VEVOR SP-CAG-334318 enclosure &mdash; 16.93 &times; 12.99 &times; 7.09 in
+      outside, and it mounts <strong>portrait</strong> &mdash; so the plate is 11.18 in wide by 15.12 in tall, on detachable ABS. The line-voltage side is an electrician's work and is marked as
+      such throughout.
+    </p>
+  </header>
+
+  <section>
+    <p class="eyebrow">The organising idea</p>
+    <h2>Three voltage classes, kept apart</h2>
+    <p>
+      The panel is laid out in bands by voltage, not by function. Line voltage
+      stays at the bottom where the feeds enter, 24&nbsp;VAC sits above it, and
+      the logic sits at the top furthest from the transformer. This colour code
+      runs through every diagram and table below &mdash; and in the wiring figures
+      it is doubled by stroke weight, line voltage drawn heaviest and signal
+      lightest, so the distinction that matters most never rests on hue alone.
+    </p>
+    <div class="legend">
+      <span class="chip v-line">120&nbsp;VAC &mdash; line, electrician's scope</span>
+      <span class="chip v-24">24&nbsp;VAC &mdash; actuators, contactor coil</span>
+      <span class="chip v-lv">5&nbsp;VDC / signal &mdash; Pi, RS-485, dry contacts</span>
+    </div>
+  </section>
+
+
+  <hr class="rule">
+
+  <!-- ================= THE PARTS ========================================= -->
+  <section>
+    <p class="eyebrow">The parts</p>
+    <h2>Every panel component, photographed</h2>
+    <p>
+      Nine of the eleven panel components have a chosen part number, and all
+      nine are shown here as the manufacturer or distributor photographs them.
+      The two without a photo are the two that are still undecided &mdash; the
+      gap in this gallery is not a sourcing problem, it is the outstanding
+      decisions, and it is worth reading that way.
+    </p>
+    <div class="parts">
+      <figure class="part">
+        <div class="shot"><img src="img/vevor-enclosure.jpg" alt="VEVOR outdoor enclosure" loading="lazy"></div>
+        <figcaption>
+          <span class="chip v-none">enclosure</span>
+          <h3>VEVOR outdoor enclosure</h3>
+          <p class="cat mono">SP-CAG-334318 &middot; 6.29 in deep inside</p>
+          <p class="role">Everything below mounts inside this. ABS shell and ABS backplate, IP67/IK08, hinged lid, 304 stainless latches. The photo looks like two glands; the datasheet says one sealing sleeve offered in two sizes, and it is smaller than the 3/4&nbsp;in entries &mdash; so it displaces nothing on the gland order.</p>
+          <p class="credit">Photo: vevor.com</p>
+        </figcaption>
+      </figure>
+      <figure class="part">
+        <div class="shot"><img src="img/raspberry-pi-4b.jpg" alt="Raspberry Pi 4 Model B" loading="lazy"></div>
+        <figcaption>
+          <span class="chip v-lv">5&nbsp;VDC / signal</span>
+          <h3>Raspberry Pi 4 Model B</h3>
+          <p class="cat mono">2&nbsp;GB</p>
+          <p class="role">Runs njsPC and the supervisor. Sits top-right, diagonally opposite the transformer &mdash; away from its heat, its steel core and the line-voltage band.</p>
+          <p class="credit">Photo: Wikimedia Commons, Laserlicht, CC&nbsp;BY-SA&nbsp;4.0</p>
+        </figcaption>
+      </figure>
+      <figure class="part">
+        <div class="shot"><img src="img/sequent-8relay-hat.jpg" alt="Sequent Microsystems Eight Relays HAT" loading="lazy"></div>
+        <figcaption>
+          <span class="chip v-lv">5&nbsp;VDC / signal</span>
+          <h3>Sequent Microsystems Eight Relays HAT</h3>
+          <p class="cat mono">8-REL v6.0 &middot; 4&nbsp;A / 120&nbsp;V</p>
+          <p class="role">The eight channels. Stacks on the Pi on 11&nbsp;mm standoffs and powers it over the GPIO header, so the Pi has no USB-C supply of its own in the panel.</p>
+          <p class="credit">Photo: sequentmicrosystems.com</p>
+        </figcaption>
+      </figure>
+      <figure class="part">
+        <div class="shot"><img src="img/meanwell-hdr-60-5.jpg" alt="Mean Well HDR-60-5" loading="lazy"></div>
+        <figcaption>
+          <span class="chip v-lv">5&nbsp;VDC / signal</span>
+          <h3>Mean Well HDR-60-5</h3>
+          <p class="cat mono">HDR-60-5 &middot; 5&nbsp;V 6.5&nbsp;A</p>
+          <p class="role">DIN-rail 5&nbsp;V supply. Line in, 5&nbsp;V out to the HAT&rsquo;s own connector. Step-shape case, so it clips to the same rail as the terminal blocks.</p>
+          <p class="credit">Photo: Amazon (B07VQ8WQZ8)</p>
+        </figcaption>
+      </figure>
+      <figure class="part">
+        <div class="shot"><img src="img/eaton-c25cnb130t.jpg" alt="Eaton definite-purpose contactor" loading="lazy"></div>
+        <figcaption>
+          <span class="chip v-24">24&nbsp;VAC</span>
+          <h3>Eaton definite-purpose contactor</h3>
+          <p class="cat mono">C25CNB130T &middot; 30&nbsp;A &middot; 24&nbsp;V coil</p>
+          <p class="role">CH6 pulls this coil; the contactor&rsquo;s own contacts carry the blower. Sized for inrush so the 4&nbsp;A relay never sees it &mdash; a welded relay would leave the blower stuck on and unreachable.</p>
+          <p class="credit">Photo: electricalparts.com</p>
+        </figcaption>
+      </figure>
+      <figure class="part">
+        <div class="shot"><img src="img/intermatic-pe24gva.jpg" alt="Intermatic valve actuator &times;&nbsp;3" loading="lazy"></div>
+        <figcaption>
+          <span class="chip v-24">24&nbsp;VAC</span>
+          <h3>Intermatic valve actuator &times;&nbsp;3</h3>
+          <p class="cat mono">PE24GVA</p>
+          <p class="role">Intake, return and bypass. These mount on the valves out at the pad, not in the box; their three-wire runs come back through glands on the left face.</p>
+          <p class="credit">Photo: ezpools.com</p>
+        </figcaption>
+      </figure>
+      <figure class="part">
+        <div class="shot"><img src="img/arlington-lpcg.jpg" alt="Arlington cord grips" loading="lazy"></div>
+        <figcaption>
+          <span class="chip v-none">cable entry</span>
+          <h3>Arlington cord grips</h3>
+          <p class="cat mono">LPCG757 (3/4&nbsp;in) &middot; LPCG50 (1/2&nbsp;in)</p>
+          <p class="role">Seals every cable through the enclosure wall. Cord range decides which size each cable gets &mdash; a cable thinner than the grip&rsquo;s range does not seal, so this is a per-cable choice, not a bulk buy.</p>
+          <p class="credit">Photo: rexelusa.com</p>
+        </figcaption>
+      </figure>
+      <figure class="part">
+        <div class="shot"><img src="img/functional-devices-tr100va001.jpg" alt="Functional Devices TR100VA001 control transformer" loading="lazy"></div>
+        <figcaption>
+          <span class="chip v-24">120 &rarr; 24&nbsp;VAC</span>
+          <h3>Functional Devices TR100VA001</h3>
+          <p class="cat mono">100 VA &middot; Class 2 UL5085-3 &middot; 3.80 lb</p>
+          <p class="role">Powers three actuators plus the contactor coil, and carries its own manual-reset circuit breaker &mdash; the button on top. Class 2 is not a nicety here: it is what ADR-8 requires of anything feeding a PE24GVA, and this part is listed for it.</p>
+          <p class="credit">Photo: ZOT Supply &middot; specs: manufacturer datasheet</p>
+        </figcaption>
+      </figure>
+      <figure class="part part-open">
+        <div class="shot shot-open"><span class="mono">no part chosen</span></div>
+        <figcaption>
+          <span class="chip v-none">distribution</span>
+          <h3>DIN rail, terminal blocks, ferrules, wire</h3>
+          <p class="role">Carries the PSU, distributes 24&nbsp;VAC, and lands every field wire so nothing terminates directly on a relay screw.</p>
+          <p class="why"><strong>Why there is no photo:</strong> Nothing specified beyond a ~$40 allowance. Block count follows from the entry table below, once the entries are final.</p>
+        </figcaption>
+      </figure>
+      <figure class="part part-open">
+        <div class="shot shot-open"><span class="mono">no part chosen</span></div>
+        <figcaption>
+          <span class="chip v-line">120&nbsp;VAC</span>
+          <h3>Ground bar, plus its bonding jumper</h3>
+          <p class="role">Where every equipment grounding conductor lands &mdash; feed in, blower out, light out. In a plastic box this is a plain insulated bar screwed to the plate, not a load-centre bonding bar: there is no metal can to bond.</p>
+          <p class="why"><strong>Why there is no photo:</strong> no part chosen. It was drawn in Figure&nbsp;1 and named in the assembly sequence without ever reaching the BOM &mdash; now added at ~$10.</p>
+        </figcaption>
+      </figure>
+      <figure class="part">
+        <div class="shot"><img src="img/ip68-breather-m12.jpg" alt="IP68 M12 by 1.5 breather screw, two pack" loading="lazy"></div>
+        <figcaption>
+          <span class="chip v-none">enclosure</span>
+          <h3>IP68 breather screw, M12&times;1.5</h3>
+          <p class="cat mono">dual-port &middot; 2-pack &middot; metric thread</p>
+          <p class="role">Equalises pressure and drains condensate without breaking the IP rating. A sealed box in Florida sun breathes whether you plan for it or not. Two in the pack, so one is a spare.</p>
+          <p class="credit">Photo: Amazon (B0H3C4CML7)</p>
+        </figcaption>
+      </figure>
+    </div>
+    <p class="note">
+      Pi accessories are not shown: the microSD card, the M2.5 standoffs and the
+      heatsink kit are chosen but belong to the Pi rather than to the plate.
+    </p>
+  </section>
+
+  <hr class="rule">
+
+  <!-- ================= FIGURE 1 &mdash; PLATE LAYOUT ======================== -->
+  <section>
+    <p class="eyebrow">Figure 1</p>
+    <h2>Backplate, plan view</h2>
+
+    <figure>
+      <div class="scroll">
+        <svg viewBox="0 0 700 760" role="img"
+             aria-label="Portrait plan view of the 11.18 by 15.12 inch backplate. Three horizontal voltage bands stack top to bottom: logic with the Raspberry Pi, relay HAT and the 5 volt supply on DIN rail A; 24 volt AC distribution on a DIN terminal strip; and line voltage with the transformer, the line terminals on DIN rail C, and the contactor. The PE bar bolts directly to the plate rather than clipping to a rail. Low-voltage cable entries run down the left face, line-voltage entries along the bottom face.">
+          <rect x="110" y="24" width="481" height="650" rx="6" class="plate-bg"/>
+          <rect x="124" y="38" width="453" height="200" rx="5" class="band-lv"/>
+          <text x="270" y="54" class="lbl-band">LOGIC &middot; 5 VDC / SIGNAL</text>
+          <rect x="124" y="252" width="453" height="170" rx="5" class="band-24"/>
+          <text x="270" y="268" class="lbl-band">24 VAC</text>
+          <rect x="124" y="436" width="453" height="224" rx="5" class="band-line"/>
+          <text x="440" y="452" class="lbl-band">120 VAC &middot; ELECTRICIAN</text>
+          <line x1="140" y1="150" x2="368" y2="150" class="rail"/>
+          <text x="248" y="168" class="lbl-sm">DIN rail A &middot; 5 in</text>
+          <line x1="138" y1="327" x2="482" y2="327" class="rail"/>
+          <line x1="140" y1="482" x2="408" y2="482" class="rail"/>
+          <rect x="378" y="58" width="196" height="116" rx="4" class="part-lv"/>
+          <text x="390" y="80" class="lbl">Pi 4 + 8-Relay HAT</text>
+          <text x="390" y="98" class="lbl-sm">CH1-8 and RS-485 on HAT</text>
+          <rect x="148" y="58" width="92" height="152" rx="4" class="part-lv"/>
+          <text x="160" y="80" class="lbl">HDR-60-5</text>
+          <text x="160" y="98" class="lbl-sm">5 V 6.5 A</text>
+          <rect x="148" y="296" width="324" height="62" rx="4" class="part-24"/>
+          <text x="160" y="318" class="lbl">DIN rail B &middot; 8 in</text>
+          <text x="160" y="336" class="lbl-sm">TB1 COM . TB2-4 valves . TB5 coil</text>
+          <rect x="148" y="452" width="250" height="60" rx="4" class="part-line"/>
+          <text x="160" y="474" class="lbl">Line terminals &middot; rail C</text>
+          <text x="160" y="492" class="lbl-sm">L . N &mdash; PE bar bolts to the plate</text>
+          <rect x="148" y="530" width="176" height="116" rx="4" class="part-line"/>
+          <text x="160" y="552" class="lbl">Transformer</text>
+          <text x="160" y="570" class="lbl-sm">TR100VA001 . 100 VA</text>
+          <rect x="452" y="530" width="122" height="116" rx="4" class="part-line"/>
+          <text x="464" y="552" class="lbl">Contactor</text>
+          <text x="464" y="570" class="lbl-sm">C25CNB130T</text>
+          <circle cx="92" cy="150" r="9" class="gland"/>
+          <text x="78" y="154" class="dim-t" text-anchor="end">CH1</text>
+          <circle cx="92" cy="206" r="9" class="gland"/>
+          <text x="78" y="210" class="dim-t" text-anchor="end">CH2</text>
+          <circle cx="92" cy="262" r="9" class="gland"/>
+          <text x="78" y="266" class="dim-t" text-anchor="end">CH3</text>
+          <circle cx="92" cy="300" r="9" class="gland"/>
+          <text x="78" y="304" class="dim-t" text-anchor="end">HTR</text>
+          <circle cx="92" cy="352" r="9" class="gland"/>
+          <text x="78" y="356" class="dim-t" text-anchor="end">485-P</text>
+          <circle cx="92" cy="398" r="9" class="gland"/>
+          <text x="78" y="402" class="dim-t" text-anchor="end">485-C</text>
+          <circle cx="200" cy="692" r="7" class="gland"/>
+          <text x="200" y="716" class="dim-t" text-anchor="middle">vent</text>
+          <circle cx="360" cy="692" r="13" class="gland-line"/>
+          <text x="360" y="716" class="dim-t" text-anchor="middle">IN</text>
+          <circle cx="500" cy="692" r="13" class="gland-line"/>
+          <text x="500" y="716" class="dim-t" text-anchor="middle">BLW</text>
+          <circle cx="570" cy="692" r="9" class="gland-line"/>
+          <text x="570" y="716" class="dim-t" text-anchor="middle">LT</text>
+          <text x="78" y="110" class="dim-t" text-anchor="end">LEFT FACE</text>
+          <text x="110" y="736" class="dim-t">BOTTOM FACE</text>
+          <text x="350" y="16" class="dim-t" text-anchor="middle">11.18 in</text>
+          <text x="613" y="349" class="dim-t" transform="rotate(-90 613 349)" text-anchor="middle">15.12 in</text>
+        </svg>
+      </div>
+      <figcaption>
+        Bands stack bottom-up by voltage so the line-voltage feeds never cross
+        the logic. Portrait suits that better than landscape did: the Pi and the
+        transformer end up 15.12 in apart rather than 11.18, which is free
+        margin on both the heat and the Wi-Fi arguments.
+        <br><br>
+        Ten entries will not fit on one 12.99 in face &mdash; roughly 13.25 in of
+        hole and clearance against about 11.5 in usable &mdash; so they split.
+        <strong>Low voltage down the left face, line voltage along the
+        bottom.</strong> Forced by arithmetic, but better practice than the
+        single row it replaces: the two classes now pass through different
+        walls. Positions are indicative; confirm against the parts in hand
+        before drilling anything.
+        <br><br>
+        The ground bar carries a jumper because it has to. The enclosure and its
+        backplate are both ABS, so a DIN rail mounted on that plate is floating,
+        and nothing in this box is bonded by accident. Note the failure mode:
+        every conductor on the bar is continuous with every other one whether or
+        not the bar reaches earth, so checking continuity between EGCs proves
+        nothing. Bar-to-incoming-ground is the only check worth making.
+      </figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2>Why the parts sit where they do</h2>
+    <div class="grid2">
+      <div class="card">
+        <span class="k">Transformer, bottom left</span>
+        <p>Heaviest item and the biggest heat source. Low keeps the centre of
+        mass low; left puts it as far as possible from the Pi.</p>
+      </div>
+      <div class="card">
+        <span class="k">Pi + HAT, top right</span>
+        <p>Diagonally opposite the transformer. Away from its heat plume, its
+        magnetic field, and the line-voltage band.</p>
+      </div>
+      <div class="card">
+        <span class="k">RS-485, on the HAT</span>
+        <p>There is no separate terminal block: the HAT carries the transceiver
+        and its own A/B/SHLD terminals, and presents on the Pi's GPIO UART. The
+        run is the most noise-sensitive in the panel, so keep it off the
+        contactor side on its way up.</p>
+      </div>
+      <div class="card">
+        <span class="k">Entries, two faces</span>
+        <p>Line voltage along the bottom, where water runs down a cable and
+        every conductor gets a natural drip loop. Low voltage down the left
+        face, because ten entries do not fit on one 12.99 in wall.</p>
+      </div>
+    </div>
+  </section>
+
+  <hr class="rule">
+
+  <!-- ================= FIGURE 2 &mdash; POWER ============================== -->
+  <section>
+    <p class="eyebrow">Figure 2</p>
+    <h2>Where the power goes</h2>
+
+    <figure>
+      <div class="scroll">
+        <svg viewBox="0 0 908 470" role="img"
+             aria-label="Power distribution: the panel's own 120 volt feed supplies only the transformer and the 5 volt DIN supply, about 2.6 amps. The blower and light are separate branch circuits from the Intermatic T40004RT3 subpanel, looped through switch contacts in this panel and back; no load power originates here. The transformer's 24 volt secondary feeds the three valve actuators through changeover relays and the blower contactor coil. The 5 volt supply powers the relay HAT, which in turn powers the Raspberry Pi over the GPIO header.">
+
+          <defs>
+            <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5"
+                    markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+            </marker>
+            <marker id="ar-line" viewBox="0 0 10 10" refX="9" refY="5"
+                    markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" class="mk-line"/>
+            </marker>
+            <marker id="ar-24" viewBox="0 0 10 10" refX="9" refY="5"
+                    markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" class="mk-24"/>
+            </marker>
+            <marker id="ar-lv" viewBox="0 0 10 10" refX="9" refY="5"
+                    markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" class="mk-lv"/>
+            </marker>
+          </defs>
+
+          <!-- source -->
+          <rect x="16" y="150" width="128" height="66" rx="5" class="part-line"/>
+          <text x="30" y="176" class="lbl">Panel supply</text>
+          <text x="30" y="194" class="lbl-sm">from T40004RT3</text>
+          <text x="30" y="210" class="lbl-sm">~2.6 A total</text>
+
+          <!-- line bus -->
+          <line x1="144" y1="183" x2="212" y2="183" class="flow-line" marker-end="url(#ar-line)"/>
+          <rect x="212" y="60" width="14" height="170" rx="4" class="part-line"/>
+          <text x="196" y="48" class="lbl-sm">line bus</text>
+
+          <!-- transformer -->
+          <line x1="226" y1="98" x2="308" y2="98" class="flow-line" marker-end="url(#ar-line)"/>
+          <rect x="308" y="66" width="176" height="66" rx="5" class="part-line"/>
+          <text x="322" y="94" class="lbl">Transformer</text>
+          <text x="322" y="114" class="lbl-sm">100 VA, Class 2</text>
+
+          <!-- 5v psu -->
+          <line x1="226" y1="196" x2="308" y2="196" class="flow-line" marker-end="url(#ar-line)"/>
+          <rect x="308" y="164" width="176" height="66" rx="5" class="part-lv"/>
+          <text x="322" y="192" class="lbl">HDR-60-5</text>
+          <text x="322" y="212" class="lbl-sm">5 V 6.5 A</text>
+
+          <!-- loads are not fed from here: each is a loop from the subpanel -->
+          <rect x="16" y="344" width="180" height="96" rx="5" class="part-line"/>
+          <text x="30" y="372" class="lbl">T40004RT3</text>
+          <text x="30" y="392" class="lbl-sm">100 A, 8 breaker spaces</text>
+          <text x="30" y="410" class="lbl-sm">light and blower branch</text>
+          <text x="30" y="428" class="lbl-sm">circuits originate here</text>
+
+          <line x1="196" y1="372" x2="330" y2="372" class="flow-line" marker-end="url(#ar-line)"/>
+          <text x="212" y="364" class="lbl-sm">hot out</text>
+          <line x1="330" y1="412" x2="196" y2="412" class="flow-line" marker-end="url(#ar-line)"/>
+          <text x="212" y="404" class="lbl-sm">switched hot back</text>
+
+          <rect x="330" y="344" width="230" height="96" rx="5" class="part-line"/>
+          <text x="344" y="372" class="lbl">Switch contacts only</text>
+          <text x="344" y="392" class="lbl-sm">CH7 light, direct</text>
+          <text x="344" y="410" class="lbl-sm">CH6 &rarr; contactor &rarr; blower</text>
+          <text x="344" y="428" class="lbl-sm">no load power originates here</text>
+
+          <text x="580" y="372" class="lbl-sm">Each load keeps its own breaker and its own</text>
+          <text x="580" y="390" class="lbl-sm">protection in the subpanel. This panel only</text>
+          <text x="580" y="408" class="lbl-sm">opens and closes the circuit.</text>
+
+          <!-- 24v bus -->
+          <line x1="484" y1="98" x2="556" y2="98" class="flow-24" marker-end="url(#ar-24)"/>
+          <text x="492" y="88" class="lbl-sm">24 VAC</text>
+          <rect x="556" y="46" width="14" height="150" rx="4" class="part-24"/>
+
+          <!-- actuators -->
+          <line x1="570" y1="72" x2="700" y2="72" class="flow-24" marker-end="url(#ar-24)"/>
+          <rect x="700" y="42" width="192" height="62" rx="5" class="part-24"/>
+          <text x="714" y="68" class="lbl">3 &times; PE24GVA</text>
+          <text x="714" y="88" class="lbl-sm">via CH1&ndash;3, COM/NO/NC</text>
+
+          <!-- contactor coil -->
+          <line x1="570" y1="164" x2="700" y2="164" class="flow-24" marker-end="url(#ar-24)"/>
+          <rect x="700" y="134" width="192" height="62" rx="5" class="part-24"/>
+          <text x="714" y="160" class="lbl">Contactor coil</text>
+          <text x="714" y="180" class="lbl-sm">via CH6 &rarr; blower</text>
+
+          <!-- 5v to hat to pi -->
+          <polyline points="484,197 540,197 540,268 700,268" class="flow-lv" marker-end="url(#ar-lv)"/>
+          <text x="552" y="258" class="lbl-sm">5 V</text>
+          <rect x="700" y="228" width="192" height="80" rx="5" class="part-lv"/>
+          <text x="714" y="256" class="lbl">HAT &rarr; Pi</text>
+          <text x="714" y="276" class="lbl-sm">over the GPIO header</text>
+          <text x="714" y="296" class="lbl-sm">no USB-C brick</text>
+        </svg>
+      </div>
+      <figcaption>
+The panel's own feed has two destinations, not five. An earlier
+        version of this drawing had the light and the chlorinator fed from these
+        line terminals, which would have put the blower's 7.3&nbsp;A and its 30&ndash;45&nbsp;A
+        inrush through this box's supply. They are not: every load is its own
+        branch circuit from the T40004RT3, looped through a contact here and
+        back, keeping its breaker and its protection where they already are.
+        <br><br>
+        The relay HAT powers the Pi over GPIO rather than the Pi powering the
+        HAT &mdash; which is why the 5&nbsp;V supply is sized for both and why there is
+        no USB-C brick in the finished enclosure.
+      </figcaption>
+    </figure>
+
+    <div class="note warn">
+      <h3>The transformer earns its size here</h3>
+      <p>
+        100&nbsp;VA rather than 75. njsPC diverts both valves at once &mdash; measured
+        on the bench, not assumed &mdash; so the "sequenced, never simultaneous"
+        assumption that made 75&nbsp;VA work does not hold. Three actuators
+        moving together draw 54&nbsp;VA before the contactor coil pulls in.
+        Class&nbsp;2 is then settled by the part rather than by arithmetic: the
+        TR100VA001 is <strong>Class&nbsp;2 UL5085-3 listed</strong> and carries its own
+        manual-reset breaker, which is what ADR-8 actually requires of anything
+        feeding a PE24GVA.
+      </p>
+    </div>
+  </section>
+
+  <hr class="rule">
+
+  <!-- ================= RELAY MAP ===================================== -->
+  <section>
+    <p class="eyebrow">The HAT</p>
+    <h2>Relay channels</h2>
+    <p>
+      Eight channels, fixed by the equipment rather than by preference.
+      Channels 1&ndash;3 need changeover contacts because a three-wire actuator
+      keeps one of two lines energised at all times; channels 4&ndash;5 must be
+      isolated because the Raypak supplies its own low voltage on that
+      terminal block.
+    </p>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th class="num">CH</th>
+            <th>Load</th>
+            <th>Contacts</th>
+            <th>Class</th>
+            <th>Lands on</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="num mono">1</td><td>Intake actuator</td><td>COM / NO / NC</td><td><span class="tag v-24">24 VAC</span></td><td>TB2 &rarr; gland 1</td></tr>
+          <tr><td class="num mono">2</td><td>Return actuator</td><td>COM / NO / NC</td><td><span class="tag v-24">24 VAC</span></td><td>TB3 &rarr; gland 2</td></tr>
+          <tr><td class="num mono">3</td><td>Bypass actuator</td><td>COM / NO / NC</td><td><span class="tag v-24">24 VAC</span></td><td>TB4 &rarr; gland 3</td></tr>
+          <tr><td class="num mono">4</td><td>Heater POOL, terminal 23</td><td>dry, isolated</td><td><span class="tag v-lv">dry</span></td><td>direct to HAT, gland 4</td></tr>
+          <tr><td class="num mono">5</td><td>Heater SPA, terminal 24</td><td>dry, isolated</td><td><span class="tag v-lv">dry</span></td><td>direct to HAT, gland 4</td></tr>
+          <tr><td class="num mono">6</td><td>Blower</td><td>NO &rarr; contactor coil</td><td><span class="tag v-24">24 VAC</span></td><td>TB5, coil in panel</td></tr>
+          <tr><td class="num mono">7</td><td>Light</td><td>NO, in the load's loop</td><td><span class="tag v-line">120 VAC</span></td><td>gland 8, to and from T40004RT3</td></tr>
+          <tr><td class="num mono">8</td><td><em>spare</em></td><td>&mdash;</td><td>&mdash;</td><td>chlorinator gate dropped &mdash; see below</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note stop">
+      <h3>Blocking: the board's own rating contradicts its product page</h3>
+      <p>
+        <strong>Do not land 120&nbsp;V on this card until Sequent confirms the
+        channel rating.</strong> The product page says <span class="mono">4&nbsp;A at
+        120&nbsp;VAC / 24&nbsp;VDC</span> for all eight channels. The silkscreen on the
+        v6.0 board says <span class="mono">RELAYS&nbsp;1&ndash;3: 5A/48VAC/DC</span>,
+        <span class="mono">RELAYS&nbsp;5&ndash;8: 5A/48VAC/DC</span> and
+        <span class="mono">RELAY4: 3A/48V</span> &mdash; visible in the photo in this
+        very document.
+      </p>
+      <p>
+        The silkscreen is the more conservative and the more specific: it
+        singles out relay 4 at a different figure, which reads as a layout
+        constraint rather than a slip. Markings like that usually describe the
+        terminal block or the certified creepage on the mains side, either of
+        which binds whatever the relay inside is rated for &mdash; and the Songle
+        relays fitted are 10&nbsp;A/250&nbsp;VAC parts, so the relay is not the limit.
+      </p>
+      <p>
+        <strong>If 48&nbsp;V is the real limit, CH7 cannot drive the light
+        directly</strong> and needs an interposing relay this BOM does not
+        contain. Everything else already sits below 48&nbsp;V &mdash; CH1&ndash;3 at
+        24&nbsp;VAC, CH4&ndash;5 dry, CH6 on a 24&nbsp;V coil &mdash; so the contactor decision
+        for the blower happens to have put most of the panel on the safe side
+        of the stricter reading. CH7 is the only exposure, and separately it is
+        the channel that drags a 120&nbsp;V pair into the logic band.
+      </p>
+    </div>
+
+    <div class="note stop">
+      <h3>Channels 4 and 5 carry someone else's voltage</h3>
+      <p>
+        The heater's three-wire interface is powered by the Raypak, not by this
+        panel. Those two channels must be genuinely isolated dry contacts with
+        no path back to the 24&nbsp;VAC transformer &mdash; tying them to the panel's
+        common is the one wiring mistake here that damages equipment rather
+        than just failing.
+      </p>
+    </div>
+  </section>
+
+  <hr class="rule">
+
+  <!-- ================= FIGURE 3 &mdash; CHANNEL WIRING ==================== -->
+  <section>
+    <p class="eyebrow">Figure 3</p>
+    <h2>What each channel actually switches</h2>
+    <p>
+      The same eight channels, drawn terminal to terminal. Read it left to
+      right: what feeds the contact, what the contact is, and what it lands on.
+      Five channels are fed from this panel's own buses, two are dry contacts
+      that must touch nothing here, and one pulls a coil and nothing else.
+    </p>
+
+    <figure>
+      <svg viewBox="0 0 908 854" role="img"
+           aria-label="Channel wiring diagram. Channels 1 to 3 drive Intermatic PE24GVA valve actuators through changeover contacts fed from the 24 volt AC bus, with red on normally open, white on normally closed and black returning to 24 volt common. Channels 4 and 5 are dry isolated contacts bridging Raypak terminals 22 to 23 and 22 to 24, enclosed in a boundary marking that they connect to nothing on this panel. Channel 6 pulls the blower contactor coil only. Channel 7 sits inside the pool light's own branch circuit. Channel 8 is spare and unwired. A footer shows the three unswitched runs: 5 volt DC, RS-485, and protective earth.">
+        <defs>
+          <marker id="w-24" viewBox="0 0 10 10" refX="9" refY="5"
+                  markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" class="mk-24"/>
+          </marker>
+          <marker id="w-line" viewBox="0 0 10 10" refX="9" refY="5"
+                  markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" class="mk-line"/>
+          </marker>
+          <marker id="w-n" viewBox="0 0 10 10" refX="9" refY="5"
+                  markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" class="mk-n"/>
+          </marker>
+        </defs>
+
+        <text x="14" y="28" class="lbl-band">FED FROM</text>
+        <text x="136" y="28" class="lbl-band">CONTACT</text>
+        <text x="344" y="28" class="lbl-band">LANDS ON</text>
+        <text x="622" y="28" class="lbl-band">WHY</text>
+
+  <!-- the one wiring mistake that damages equipment -->
+  <rect x="6" y="292" width="606" height="156" rx="6" class="w-iso"/>
+  <text x="14" y="284" class="lbl-band">ISOLATED &mdash; NOTHING HERE TOUCHES THIS PANEL'S 24 VAC</text>
+
+  <!-- channel 1 -->
+  <rect x="14" y="60" width="82" height="24" rx="3" class="w-src-24"/>
+  <text x="55" y="76" class="lbl-t" text-anchor="middle">24 H</text>
+  <line x1="96" y1="72" x2="136" y2="72" class="flow-24" marker-end="url(#w-24)"/>
+  <rect x="14" y="90" width="82" height="24" rx="3" class="w-src-24"/>
+  <text x="55" y="106" class="lbl-t" text-anchor="middle">24 C</text>
+  <line x1="96" y1="102" x2="136" y2="102" class="flow-24" marker-end="url(#w-24)"/>
+  <rect x="136" y="56" width="154" height="58" rx="4" class="part-24"/>
+  <text x="150" y="80" class="lbl">CH1 &mdash; SPDT</text>
+  <text x="150" y="99" class="lbl-sm">COM &middot; NO &middot; NC</text>
+  <line x1="290" y1="85" x2="344" y2="85" class="flow-24" marker-end="url(#w-24)"/>
+  <rect x="344" y="56" width="262" height="58" rx="4" class="part-24"/>
+  <text x="358" y="80" class="lbl">PE24GVA &mdash; intake (180&deg;)</text>
+  <text x="358" y="99" class="lbl-sm">RED = NO &middot; WHT = NC &middot; BLK = 24 C</text>
+  <text x="622" y="76" class="lbl-sm">COM is fed from 24 H, so one of the two</text>
+  <text x="622" y="91" class="lbl-sm">lines is always live. The cam limit switch</text>
+  <text x="622" y="106" class="lbl-sm">stops the motor at the end of travel.</text>
+
+  <!-- channel 2 -->
+  <rect x="14" y="134" width="82" height="24" rx="3" class="w-src-24"/>
+  <text x="55" y="150" class="lbl-t" text-anchor="middle">24 H</text>
+  <line x1="96" y1="146" x2="136" y2="146" class="flow-24" marker-end="url(#w-24)"/>
+  <rect x="14" y="164" width="82" height="24" rx="3" class="w-src-24"/>
+  <text x="55" y="180" class="lbl-t" text-anchor="middle">24 C</text>
+  <line x1="96" y1="176" x2="136" y2="176" class="flow-24" marker-end="url(#w-24)"/>
+  <rect x="136" y="130" width="154" height="58" rx="4" class="part-24"/>
+  <text x="150" y="154" class="lbl">CH2 &mdash; SPDT</text>
+  <text x="150" y="173" class="lbl-sm">COM &middot; NO &middot; NC</text>
+  <line x1="290" y1="159" x2="344" y2="159" class="flow-24" marker-end="url(#w-24)"/>
+  <rect x="344" y="130" width="262" height="58" rx="4" class="part-24"/>
+  <text x="358" y="154" class="lbl">PE24GVA &mdash; return (90&deg;)</text>
+  <text x="358" y="173" class="lbl-sm">RED = NO &middot; WHT = NC &middot; BLK = 24 C</text>
+  <text x="622" y="150" class="lbl-sm">Wired identically to CH1, on a 90&deg; valve.</text>
+
+  <!-- channel 3 -->
+  <rect x="14" y="208" width="82" height="24" rx="3" class="w-src-24"/>
+  <text x="55" y="224" class="lbl-t" text-anchor="middle">24 H</text>
+  <line x1="96" y1="220" x2="136" y2="220" class="flow-24" marker-end="url(#w-24)"/>
+  <rect x="14" y="238" width="82" height="24" rx="3" class="w-src-24"/>
+  <text x="55" y="254" class="lbl-t" text-anchor="middle">24 C</text>
+  <line x1="96" y1="250" x2="136" y2="250" class="flow-24" marker-end="url(#w-24)"/>
+  <rect x="136" y="204" width="154" height="58" rx="4" class="part-24"/>
+  <text x="150" y="228" class="lbl">CH3 &mdash; SPDT</text>
+  <text x="150" y="247" class="lbl-sm">COM &middot; NO &middot; NC</text>
+  <line x1="290" y1="233" x2="344" y2="233" class="flow-24" marker-end="url(#w-24)"/>
+  <rect x="344" y="204" width="262" height="58" rx="4" class="part-24"/>
+  <text x="358" y="228" class="lbl">PE24GVA &mdash; bypass (90&deg;)</text>
+  <text x="358" y="247" class="lbl-sm">RED = NO &middot; WHT = NC &middot; BLK = 24 C</text>
+  <text x="622" y="224" class="lbl-sm">Held energised right through pool mode</text>
+  <text x="622" y="239" class="lbl-sm">(ADR-9). Holding a line live does not run</text>
+  <text x="622" y="254" class="lbl-sm">the motor once the valve has arrived.</text>
+
+  <!-- channel 4 -->
+  <rect x="14" y="323" width="82" height="24" rx="3" class="w-none"/>
+  <text x="55" y="339" class="lbl-sm" text-anchor="middle">no feed</text>
+  <rect x="136" y="306" width="154" height="58" rx="4" class="part"/>
+  <text x="150" y="330" class="lbl">CH4 &mdash; dry</text>
+  <text x="150" y="349" class="lbl-sm">isolated contact</text>
+  <line x1="290" y1="335" x2="344" y2="335" class="flow-n" marker-end="url(#w-n)"/>
+  <rect x="344" y="306" width="262" height="58" rx="4" class="part"/>
+  <text x="358" y="330" class="lbl">Raypak TB &mdash; 22 &harr; 23</text>
+  <text x="358" y="349" class="lbl-sm">close to call POOL heat</text>
+  <text x="622" y="326" class="lbl-sm">Touches nothing on this panel. The Raypak</text>
+  <text x="622" y="341" class="lbl-sm">supplies this low voltage from its own</text>
+  <text x="622" y="356" class="lbl-sm">board, and 22 is the shared common.</text>
+
+  <!-- channel 5 -->
+  <rect x="14" y="397" width="82" height="24" rx="3" class="w-none"/>
+  <text x="55" y="413" class="lbl-sm" text-anchor="middle">no feed</text>
+  <rect x="136" y="380" width="154" height="58" rx="4" class="part"/>
+  <text x="150" y="404" class="lbl">CH5 &mdash; dry</text>
+  <text x="150" y="423" class="lbl-sm">isolated contact</text>
+  <line x1="290" y1="409" x2="344" y2="409" class="flow-n" marker-end="url(#w-n)"/>
+  <rect x="344" y="380" width="262" height="58" rx="4" class="part"/>
+  <text x="358" y="404" class="lbl">Raypak TB &mdash; 22 &harr; 24</text>
+  <text x="358" y="423" class="lbl-sm">close to call SPA heat</text>
+  <text x="622" y="400" class="lbl-sm">Same contact form, same isolation.</text>
+  <text x="622" y="415" class="lbl-sm">The heater keeps its own thermostat and</text>
+  <text x="622" y="430" class="lbl-sm">its 104 &deg;F spa cap (ADR-4).</text>
+
+  <!-- channel 6 -->
+  <rect x="14" y="486" width="82" height="24" rx="3" class="w-src-24"/>
+  <text x="55" y="502" class="lbl-t" text-anchor="middle">24 H</text>
+  <line x1="96" y1="498" x2="136" y2="498" class="flow-24" marker-end="url(#w-24)"/>
+  <rect x="14" y="516" width="82" height="24" rx="3" class="w-src-24"/>
+  <text x="55" y="532" class="lbl-t" text-anchor="middle">24 C</text>
+  <line x1="96" y1="528" x2="136" y2="528" class="flow-24" marker-end="url(#w-24)"/>
+  <rect x="136" y="482" width="154" height="58" rx="4" class="part-24"/>
+  <text x="150" y="506" class="lbl">CH6 &mdash; NO</text>
+  <text x="150" y="525" class="lbl-sm">coil circuit only</text>
+  <line x1="290" y1="511" x2="344" y2="511" class="flow-24" marker-end="url(#w-24)"/>
+  <rect x="344" y="482" width="262" height="58" rx="4" class="part-24"/>
+  <text x="358" y="506" class="lbl">Contactor coil &mdash; A1 / A2</text>
+  <text x="358" y="525" class="lbl-sm">C25CNB130T, 24 V coil</text>
+  <text x="622" y="502" class="lbl-sm">The relay pulls the coil and nothing else.</text>
+  <text x="622" y="517" class="lbl-sm">The contactor's own L1/T1 carry the blower:</text>
+  <text x="622" y="532" class="lbl-sm">7.3 A running, 30&ndash;45 A locked-rotor inrush.</text>
+
+  <!-- channel 7 -->
+  <rect x="14" y="573" width="82" height="24" rx="3" class="w-src-line"/>
+  <text x="55" y="589" class="lbl-t" text-anchor="middle">T4000</text>
+  <line x1="96" y1="585" x2="136" y2="585" class="flow-line" marker-end="url(#w-line)"/>
+  <rect x="136" y="556" width="154" height="58" rx="4" class="part-line"/>
+  <text x="150" y="580" class="lbl">CH7 &mdash; NO</text>
+  <text x="150" y="599" class="lbl-sm">in the load's loop</text>
+  <line x1="290" y1="585" x2="344" y2="585" class="flow-line" marker-end="url(#w-line)"/>
+  <rect x="344" y="556" width="262" height="58" rx="4" class="part-line"/>
+  <text x="358" y="580" class="lbl">Pool light</text>
+  <text x="358" y="599" class="lbl-sm">LED, under 1 A</text>
+  <text x="622" y="569" class="lbl-sm">Hot in from the subpanel breaker, switched</text>
+  <text x="622" y="584" class="lbl-sm">hot back out to it. Far more cycles than any</text>
+  <text x="622" y="599" class="lbl-sm">other channel &mdash; Jandy colour changes count</text>
+  <text x="622" y="614" class="lbl-sm">power interruptions. Remap in software.</text>
+
+  <!-- channel 8 -->
+  <rect x="14" y="647" width="82" height="24" rx="3" class="w-none"/>
+  <text x="55" y="663" class="lbl-sm" text-anchor="middle">no feed</text>
+  <rect x="136" y="630" width="154" height="58" rx="4" class="part"/>
+  <text x="150" y="654" class="lbl">CH8 &mdash; spare</text>
+  <text x="150" y="673" class="lbl-sm">not wired</text>
+  <rect x="344" y="630" width="262" height="58" rx="4" class="w-none"/>
+  <text x="358" y="654" class="lbl-sm">nothing &mdash; the gate was dropped</text>
+  <text x="358" y="673" class="lbl-sm">the cell has its own supply</text>
+  <text x="622" y="643" class="lbl-sm">The chlorinator is fed by its own transformer</text>
+  <text x="622" y="658" class="lbl-sm">off the subpanel; only RS-485 reaches us. Its</text>
+  <text x="622" y="673" class="lbl-sm">only job was suppressing spa chlorination,</text>
+  <text x="622" y="688" class="lbl-sm">which ADR-6 already allows simply accepting.</text>
+
+  <!-- everything that is not a relay channel -->
+  <rect x="6" y="726" width="896" height="118" rx="6" class="plate-bg"/>
+  <text x="20" y="748" class="lbl-band">NOT SWITCHED &mdash; THE THREE RUNS THAT HAVE NO RELAY</text>
+  <text x="20" y="776" class="lbl">5 VDC</text>
+  <text x="120" y="776" class="lbl-sm">HDR-60-5 +V / -V &rarr; HAT 5 V connector &rarr; Pi over the GPIO header. The Pi has no supply of its own.</text>
+  <text x="20" y="802" class="lbl">RS-485</text>
+  <text x="120" y="802" class="lbl-sm">HAT A / B / SHLD &rarr; IntelliFlo pump and chlorinator cell. Shield termination is not decided.</text>
+  <text x="20" y="828" class="lbl">PE</text>
+  <text x="120" y="828" class="lbl-sm">Feed, blower and light EGCs &rarr; ground bar &rarr; jumper to incoming ground. Nothing here bonds itself.</text>
+      </svg>
+      <figcaption>
+        Channels 4 and 5 are the ones to get right. They carry the Raypak's own
+        low voltage, so tying either to this panel's 24&nbsp;VAC common back-feeds
+        one supply into the other &mdash; the single wiring mistake here that
+        damages equipment rather than merely failing. Everything inside the
+        dashed boundary connects only to the heater's terminal block.
+      </figcaption>
+    </figure>
+  </section>
+
+
+  <hr class="rule">
+
+  <!-- ================= FIGURE 4 &mdash; WIRING ON THE PLATE ================ -->
+  <section>
+    <p class="eyebrow">Figure 4</p>
+    <h2>The same panel, wired</h2>
+    <p>
+      Figure&nbsp;1 says where the parts go and Figure&nbsp;3 says what connects to
+      what. This is both at once: every cable drawn on the real plate, entering
+      at its own gland and routed through the gaps the parts leave. Colour is
+      voltage class, as everywhere else.
+    </p>
+
+    <figure>
+      <svg viewBox="0 0 700 760" role="img"
+           aria-label="The same portrait plate with every cable drawn on it. Three actuator cables enter the left face, run down the left margin clear of the 5 volt supply, and drop onto three separate blocks along the top of the 24 volt terminal strip. The RS-485 pair and the heater three-wire pass beneath that strip without landing on it. The heater three-wire and both RS-485 cables enter the left face lower down and climb the right margin to the HAT. On the bottom face the panel supply rises to the line terminals, the blower loop rises to the contactor, and the light loop climbs the outermost right lane to CH7 on the HAT. Crossings are drawn as hops.">
+          <rect x="110" y="24" width="481" height="650" rx="6" class="plate-bg"/>
+          <rect x="124" y="38" width="453" height="200" rx="5" class="band-lv"/>
+          <text x="270" y="54" class="lbl-band">LOGIC &middot; 5 VDC / SIGNAL</text>
+          <rect x="124" y="252" width="453" height="170" rx="5" class="band-24"/>
+          <text x="270" y="268" class="lbl-band">24 VAC</text>
+          <rect x="124" y="436" width="453" height="224" rx="5" class="band-line"/>
+          <text x="440" y="452" class="lbl-band">120 VAC &middot; ELECTRICIAN</text>
+          <line x1="140" y1="150" x2="368" y2="150" class="rail"/>
+          <text x="248" y="168" class="lbl-sm">DIN rail A &middot; 5 in</text>
+          <line x1="138" y1="327" x2="482" y2="327" class="rail"/>
+          <line x1="140" y1="482" x2="408" y2="482" class="rail"/>
+          <rect x="378" y="58" width="196" height="116" rx="4" class="part-lv"/>
+          <text x="390" y="80" class="lbl">Pi 4 + 8-Relay HAT</text>
+          <text x="390" y="98" class="lbl-sm">CH1-8 and RS-485 on HAT</text>
+          <rect x="148" y="58" width="92" height="152" rx="4" class="part-lv"/>
+          <text x="160" y="80" class="lbl">HDR-60-5</text>
+          <text x="160" y="98" class="lbl-sm">5 V 6.5 A</text>
+          <rect x="148" y="296" width="324" height="62" rx="4" class="part-24"/>
+          <text x="160" y="318" class="lbl">DIN rail B &middot; 8 in</text>
+          <text x="160" y="336" class="lbl-sm">TB1 COM . TB2-4 valves . TB5 coil</text>
+          <rect x="148" y="452" width="250" height="60" rx="4" class="part-line"/>
+          <text x="160" y="474" class="lbl">Line terminals &middot; rail C</text>
+          <text x="160" y="492" class="lbl-sm">L . N &mdash; PE bar bolts to the plate</text>
+          <rect x="148" y="530" width="176" height="116" rx="4" class="part-line"/>
+          <text x="160" y="552" class="lbl">Transformer</text>
+          <text x="160" y="570" class="lbl-sm">TR100VA001 . 100 VA</text>
+          <rect x="452" y="530" width="122" height="116" rx="4" class="part-line"/>
+          <text x="464" y="552" class="lbl">Contactor</text>
+          <text x="464" y="570" class="lbl-sm">C25CNB130T</text>
+          <circle cx="92" cy="150" r="9" class="gland"/>
+          <text x="78" y="154" class="dim-t" text-anchor="end">CH1</text>
+          <circle cx="92" cy="206" r="9" class="gland"/>
+          <text x="78" y="210" class="dim-t" text-anchor="end">CH2</text>
+          <circle cx="92" cy="262" r="9" class="gland"/>
+          <text x="78" y="266" class="dim-t" text-anchor="end">CH3</text>
+          <circle cx="92" cy="300" r="9" class="gland"/>
+          <text x="78" y="304" class="dim-t" text-anchor="end">HTR</text>
+          <circle cx="92" cy="352" r="9" class="gland"/>
+          <text x="78" y="356" class="dim-t" text-anchor="end">485-P</text>
+          <circle cx="92" cy="398" r="9" class="gland"/>
+          <text x="78" y="402" class="dim-t" text-anchor="end">485-C</text>
+          <circle cx="200" cy="692" r="7" class="gland"/>
+          <text x="200" y="716" class="dim-t" text-anchor="middle">vent</text>
+          <circle cx="360" cy="692" r="13" class="gland-line"/>
+          <text x="360" y="716" class="dim-t" text-anchor="middle">IN</text>
+          <circle cx="500" cy="692" r="13" class="gland-line"/>
+          <text x="500" y="716" class="dim-t" text-anchor="middle">BLW</text>
+          <circle cx="570" cy="692" r="9" class="gland-line"/>
+          <text x="570" y="716" class="dim-t" text-anchor="middle">LT</text>
+          <text x="78" y="110" class="dim-t" text-anchor="end">LEFT FACE</text>
+          <text x="110" y="736" class="dim-t">BOTTOM FACE</text>
+          <text x="350" y="16" class="dim-t" text-anchor="middle">11.18 in</text>
+          <text x="613" y="349" class="dim-t" transform="rotate(-90 613 349)" text-anchor="middle">15.12 in</text>
+          <path d="M 92 150 L 142 150 L 142 264 L 230 264 L 230 296" class="w4-24"/>
+          <path d="M 92 206 L 134 206 L 134 272 L 200 272 L 200 296" class="w4-24"/>
+          <path d="M 92 262 L 117.5 262 A 4.5 4.5 0 0 1 126.5 262 L 126 262 L 126 280 L 170 280 L 170 296" class="w4-24"/>
+          <path d="M 92 398 L 113.5 398 A 4.5 4.5 0 0 1 122.5 398 L 117.5 398 A 4.5 4.5 0 0 1 126.5 398 L 126 398 L 126 382 L 125.5 382 A 4.5 4.5 0 0 1 134.5 382 L 459.5 382 A 4.5 4.5 0 0 1 468.5 382 L 542 382 L 542 174" class="w4-lv"/>
+          <path d="M 92 352 L 113.5 352 A 4.5 4.5 0 0 1 122.5 352 L 117.5 352 A 4.5 4.5 0 0 1 126.5 352 L 126 352 L 126 404 L 125.5 404 A 4.5 4.5 0 0 1 134.5 404 L 459.5 404 A 4.5 4.5 0 0 1 468.5 404 L 554 404 L 554 174" class="w4-lv"/>
+          <path d="M 92 300 L 118 300 L 118 426 L 117.5 426 A 4.5 4.5 0 0 1 126.5 426 L 125.5 426 A 4.5 4.5 0 0 1 134.5 426 L 459.5 426 A 4.5 4.5 0 0 1 468.5 426 L 566 426 L 566 174" class="w4-dry"/>
+          <path d="M 570 692 L 570 666 L 578 666 L 578 160 L 574 160" class="w4-line"/>
+          <path d="M 360 692 L 360 512" class="w4-line"/>
+          <path d="M 500 692 L 500 646" class="w4-line"/>
+          <path d="M 250 512 L 250 530" class="w4-line"/>
+          <path d="M 170 530 L 170 522 L 130 522 L 130 370 L 170 370 L 170 358" class="w4-24"/>
+          <path d="M 300 452 L 300 440 L 134.5 440 A 4.5 4.5 0 0 0 125.5 440 L 122 440 L 122 240 L 129.5 240 A 4.5 4.5 0 0 1 138.5 240 L 137.5 240 A 4.5 4.5 0 0 1 146.5 240 L 200 240 L 200 210" class="w4-line"/>
+          <path d="M 240 120 L 378 120" class="w4-lv"/>
+          <path d="M 384 174 L 384 296" class="w4-24"/>
+          <path d="M 404 174 L 404 296" class="w4-24"/>
+          <path d="M 424 174 L 424 296" class="w4-24"/>
+          <path d="M 444 174 L 444 296" class="w4-24"/>
+          <path d="M 464 358 L 464 530" class="w4-24"/>
+          <text x="300" y="376" class="lbl-sm">RS-485 to cell</text>
+          <text x="300" y="398" class="lbl-sm">RS-485 to pump</text>
+          <text x="300" y="420" class="lbl-sm">heater 3-wire, dry</text>
+          <text x="462" y="686" class="lbl-sm">light loop to CH7</text>
+          <text x="366" y="600" class="lbl-sm">supply ~2.6 A</text>
+          <text x="506" y="666" class="lbl-sm">blower loop</text>
+          <text x="300" y="526" class="lbl-sm">primary</text>
+          <text x="176" y="524" class="lbl-sm">24 V secondary</text>
+          <text x="206" y="236" class="lbl-sm">L/N to 5 V supply</text>
+          <text x="268" y="114" class="lbl-sm">5 V to HAT</text>
+          <text x="450" y="240" class="lbl-sm">CH6</text>
+          <text x="470" y="470" class="lbl-sm">TB5 to coil</text>
+          <path d="M 110 754 L 132 754" class="w4-line"/>
+          <text x="138" y="758" class="lbl-sm">120 VAC</text>
+          <path d="M 228 754 L 250 754" class="w4-24"/>
+          <text x="256" y="758" class="lbl-sm">24 VAC</text>
+          <path d="M 346 754 L 368 754" class="w4-dry"/>
+          <text x="374" y="758" class="lbl-sm">dry</text>
+          <path d="M 464 754 L 486 754" class="w4-lv"/>
+          <text x="492" y="758" class="lbl-sm">5 V / signal</text>
+      </svg>
+      <figcaption>
+        What this drawing says that a schematic cannot. Portrait puts the
+        actuator glands on the left face at the same height as the terminal
+        strip, so those three cables go almost straight in &mdash; but only if they
+        are pulled in the right order. The cable entering highest has to turn
+        down furthest right, or the three cross each other on the way to the
+        strip. That is a pulling order, not a drawing detail.
+        <br><br>
+        The right margin is the other thing to notice. On a portrait plate it is
+        the <em>only</em> path from the bottom face or the lower left to the HAT
+        at the top, so it carries four risers: both RS-485 cables, the heater
+        three-wire, and the light loop. They are lane-ordered on the same rule.
+        Anything else that later needs to reach the HAT goes there too, and
+        there is not much room left.
+        <br><br>
+        The two RS-485 cables are drawn as two, because they are: the pump and
+        the cell each home-run to the panel rather than chaining to each other.
+        Electrically that is still one bus &mdash; the HAT has a single transceiver
+        and two terminals wired in parallel to it &mdash; but it puts the panel in the
+        <em>middle</em> of that bus, with a device at either end. Termination
+        belongs at the ends, so the HAT&rsquo;s termination DIP stays off. Chain the two
+        outside instead and the panel becomes an end, and that switch goes on.
+        <br><br>
+        Follow the light loop and the drawing makes an awkward point of its own.
+        CH7 is a relay on the HAT, so a 120&nbsp;V pair has to climb the full height
+        of the plate into the logic band and land on the same board as the Pi.
+        The card is rated for it &mdash; 4&nbsp;A at 120&nbsp;V &mdash; but it is the one place the
+        voltage-band layout breaks down, and it breaks down because the channel
+        is used directly rather than through a contactor in the line band, the
+        way the blower is. Worth deciding deliberately rather than by default.
+      </figcaption>
+    </figure>
+  </section>
+
+  <hr class="rule">
+
+  <!-- ================= ENTRIES ======================================= -->
+  <section>
+    <p class="eyebrow">Two faces</p>
+    <h2>Cable entries</h2>
+    <p>
+      Split across two faces: <strong>low voltage down the left, line voltage
+      along the bottom</strong>. Ten entries need about 13.25 in of hole and
+      clearance and the bottom wall offers roughly 11.5 in usable, so one row
+      was never going to work &mdash; and splitting them puts the two classes
+      through different walls, which is where they should have been anyway.
+      Every grip seals only inside its cord range &mdash; a cable too small for the
+      grip leaves an open hole just as surely as one too large.
+    </p>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Face</th>
+            <th>Cable</th>
+            <th>~OD</th>
+            <th>Fitting</th>
+            <th>Range</th>
+            <th>Hole</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="mono">1&ndash;3</td><td class="mono">left</td><td>Actuator pigtails &times;3 <span class="tag v-24">24 VAC</span></td><td class="num mono">0.25&Prime;</td><td class="mono">LPCG503</td><td class="mono">.100&ndash;.360</td><td class="mono">7/8&Prime;</td></tr>
+          <tr><td class="mono">4</td><td class="mono">left</td><td>Heater 3-wire, 18/3 <span class="tag v-lv">dry</span></td><td class="num mono">0.20&Prime;</td><td class="mono">LPCG503</td><td class="mono">.100&ndash;.360</td><td class="mono">7/8&Prime;</td></tr>
+          <tr><td class="mono">5</td><td class="mono">left</td><td>RS-485 to pump <span class="tag v-lv">signal</span></td><td class="num mono">0.21&Prime;</td><td class="mono">LPCG503</td><td class="mono">.100&ndash;.360</td><td class="mono">7/8&Prime;</td></tr>
+          <tr><td class="mono">6</td><td class="mono">left</td><td>RS-485 to cell <span class="tag v-lv">signal</span></td><td class="num mono">0.21&Prime;</td><td class="mono">LPCG503</td><td class="mono">.100&ndash;.360</td><td class="mono">7/8&Prime;</td></tr>
+          <tr><td class="mono">7</td><td class="mono">bottom</td><td>Panel supply in, ~2.6 A <span class="tag v-line">line</span></td><td class="num mono">0.53&Prime;</td><td class="mono">LPCG757</td><td class="mono">.385&ndash;.600</td><td class="mono">1-1/8&Prime;</td></tr>
+          <tr><td class="mono">8</td><td class="mono">bottom</td><td>Blower loop, to/from subpanel <span class="tag v-line">line</span></td><td class="num mono">0.53&Prime;</td><td class="mono">LPCG757</td><td class="mono">.385&ndash;.600</td><td class="mono">1-1/8&Prime;</td></tr>
+          <tr><td class="mono">9</td><td class="mono">bottom</td><td>Light loop, to/from subpanel <span class="tag v-line">line</span></td><td class="num mono">0.45&Prime;</td><td class="mono">LPCG50</td><td class="mono">.200&ndash;.485</td><td class="mono">7/8&Prime;</td></tr>
+          <tr><td class="mono">D</td><td class="mono">bottom</td><td>Breather screw, IP68 <span class="tag">vent</span></td><td class="num mono">&mdash;</td><td class="mono">M12&times;1.5</td><td class="mono">&mdash;</td><td class="mono">12.5&nbsp;mm</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note">
+      <h3>Four things that decide these before you drill</h3>
+      <p>
+        <strong>The breather is metric, everything else is not.</strong> Rows
+        1&ndash;8 are imperial trade sizes; row&nbsp;D is an M12&times;1.5 thread
+        wanting a 12.5&nbsp;mm hole. A 1/2&Prime; bit is 12.7&nbsp;mm &mdash; 0.2&nbsp;mm
+        over, which the O-ring will probably still seal, but it is a sloppier
+        hole than the one part on this panel whose whole job is to keep water
+        out deserves. Use a 12.5&nbsp;mm bit or a step drill with that detent.
+      </p>
+      <p>
+        <strong>Conduit changes rows 6&ndash;8 entirely.</strong> If the line voltage
+        arrives in conduit rather than as cord, those want hubs, not cord
+        grips. Ask whoever does the 240&nbsp;V side first.
+      </p>
+      <p>
+        <strong>Flat cable never seals in a round grip.</strong> UF-B and NM-B
+        are flat. If either is being pulled, the fitting is wrong regardless of
+        size.
+      </p>
+      <p>
+        <strong>Measure the cable, then drill.</strong> The ODs above are
+        typical SOOW. A wrong-sized hole in a sealed box is not recoverable &mdash;
+        keep a couple of rated hole plugs on hand in case.
+      </p>
+    </div>
+  </section>
+
+  <hr class="rule">
+
+  <!-- ================= SEQUENCE ====================================== -->
+  <section>
+    <p class="eyebrow">Order of work</p>
+    <h2>Assembly sequence</h2>
+    <p>
+      The order matters in two places: the plate is laid out before anything is
+      drilled, and the panel is proven at 24&nbsp;VAC before line voltage is
+      ever connected.
+    </p>
+
+    <ol class="steps">
+      <li><strong>Lay the parts on the plate, unmounted</strong><span>Transformer, contactor, PSU, Pi and rail, physically positioned. Confirm the diagonal separation and that DIN rail runs clear the transformer. Adjust on paper, not with a drill.</span></li>
+      <li><strong>Mount DIN rail and the fixed parts</strong><span>Rail first, then transformer on its feet, contactor, PSU. Pi and HAT on 11 mm standoffs last so nothing is dropped on it.</span></li>
+      <li><strong>Drill entries and fit glands</strong><span>Only once the actual cables are in hand and measured. Bottom face, low voltage left, line right. Breather-drain at the lowest point.</span></li>
+      <li><strong>Wire 24 VAC and signal only</strong><span>Transformer secondary to TB1&ndash;5, relay channels 1&ndash;6, RS-485, heater dry contacts. Nothing line-voltage yet.</span></li>
+      <li><strong>Power the logic from a bench supply</strong><span>5 V to the HAT, Pi boots, supervisor runs. Exercise every relay channel and watch the actuators move before the panel is anywhere near the pad.</span></li>
+      <li><strong>Electrician connects line voltage</strong><span>Feed in, blower out, light out. Every EGC to the ground bar, and the bar jumpered to the incoming ground &mdash; nothing in an all-plastic box is bonded on its own. Permit and inspection as your jurisdiction requires.</span></li>
+      <li><strong>Commission njsPC against real equipment</strong><span>Point njsPC at <code>/dev/serial0</code>, set <code>enable_uart=1</code>, remove <code>console=serial0</code>, and set the HAT's TX/RX DIP switches on. The supervisor will tell you on screen if the port is still missing.</span></li>
+      <li><strong>Seal, then measure the temperature</strong><span>Close it, run it through a hot afternoon, and read the internal temperature. That is the one number the whole thermal design is still missing.</span></li>
+    </ol>
+  </section>
+
+  <hr class="rule">
+
+  <!-- ================= OPEN ========================================== -->
+  <section>
+    <p class="eyebrow">Not settled</p>
+    <h2>What this plan does not decide</h2>
+
+    <div class="grid2">
+      <div class="card">
+        <span class="k">Where the RS-485 cable lands</span>
+        <p>Per <code>architecture.md</code> the field cable goes straight to the
+        HAT's own terminals, and Figure&nbsp;4 draws it that way. Worth deciding
+        whether it should: landing a field cable on a stacked HAT means
+        unplugging the bus to lift the card, and an intermediate terminal block
+        would fix that. Nothing in this project has proposed one &mdash; this is a
+        suggestion, not a decision already made.</p>
+      </div>
+      <div class="card">
+        <span class="k">Relay channel rating &mdash; blocking</span>
+        <p>4&nbsp;A/120&nbsp;VAC on the product page, 5&nbsp;A/48&nbsp;VAC on the board itself.
+        Until Sequent resolves it, no 120&nbsp;V may land on the card, and CH7's
+        direct light connection is the one part of the design that assumes it
+        can. Ask what the silkscreen refers to and why relay&nbsp;4 differs.</p>
+      </div>
+      <div class="card">
+        <span class="k">RS-485 shield termination</span>
+        <p>Figure&nbsp;3 shows the shield reaching the HAT and stops there. Whether
+        it lands at one end, both, or through a capacitor is a real decision
+        about ground loops on a run that leaves the box, and nothing in this
+        project has made it. Decide it before the cable is pulled, not after.</p>
+      </div>
+      <div class="card">
+        <span class="k">Enclosure temperature</span>
+        <p>The only figure is +14 &deg;C over ambient, measured on a bench without
+        the HAT and unsealed. Four heat sources go in this box. Measure before
+        adding vents &mdash; venting trades a corrosion exposure for a temperature
+        rise nobody has quantified.</p>
+      </div>
+      <div class="card">
+        <span class="k">Valve travel</span>
+        <p>Assumed 45 s, never timed. njsPC currently restarts the pump 20 s
+        after a valve move, so if the assumption holds the pump restarts
+        mid-swing. Time a valve, then set <code>valveDelayTime</code> above it.</p>
+      </div>
+      <div class="card">
+        <span class="k">The watchdog</span>
+        <p>Unbuilt on purpose. The HAT's own watchdog cuts power to the Pi
+        rather than dropping relays, and whether relay state survives that
+        decides the design. Ten minutes on a bench answers it.</p>
+      </div>
+      <div class="card">
+        <span class="k">Conduit vs cord</span>
+        <p>Rows 6&ndash;8 of the entries table assume round cord. The electrician's
+        answer changes the fittings, and possibly the hole sizes.</p>
+      </div>
+    </div>
+
+    <div class="note stop">
+      <h3>Line voltage is not this document's scope</h3>
+      <p>
+        Everything marked 120&nbsp;VAC &mdash; the feed, the blower run, the light,
+        the ground bar, and NEC 680 equipotential bonding &mdash; is work for a
+        licensed electrician, and in most jurisdictions needs a permit and an
+        inspection. This plan says where those conductors land inside the box.
+        It is not a wiring guide.
+      </p>
+    </div>
+  </section>
+
+</div>
+
+</body>
+</html>
