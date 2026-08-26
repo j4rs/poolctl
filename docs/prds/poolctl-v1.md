@@ -1193,6 +1193,30 @@ or a fan. The largest was rejected as 21×17 inches of wall for benefit beyond
 what the load needs. Its internal footprint also slightly exceeds the
 original 14×12×6, so this is ahead of the spec rather than a compromise.
 
+**It mounts portrait, and that decides the layout.** *Owner's constraint:
+the mount space.* So the plate is **11.18 in wide by 15.12 in tall**, not the
+other way round — `430 × 330 × 180 mm` is height × width × depth. Two
+consequences.
+
+The three-band voltage stack suits portrait better than landscape: the Pi and
+the transformer end up 15.12 in apart instead of 11.18, which is free margin
+on both the heat and the Wi-Fi arguments in ADR-3. Thermal sizing is
+unaffected — that rested on external surface area, which does not care about
+orientation.
+
+**But the entries no longer fit on one face.** Ten entries need roughly
+13.25 in of hole plus locknut clearance; the bottom wall offers about 11.5 in
+usable once corner radii and wall thickness come off. So they split: **low
+voltage down the left face, line voltage along the bottom.** Forced by
+arithmetic, but better practice than one row — the two classes now pass
+through different walls rather than sharing one.
+
+A third consequence shows up only in the wiring drawing: on a portrait plate
+the **right margin is the only path** from the bottom face or the lower left
+up to the HAT. It carries four risers — both RS-485 cables, the heater
+three-wire and the light loop — and there is little room left for a fifth.
+Anything later that needs to reach the HAT competes for it.
+
 **Internal depth: 6.29 in, not 4.84.** *Resolved against the manufacturer
 datasheet for SP-CAG-334318, which gives 384 × 284 × 160 mm internal.* The
 retail listing's 4.84 in was the sloppy figure this document suspected, and
