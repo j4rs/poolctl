@@ -718,6 +718,15 @@ one of two lines energized at all times, and an SPDT relay selects which.
 NO-only relays cannot drive them — this is precisely why the IntelliConnect's
 relays are useless for valves.
 
+**Screw order: N.C. / COM / N.O., top to bottom, on the right edge of the
+board.** Read off the silkscreen in the V6.0 product photograph — the same
+legend that carries the `5A/48VAC/DC` rating §10's blocking question turns on.
+Confirm against the card in hand before landing anything: swapping N.C. and
+N.O. on these three inverts which position the valve rests in with the coil
+off, and ADR-9 turns on relay 3's de-energized rest being *flow*. The panel
+plan draws one valve end to end for exactly this reason (`docs/panel/`,
+Figure 4).
+
 Channels 4–5 must be **isolated from the 24 VAC transformer**; the Raypak
 supplies its own low voltage on that terminal block.
 

@@ -14,10 +14,10 @@ here = pathlib.Path(__file__).parent
 subprocess.run([sys.executable, "emit.py"], cwd=here, check=True)
 
 html = (here / "index.html").read_text()
-stale = [f for f in ("fig1_portrait.svg", "fig4_portrait.svg")
+stale = [f for f in ("fig_plate.svg", "fig_wired.svg")
          if (here / f).read_text() not in html]
 
-for f in ("fig1_portrait.svg", "fig4_portrait.svg"):
+for f in ("fig_plate.svg", "fig_wired.svg"):
     (here / f).unlink(missing_ok=True)
 
 if stale:

@@ -73,6 +73,9 @@ def wiring():
 fig1="\n".join("          "+l for l in shell(False))
 w,nh=wiring()
 fig4="\n".join("          "+l for l in shell(True)+w)
-open("fig1_portrait.svg","w").write(fig1)
-open("fig4_portrait.svg","w").write(fig4)
+# Named for what they draw, not for their position in the page. An earlier
+# pair was called fig1/fig4 and stopped being true the moment a figure was
+# inserted ahead of them.
+open("fig_plate.svg","w").write(fig1)
+open("fig_wired.svg","w").write(fig4)
 print("emitted; hops:",nh,"| viewBox 0 0 %d %d"%(VW,VH))

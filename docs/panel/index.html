@@ -1165,11 +1165,222 @@ The panel's own feed has two destinations, not five. An earlier
   </section>
 
 
+
   <hr class="rule">
 
-  <!-- ================= FIGURE 4 &mdash; WIRING ON THE PLATE ================ -->
+  <!-- ================= FIGURE 4 &mdash; ONE VALVE, END TO END ============== -->
   <section>
     <p class="eyebrow">Figure 4</p>
+    <h2>One valve, traced end to end</h2>
+    <p>
+      Figure&nbsp;3 draws all eight channels at once, which is the wrong scale for
+      the question that actually comes up while holding a screwdriver: where does
+      each individual wire go? So here is one valve &mdash; channel&nbsp;1, the intake
+      actuator &mdash; drawn as the complete circuit it is, out of the transformer,
+      through the relay, out to the actuator and back.
+    </p>
+
+    <figure>
+      <svg viewBox="0 52 1000 552" role="img"
+           aria-label="One valve traced end to end. The transformer's 24 volt secondary splits into a hot leg and a common leg. The hot leg lands on the hot bus terminal and runs to the COM screw of relay channel 1 on the HAT. The relay is a changeover: with its coil off, COM ties to N.C. and the white conductor is live; with the coil on, COM ties to N.O. and the red conductor is live. N.C. and N.O. run back down to two terminal blocks, TB2a and TB2b, and out through gland 1 as the white and red conductors of the actuator cable. Inside the Intermatic PE24GVA each of the two conductors passes through its own cam-operated limit switch to the motor, whose other side returns on the black conductor, back through the same gland, onto the common bus, and to the transformer. An inset shows the physical screw block on the right edge of the HAT, ordered N.C., COM, N.O. from top to bottom.">
+
+        <!-- enclosure wall + the single gland all three conductors share -->
+        <line x1="762" y1="60" x2="762" y2="430"
+              stroke="var(--muted)" stroke-width="1" stroke-dasharray="6 5"/>
+        <rect x="754" y="100" width="16" height="248" rx="4" class="gland"
+              fill="var(--surface-up)" stroke="var(--muted)" stroke-width="1"/>
+
+        <!-- parts -->
+        <rect x="62"  y="220" width="118" height="140" class="part-line"/>
+        <rect x="232" y="98"  width="86"  height="44"  class="part-24"/>
+        <rect x="232" y="382" width="86"  height="44"  class="part-24"/>
+        <rect x="628" y="98"  width="86"  height="44"  class="part-24"/>
+        <rect x="628" y="184" width="86"  height="44"  class="part-24"/>
+        <rect x="358" y="80"  width="222" height="272" class="part-lv"/>
+        <rect x="800" y="88"  width="168" height="272" class="part-24"/>
+
+        <!-- top leg: transformer hot -> hot bus -> relay COM -->
+        <path d="M 180 258 L 206 258 L 206 120 L 232 120" class="w4-24"/>
+        <path d="M 318 120 L 358 120" class="w4-24"/>
+
+        <!-- relay outputs -> valve blocks -> through the gland -> actuator -->
+        <path d="M 580 120 L 628 120" class="w4-24"/>
+        <path d="M 580 206 L 628 206" class="w4-24"/>
+        <path d="M 714 120 L 800 120" class="w4-24"/>
+        <path d="M 714 206 L 800 206" class="w4-24"/>
+
+        <!-- return leg: actuator black -> gland -> common bus -> transformer -->
+        <path d="M 800 320 L 740 320 L 740 404 L 318 404" class="w4-24"/>
+        <path d="M 232 404 L 206 404 L 206 322 L 180 322" class="w4-24"/>
+
+        <!-- coil drive, the only 5 V thing in the picture -->
+        <path d="M 330 306 L 372 306" class="w4-lv"/>
+
+        <!-- relay internals: changeover, resting on N.C. -->
+        <circle cx="392" cy="120" r="4" fill="var(--v24)"/>
+        <circle cx="392" cy="120" r="8" fill="none" stroke="var(--v24)" stroke-width="1.2"/>
+        <circle cx="536" cy="104" r="4" fill="var(--v24)"/>
+        <circle cx="536" cy="206" r="4" fill="var(--v24)"/>
+        <path d="M 392 120 L 533 105" class="w4-24"/>
+        <path d="M 392 120 L 528 202" fill="none" stroke="var(--muted)"
+              stroke-width="1.6" stroke-dasharray="5 4"/>
+        <path d="M 536 104 L 556 104 L 556 120 L 580 120" class="w4-24"/>
+        <path d="M 536 206 L 580 206" class="w4-24"/>
+        <rect x="372" y="286" width="104" height="40" fill="none"
+              stroke="var(--water)" stroke-width="2"/>
+        <path d="M 400 286 L 400 134" fill="none" stroke="var(--muted)"
+              stroke-width="1.2" stroke-dasharray="4 4"/>
+
+        <!-- actuator internals: two cam-limited paths into one motor -->
+        <path d="M 800 120 L 824 120" class="w4-24"/>
+        <path d="M 824 120 L 852 107" fill="none" stroke="var(--v24)" stroke-width="2.4"/>
+        <path d="M 856 120 L 884 120 L 884 238" class="w4-24"/>
+        <path d="M 800 206 L 824 206" class="w4-24"/>
+        <path d="M 824 206 L 852 193" fill="none" stroke="var(--v24)" stroke-width="2.4"/>
+        <path d="M 856 206 L 884 206" class="w4-24"/>
+        <circle cx="824" cy="120" r="3" fill="var(--v24)"/>
+        <circle cx="856" cy="120" r="3" fill="var(--v24)"/>
+        <circle cx="824" cy="206" r="3" fill="var(--v24)"/>
+        <circle cx="856" cy="206" r="3" fill="var(--v24)"/>
+        <circle cx="884" cy="206" r="4" fill="var(--v24)"/>
+        <circle cx="884" cy="266" r="28" fill="none" stroke="var(--v24)" stroke-width="2"/>
+        <path d="M 884 294 L 884 320 L 800 320" class="w4-24"/>
+
+        <!-- conductor swatches: real insulation colour, so hue never carries voltage class -->
+        <circle cx="700" cy="127" r="5" fill="#f2f2f2" stroke="var(--muted)" stroke-width="1"/>
+        <circle cx="700" cy="213" r="5" fill="#c0392b" stroke="var(--muted)" stroke-width="1"/>
+        <circle cx="302" cy="398" r="5" fill="#1a1a1a" stroke="var(--muted)" stroke-width="1"/>
+
+        <!-- labels -->
+        <text x="121" y="246" text-anchor="middle" class="lbl-t">TR100VA001</text>
+        <text x="121" y="262" text-anchor="middle" class="lbl-sm">100 VA · Class 2</text>
+        <text x="121" y="300" text-anchor="middle" class="lbl-sm">24 VAC</text>
+        <text x="121" y="316" text-anchor="middle" class="lbl-sm">secondary</text>
+
+        <text x="275" y="116" text-anchor="middle" class="lbl-t">TB-H</text>
+        <text x="275" y="131" text-anchor="middle" class="lbl-sm">hot bus</text>
+        <text x="275" y="400" text-anchor="middle" class="lbl-t">TB1</text>
+        <text x="275" y="415" text-anchor="middle" class="lbl-sm">common bus</text>
+        <text x="671" y="116" text-anchor="middle" class="lbl-t">TB2a</text>
+        <text x="671" y="131" text-anchor="middle" class="lbl-sm">white</text>
+        <text x="671" y="202" text-anchor="middle" class="lbl-t">TB2b</text>
+        <text x="671" y="217" text-anchor="middle" class="lbl-sm">red</text>
+
+        <text x="275" y="160" text-anchor="middle" class="lbl-sm">also feeds CH2, CH3</text>
+        <text x="214" y="180" class="lbl-sm">24 VAC hot</text>
+        <text x="214" y="368" class="lbl-sm">24 VAC common</text>
+        <text x="275" y="444" text-anchor="middle" class="lbl-sm">also returns valves 2, 3</text>
+        <text x="338" y="112" text-anchor="middle" class="lbl-sm">COM</text>
+        <text x="604" y="112" text-anchor="middle" class="lbl-sm">N.C.</text>
+        <text x="604" y="198" text-anchor="middle" class="lbl-sm">N.O.</text>
+        <text x="734" y="112" text-anchor="middle" class="lbl-sm">white</text>
+        <text x="734" y="198" text-anchor="middle" class="lbl-sm">red</text>
+        <text x="712" y="316" text-anchor="end" class="lbl-sm">black</text>
+        <text x="748" y="94"  text-anchor="end" class="lbl-sm">gland 1 · 3-wire cable</text>
+
+        <text x="469" y="72"  text-anchor="middle" class="lbl">HAT relay CH1 · intake</text>
+        <text x="424" y="311" text-anchor="middle" class="lbl-t">coil</text>
+        <text x="326" y="302" text-anchor="end" class="lbl-sm">5 V from the Pi</text>
+        <text x="469" y="344" text-anchor="middle" class="lbl-sm">changeover · coil off as drawn</text>
+
+        <text x="884" y="80"  text-anchor="middle" class="lbl">PE24GVA</text>
+        <text x="884" y="272" text-anchor="middle" class="lbl-t">M</text>
+        <text x="840" y="142" text-anchor="middle" class="lbl-sm">cam limit</text>
+        <text x="840" y="228" text-anchor="middle" class="lbl-sm">cam limit</text>
+        <text x="884" y="352" text-anchor="middle" class="lbl-sm">intake · 180°</text>
+        <text x="884" y="382" text-anchor="middle" class="lbl-sm">rear toggle: AUTO 1 / OFF / AUTO 2</text>
+
+        <!-- what the relay does -->
+        <text x="40" y="470" class="lbl">What the relay is actually doing</text>
+        <text x="40" y="492" class="lbl-sm">coil off — boot, power cut, Pi down: COM ties to N.C., white is live. The fail-safe position.</text>
+        <text x="40" y="510" class="lbl-sm">coil on — CH1 commanded: COM ties to N.O., red is live.</text>
+        <text x="40" y="534" class="lbl-sm">One of the two is live at all times. The relay picks which; it never switches the valve off.</text>
+        <text x="40" y="552" class="lbl-sm">At end of travel the cam opens that side's limit switch, so a live line is not a running motor.</text>
+
+        <!-- inset: the physical screw block -->
+        <text x="838" y="466" text-anchor="middle" class="lbl">CH1 screw block</text>
+        <rect x="712" y="482" width="54" height="84" class="part-lv"/>
+        <circle cx="739" cy="498" r="7" fill="var(--surface)" stroke="var(--muted)" stroke-width="1.4"/>
+        <circle cx="739" cy="524" r="7" fill="var(--surface)" stroke="var(--muted)" stroke-width="1.4"/>
+        <circle cx="739" cy="550" r="7" fill="var(--surface)" stroke="var(--muted)" stroke-width="1.4"/>
+        <text x="780" y="502" class="lbl-t">N.C. → white</text>
+        <text x="780" y="528" class="lbl-t">COM ← 24 VAC hot</text>
+        <text x="780" y="554" class="lbl-t">N.O. → red</text>
+        <text x="40" y="592" class="lbl-sm">Right edge of the board, top to bottom, as silkscreened. Confirm against your own card — the photo is a V6.0 product shot.</text>
+      </svg>
+      <figcaption>
+        Channel&nbsp;1 and the intake actuator, drawn from the transformer
+        secondary and back to it. Colour is voltage class here as everywhere
+        else, so the small filled circles carry the actual insulation colour
+        instead &mdash; hue never has to do two jobs at once. All three conductors
+        share gland&nbsp;1: it is one cable, drawn apart only so the circuit reads.
+      </figcaption>
+    </figure>
+
+    <p>
+      <b>It is a loop, and that is the part the plan views hide.</b> Every other
+      figure here draws a cable as a line going somewhere. Current does not go
+      somewhere; it goes around. Twenty-four volts leaves one end of the
+      transformer secondary, reaches the actuator through whichever conductor the
+      relay has selected, passes through the motor, and comes back on black to the
+      other end of the secondary. Two of the three conductors are in a complete
+      circuit at any moment. The third is simply open.
+    </p>
+
+    <p>
+      <b>The relay does not switch the valve on and off.</b> This is the thing
+      worth reading twice, and it is why channels&nbsp;1&ndash;3 need changeover
+      contacts rather than the ordinary on/off kind. COM is permanently fed with
+      24&nbsp;VAC. The contact chooses whether that feed continues to N.C. or to
+      N.O. &mdash; so one of white and red is live at all times, in both valve
+      positions, including when the Pi is off. Energising the coil moves the feed
+      from one to the other, and that is the entire command.
+    </p>
+
+    <p>
+      <b>Which is why a permanently live wire does not cook the motor.</b> The
+      actuator's cam opens that direction's limit switch as it arrives at the end
+      of travel. The line stays energised; the motor stops. This is also what lets
+      ADR&#8209;9 hold relay&nbsp;3 energised through all of pool mode without a duty
+      cycle problem &mdash; the 1&nbsp;min&nbsp;ON / 8&nbsp;min&nbsp;OFF limit governs
+      <em>movement</em>, not sitting still with a line hot.
+    </p>
+
+    <p>
+      <b>Which conductor gives which position is decided at the valve, not here.</b>
+      Red and white are just "the two directions"; the cam plate and the rear
+      <span class="tag">AUTO 1 / OFF / AUTO 2</span> toggle set what those
+      directions mean physically. If the valve ends up backwards on first power-up,
+      flip the toggle at the actuator &mdash; do not rewire the panel, and do not
+      swap red and white at the terminals. Swapping them inverts the fail-safe,
+      which is the one property here chosen deliberately: with the coil unpowered,
+      the bypass must rest in <em>flow</em>.
+    </p>
+
+    <p>
+      <b>Only two blocks on rail&nbsp;B belong to this valve.</b> TB2a and TB2b
+      carry white and red, each landing the field wire in one clamp and the wire
+      up to the HAT in the other. Black shares the common bus with the other two
+      actuators and the contactor coil, and the hot side is shared the same way.
+      That is the whole reason for the jumpers: one arriving conductor, several
+      departing ones, at one potential.
+    </p>
+
+    <p class="note">
+      <b>One thing this exposes.</b> The terminal schedule on rail&nbsp;B reads
+      <span class="tag">TB1 COM &middot; TB2&ndash;4 valves &middot; TB5 coil</span>,
+      which names a common bus but no hot bus &mdash; and the hot leg needs exactly
+      the same treatment, since it feeds four COM screws. Either TB1 is really a
+      pair of buses or the schedule is a block short. Pin it down before ordering
+      the blocks, not while wiring them.
+    </p>
+  </section>
+
+  <hr class="rule">
+
+  <!-- ================= FIGURE 5 &mdash; WIRING ON THE PLATE ================ -->
+  <section>
+    <p class="eyebrow">Figure 5</p>
     <h2>The same panel, wired</h2>
     <p>
       Figure&nbsp;1 says where the parts go and Figure&nbsp;3 says what connects to
@@ -1412,7 +1623,7 @@ The panel's own feed has two destinations, not five. An earlier
       <div class="card">
         <span class="k">Where the RS-485 cable lands</span>
         <p>Per <code>architecture.md</code> the field cable goes straight to the
-        HAT's own terminals, and Figure&nbsp;4 draws it that way. Worth deciding
+        HAT's own terminals, and Figure&nbsp;5 draws it that way. Worth deciding
         whether it should: landing a field cable on a stacked HAT means
         unplugging the bus to lift the card, and an intermediate terminal block
         would fix that. Nothing in this project has proposed one &mdash; this is a

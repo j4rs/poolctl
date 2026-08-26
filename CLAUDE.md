@@ -20,7 +20,7 @@ The full record lives elsewhere and is deliberately not duplicated here:
   flashed card to a controller the phones can use. Timezone first, and the
   reason why.
 - `docs/panel/` — the panel build plan: every part photographed, where each
-  sits on the backplate, and what connects to what. Figures 1 and 4 are
+  sits on the backplate, and what connects to what. Figures 1 and 5 are
   generated from one shared geometry (`plate.py`, `emit.py`) so they cannot
   disagree — an earlier hand-drawn pair did, and both had the plate landscape
   when the enclosure mounts portrait.

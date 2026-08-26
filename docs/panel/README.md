@@ -14,18 +14,18 @@ apart once already.
 | `index.html` | the plan. Images referenced, not embedded, so git can diff it |
 | `img/` | nine component photographs, one file each |
 | `plate.py` | portrait plate geometry: parts, glands, cable runs |
-| `emit.py` | renders Figures 1 and 4 from `plate.py` |
+| `emit.py` | renders Figures 1 and 5 from `plate.py` |
 | `build.py` | `--artifact` inlines images as data URIs; `--pdf` renders via Chrome |
 | `check.py` | fails if `index.html`'s figures are stale against `plate.py` |
 
 ## Regenerating the figures
 
-Figures 1 and 4 share one geometry so they cannot disagree — an earlier pair of
+Figures 1 and 5 share one geometry so they cannot disagree — an earlier pair of
 hand-drawn SVGs did, and the plate was landscape in both when the enclosure
 mounts portrait.
 
 ```bash
-python3 emit.py          # writes fig1_portrait.svg and fig4_portrait.svg
+python3 emit.py          # writes fig_plate.svg and fig_wired.svg
 ```
 
 `emit.py` checks two invariants before writing and will refuse on the first:
