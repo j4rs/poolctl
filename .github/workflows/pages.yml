@@ -1,0 +1,47 @@
+# Publishes docs/panel/ — and only docs/panel/ — to GitHub Pages.
+#
+# Scoped deliberately. Serving docs/ wholesale would put the PRD, the
+# bring-up guide and the architecture notes on the public internet while
+# the repo itself stayed private, which is a surprising asymmetry to
+# create by accident. Widen `path:` below if that is ever what you want.
+#
+# .nojekyll is written at build time rather than committed: Jekyll would
+# otherwise try to process the page and the three .py generators, and
+# nothing here wants a static-site generator's opinion.
+name: panel plan
+
+on:
+  push:
+    branches: [main]
+    paths: ['docs/panel/**', '.github/workflows/pages.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fail if the figures are stale against plate.py
+        run: python3 docs/panel/check.py
+
+      - run: touch docs/panel/.nojekyll
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/panel
+      - id: deploy
+        uses: actions/deploy-pages@v4

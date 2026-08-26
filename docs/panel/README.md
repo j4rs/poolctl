@@ -16,6 +16,7 @@ apart once already.
 | `plate.py` | portrait plate geometry: parts, glands, cable runs |
 | `emit.py` | renders Figures 1 and 4 from `plate.py` |
 | `build.py` | `--artifact` inlines images as data URIs; `--pdf` renders via Chrome |
+| `check.py` | fails if `index.html`'s figures are stale against `plate.py` |
 
 ## Regenerating the figures
 
@@ -31,6 +32,16 @@ python3 emit.py          # writes fig1_portrait.svg and fig4_portrait.svg
 no cable run may pass through a part, and every crossing is drawn as a hop so
 it can never read as a junction. Paste the output into the matching `<svg>` in
 `index.html`.
+
+That paste is a manual step, and manual steps are how the figures drifted the
+first time. So it is policed:
+
+```bash
+python3 check.py         # re-emits, asserts both appear verbatim in index.html
+```
+
+CI runs it before publishing, and a stale page fails the build rather than
+going up looking authoritative.
 
 ## Derived forms
 
@@ -55,3 +66,15 @@ attribution with the image if you reuse it.
 - `../prds/poolctl-v1.md` — the reasoning, the ADRs, the BOM, the open questions
 - `../architecture.md` — components, state ownership, failure modes
 - `../pi-bringup.md` — what happens on the box, in order
+
+## Publishing
+
+`.github/workflows/pages.yml` publishes **this directory only** as the site
+root, so the plan is one URL with no path suffix. The PRD, the bring-up guide
+and the architecture notes stay unpublished on purpose: serving `docs/`
+wholesale would put them on the public internet while the repo itself stayed
+private.
+
+The workflow is committed and inert. GitHub Pages is not enabled — a private
+repo needs GitHub Pro for it. Make the repo public or upgrade, and the next
+push to `docs/panel/**` deploys.
