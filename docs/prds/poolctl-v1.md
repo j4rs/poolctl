@@ -565,6 +565,15 @@ tool. What is rejected is treating a fork as the architecture.
 ### ADR-13 — Forking njsPC is a tactic, not an architecture
 
 **Decision:** patching or forking njsPC is available and sometimes correct.
+
+**Standing commitment, owner's call:** where njsPC turns out to be missing a
+reading or a capability this project needs, the default is to **patch it and
+open a PR upstream**, not to work around it locally and not to fork quietly.
+We are taking an AGPL project and building on it; sending fixes back is both
+the decent return and the cheapest long-run maintenance position, because
+anything merged is something we stop carrying. A local patch is a holding
+position while a PR is in flight, not a destination.
+
 Apply this ladder, cheapest first:
 
 1. **Route around it.** If we can simply not use the component, do that. It

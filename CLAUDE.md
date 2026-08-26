@@ -399,5 +399,11 @@ Blocked on the relay HAT: bus sniffing, the salt question (case 18), real
 
 ## Upstream
 
+**If njsPC is missing a reading or a capability we need, patch it and open a
+PR upstream** rather than working around it or forking quietly (ADR-13). A
+local patch is a holding position while the PR is in flight, not a
+destination. Keep such patches surgical and inside njsPC — our interlocks stay
+in our own process, or this repo stops being MIT.
+
 - nodejs-poolController (njsPC) — https://github.com/tagyoureit/nodejs-poolController (AGPL-3.0)
 - relayEquipmentManager (REM) — https://github.com/rstrouse/relayEquipmentManager (GPL-3.0)
