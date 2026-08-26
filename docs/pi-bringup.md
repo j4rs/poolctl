@@ -303,6 +303,18 @@ Three things have to be true, and none of them are by default:
 With them off the card is a MODBUS RTU slave and the Pi cannot talk to the
 pump at all.
 
+**And the third one: termination OFF.** The same switch bank carries a
+termination switch alongside TX and RX, and it had no home in this document
+until the bus topology was settled. The pump and the cell each home-run to the
+panel on their own cable, so the panel is a **mid-bus node** with a device at
+either end — and termination belongs at the two physical ends, not in the
+middle. Leave it off.
+
+This is the one setting here that flips if the wiring changes: chain the pump
+and the cell to each other outside the panel instead, and the panel becomes an
+end of the bus, and this switch goes **on**. Check which you actually built
+before trusting either answer.
+
 **2. Enable the UART and take the console off it.** Linux claims
 `/dev/serial0` as a login console out of the box, so njsPC cannot open it:
 

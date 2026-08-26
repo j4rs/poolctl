@@ -1123,13 +1123,41 @@ leak path to save less than the antenna costs.
 
 **On the two smallest lines.** A NEMA 4X rating is a property of the whole
 assembly, not the box: every cable entry needs a liquid-tight gland or the
-rating is void, and this panel has a lot of entries — 120 V supply, RS-485 to
-the pump and cell, 24 VAC to three actuators, the heater's three-wire, the
-blower contactor and the light. And a sealed box outdoors in Florida
+rating is void, and this panel has a lot of entries — 120 V supply, **two**
+RS-485 runs, 24 VAC to three actuators, the heater's three-wire, the blower
+contactor and the light. And a sealed box outdoors in Florida
 breathes: it warms in sun, cools at night, and pulls in humid air through
 whatever gap it has. A breather-drain equalises that and lets condensate out
 while keeping the rating. Both are the kind of $15 part that holds up an
 install for a week because nobody listed it.
+
+### RS-485 bus topology
+
+**Two cables, and the panel sits in the middle of the bus.** *Owner's
+answer, confirming the physical layout:* the pump and the cell are both in
+front of the panel and **each home-runs on its own cable**. They are not
+chained to one another.
+
+Electrically this is still one bus. The HAT carries a single transceiver on
+the Pi's GPIO UART, and its two RS-485 terminals are wired in parallel to it —
+two places to land wire on one port, not two ports. njsPC distinguishes the
+devices by address, not by conductor.
+
+Three consequences, none of them optional:
+
+- **Two glands, not one.** A cord grip seals one round cable inside a stated
+  diameter range; two cables in one grip leaves voids either side and voids
+  IP67 for the whole assembly. The entry list carries nine entries, not eight.
+- **The HAT's termination DIP stays OFF.** With a device at each end and the
+  panel between them, the panel is a mid-bus node. Termination belongs at the
+  two physical ends. This is the third of the HAT's three RS-485 switches and
+  `docs/pi-bringup.md` previously covered only TX and RX.
+- **It is the better topology anyway.** Panel-in-the-middle is a proper linear
+  bus. Chaining the two devices outside instead would make the panel an end —
+  one gland saved, the termination switch flipped **on**, and a cable joint
+  created at the pad that does not exist today. Both existing cables already
+  run to the IntelliConnect being retired, so two home runs is also the
+  wiring that is already in the ground.
 
 ### Storage note
 
