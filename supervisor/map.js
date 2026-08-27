@@ -188,7 +188,8 @@ export function toUiState(njs, own) {
     /* njsPC panel mode: 'service' stands the schedules down. */
     panelMode: nameOf(njs.mode) === "service" ? "service" : (own.panelMode ?? "auto"),
 
-    /* Not yet mapped — no relay assignment exists until the HAT arrives. */
+    /* Still supervisor-owned rather than njsPC-derived. The relay assignment
+       now exists (`relays.js`), but nothing writes it from the live path yet. */
     blower: own.blower ?? false,
     light: own.light ?? false,
 
