@@ -97,6 +97,27 @@ Record the full table. `ch<n> = REL<n>` throughout means the driver matches the
 board; any disagreement means it was written for a different product and the
 supervisor must carry its own mapping.
 
+**Read the printed label beside the LED. Do not count positions.** The row is
+silkscreened `PWR REL8 R7 R6 R5 R4 R3 R2 REL1`, so counting left to right gives
+the numbers *backwards*, and the always-lit `PWR` at one end shifts the count by
+one on top of that. A first attempt at this test reported channels 1,3,5,7 as
+lighting LEDs "1,3,5,8", which was a counting artefact and not a mapping fault.
+The terminal blocks carry the same numbering in much larger text if the LED
+labels are unreadable under glare.
+
+**Partial result, 27 August 2026.** Confirmed by label on two channels at
+widely separated bits:
+
+| Channel | Bit written | LED label |
+|---|---|---|
+| 1 | 0 | `REL1` |
+| 7 | 5 | `R7` |
+
+Both agree with `8relay`'s table, and they discriminate against `8relind`'s,
+which maps channel 7 to bit 3. **The other six channels are inferred, not
+measured.** Finish the walk before an actuator is wired to anything: CH1&ndash;3
+are valves, and a mapping error there moves the wrong body of water.
+
 Note **relay 4**, which the silkscreen rates at 3 A where its neighbours are
 8&ndash;10 A.
 
