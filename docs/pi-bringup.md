@@ -435,12 +435,36 @@ The supervisor checks the result rather than trusting it: if njsPC's
 configured port does not exist on the box, it raises **"njsPC cannot open
 /dev/…"** on the Water screen and names the three fixes.
 
-*State on 27 August 2026, read off the box:* `rs485Port` is still
-`/dev/ttyUSB0`, `baudRate` is `9600`, `netConnect` is `false`, port 0 enabled.
-So the baud is already right for a Pentair bus and only the path is wrong.
-Leave it pointing at the USB path until the bus is physically attached &mdash;
-the supervisor's finding is accurate while that is true, and switching it early
-just replaces a true finding with a silent port that never sees a frame.
+**Done, 27 August 2026.** `baudRate` was already `9600`, correct for a Pentair
+bus; only the path was wrong.
+
+Change it through njsPC, not by editing the file. njsPC holds its configuration
+in memory and writes it out, so editing `config.json` under a running instance
+is a race it wins. `PUT /app/rs485Port` applies the change live, reopens the
+port and persists it:
+
+```bash
+# send the WHOLE comms object with one field changed, not a patch:
+# setPortAsync keys off portId and fills unlisted fields from defaults
+curl -s http://127.0.0.1:4200/config/all \
+  | python3 -c 'import json,sys; print(json.dumps(json.load(sys.stdin)["controller"]["comms"]))' \
+  | python3 -c 'import json,sys; d=json.load(sys.stdin); d["rs485Port"]="/dev/serial0"; print(json.dumps(d))' \
+  | curl -s -X PUT -H "Content-Type: application/json" --data-binary @- \
+      http://127.0.0.1:4200/app/rs485Port
+```
+
+**What "working" looks like before the bus exists.** njsPC opens the port, sees
+nothing for `inactivityRetry` seconds, closes it and reopens:
+
+```
+Serial port: /dev/serial0 request to open successful 9600b 8-none-1
+Inactivity timeout for 0 serial port /dev/serial0 after 10 seconds
+Serial Port 0 - /dev/serial0 has been closed.
+```
+
+That cycle is the correct signal, not a fault. It says the port is real and
+openable and nobody is talking, which is exactly true on a bench. It stops on
+its own the moment a pump is on the other end.
 
 ### The rest
 
