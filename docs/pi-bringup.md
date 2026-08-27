@@ -395,6 +395,31 @@ After the reboot `/dev/serial0` should point at `ttyAMA0`, not `ttyS0`:
 ls -l /dev/serial0        # -> ttyAMA0
 ```
 
+**Verifying the UART with no bus attached.** Transmitting and listening for an
+echo proves nothing: most RS-485 transceivers mute the receiver while driving,
+so silence is the expected result either way. What does prove it is **timing a
+blocking write**, because a UART clocking bits out takes exactly as long as the
+baud rate says it should:
+
+```bash
+python3 - <<'EOF'
+import os, time
+fd = os.open("/dev/serial0", os.O_RDWR | os.O_NOCTTY)
+t = time.time(); n = os.write(fd, bytes([0x55, 0xAA] * 32)); os.close(fd)
+print("%d bytes in %.1f ms" % (n, (time.time() - t) * 1000))
+EOF
+```
+
+64 bytes at 9600 8N1 is 640 bits, so 66.7 ms. Measured here: **71.5 ms**. A
+buffer swallowing the write and discarding it would return in microseconds, and
+the mini-UART running off an unfixed core clock would come back at the wrong
+figure. This checks the Pi half of the path &mdash; the right UART, the right
+pins, the right baud &mdash; and it can be done on a desk.
+
+It does **not** check the transceiver. Whether TX reaches A/B and A/B reaches
+RX needs either a meter across the terminals or a device on the bus. The pump
+chattering away is the real test, and it arrives the moment the bus is landed.
+
 Afterwards `/dev/serial0` should exist and nothing should be holding it:
 
 ```bash
