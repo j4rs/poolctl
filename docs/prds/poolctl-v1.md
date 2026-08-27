@@ -1841,6 +1841,22 @@ temperature (read from source).
 - nodejs-poolController (njsPC) — https://github.com/tagyoureit/nodejs-poolController
 - relayEquipmentManager (REM) — https://github.com/rstrouse/relayEquipmentManager
 - dashPanel — https://github.com/rstrouse/nodejs-poolController-dashPanel
+- 8relay-rpi, Sequent's driver for the relay HAT — https://github.com/SequentMicrosystems/8relay-rpi
+
+### Reported upstream
+
+ADR-13 commits this project to patching upstream rather than working around.
+Open:
+
+- **SequentMicrosystems/8relay-rpi#7** — the channel remap table is wrong for
+  V 7.1 hardware; channels 6, 7 and 8 close relays 7, 8 and 6. Affects the C
+  tool and the Python library alike, and no sibling repo carries the correct
+  table. Filed 27 August 2026 with the measured mapping and an offer to PR the
+  fix. https://github.com/SequentMicrosystems/8relay-rpi/issues/7
+
+  *Not blocking us.* The supervisor addresses relays by the measured bit mask
+  written to `0x27` directly, so it does not depend on the fix landing — which
+  is just as well on a repo whose last commit was June 2021.
 
 njsPC runs in **Nixie** mode: it is the controller. There is no Pentair
 outdoor control panel in this system after cutover.
