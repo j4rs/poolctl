@@ -676,7 +676,7 @@
           <text x="160" y="98" class="lbl-sm">5 V 6.5 A</text>
           <rect x="148" y="296" width="324" height="62" rx="4" class="part-24"/>
           <text x="160" y="318" class="lbl">DIN rail B &middot; 8 in</text>
-          <text x="160" y="336" class="lbl-sm">1-4 hot &middot; 5-10 valves &middot; 11 coil &middot; 12-15 common</text>
+          <text x="160" y="336" class="lbl-sm">1-4 hot &middot; 5-10 valves &middot; 11 coil &middot; 12-16 common</text>
           <rect x="148" y="452" width="250" height="60" rx="4" class="part-line"/>
           <text x="160" y="474" class="lbl">Line terminals &middot; rail C</text>
           <text x="160" y="492" class="lbl-sm">L . N &mdash; PE bar bolts to the plate</text>
@@ -1411,7 +1411,7 @@ The panel's own feed has two destinations, not five. An earlier
           <text x="160" y="98" class="lbl-sm">5 V 6.5 A</text>
           <rect x="148" y="296" width="324" height="62" rx="4" class="part-24"/>
           <text x="160" y="318" class="lbl">DIN rail B &middot; 8 in</text>
-          <text x="160" y="336" class="lbl-sm">1-4 hot &middot; 5-10 valves &middot; 11 coil &middot; 12-15 common</text>
+          <text x="160" y="336" class="lbl-sm">1-4 hot &middot; 5-10 valves &middot; 11 coil &middot; 12-16 common</text>
           <rect x="148" y="452" width="250" height="60" rx="4" class="part-line"/>
           <text x="160" y="474" class="lbl">Line terminals &middot; rail C</text>
           <text x="160" y="492" class="lbl-sm">L . N &mdash; PE bar bolts to the plate</text>
@@ -1539,152 +1539,153 @@ The panel's own feed has two destinations, not five. An earlier
     </p>
 
     <figure>
-      <svg viewBox="130 60 890 660" role="img" aria-label="Connection map of the 24 volt AC network on DIN rail B. Fifteen terminal blocks in a row. Blocks 1 to 4 are the hot bus, bridged into one node by a four-way comb, and one conductor leaves each of them for the COM screw of relay channels 1, 2, 3 and 6 - four conductors all heading to the HAT, so four blocks. Blocks 5 to 10 are the six switched conductors of the three valve actuators, two blocks per actuator. Block 11 is the blower contactor coil. Blocks 12 to 15 are the common bus, bridged by a second four-way comb. The transformer's hot leg lands on block 1 and its common leg on block 12. Each relay drops its N.C. and N.O. contacts onto its own pair of blocks, which leave through glands 1 to 3 as the white and red conductors of each actuator cable. The three black conductors return to the common bus, along with the second leg of the contactor coil.">
-        <rect x="200" y="330" width="46" height="60" class="part-24"/>
-        <text x="223" y="346" text-anchor="middle" class="lbl-t">1</text>
-        <rect x="251" y="330" width="46" height="60" class="part-24"/>
-        <text x="274" y="346" text-anchor="middle" class="lbl-t">2</text>
-        <rect x="302" y="330" width="46" height="60" class="part-24"/>
-        <text x="325" y="346" text-anchor="middle" class="lbl-t">3</text>
-        <rect x="353" y="330" width="46" height="60" class="part-24"/>
-        <text x="376" y="346" text-anchor="middle" class="lbl-t">4</text>
-        <rect x="404" y="330" width="46" height="60" class="part-24"/>
-        <text x="427" y="346" text-anchor="middle" class="lbl-t">5</text>
-        <rect x="455" y="330" width="46" height="60" class="part-24"/>
-        <text x="478" y="346" text-anchor="middle" class="lbl-t">6</text>
-        <rect x="506" y="330" width="46" height="60" class="part-24"/>
-        <text x="529" y="346" text-anchor="middle" class="lbl-t">7</text>
-        <rect x="557" y="330" width="46" height="60" class="part-24"/>
-        <text x="580" y="346" text-anchor="middle" class="lbl-t">8</text>
-        <rect x="608" y="330" width="46" height="60" class="part-24"/>
-        <text x="631" y="346" text-anchor="middle" class="lbl-t">9</text>
-        <rect x="659" y="330" width="46" height="60" class="part-24"/>
-        <text x="682" y="346" text-anchor="middle" class="lbl-t">10</text>
-        <rect x="710" y="330" width="46" height="60" class="part-24"/>
-        <text x="733" y="346" text-anchor="middle" class="lbl-t">11</text>
-        <rect x="761" y="330" width="46" height="60" class="part-24"/>
-        <text x="784" y="346" text-anchor="middle" class="lbl-t">12</text>
-        <rect x="812" y="330" width="46" height="60" class="part-24"/>
-        <text x="835" y="346" text-anchor="middle" class="lbl-t">13</text>
-        <rect x="863" y="330" width="46" height="60" class="part-24"/>
-        <text x="886" y="346" text-anchor="middle" class="lbl-t">14</text>
-        <rect x="914" y="330" width="46" height="60" class="part-24"/>
-        <text x="937" y="346" text-anchor="middle" class="lbl-t">15</text>
-        <rect x="206" y="356" width="187" height="16" class="part-24" opacity="0.9"/>
-        <rect x="767" y="356" width="187" height="16" class="part-24" opacity="0.9"/>
+      <svg viewBox="130 60 900 660" role="img" aria-label="Connection map of the 24 volt AC network on DIN rail B. Sixteen terminal blocks in a row, in four groups. Blocks 1 to 4 are the hot bus, bridged into one node by a four-way comb: the transformer's hot leg lands on block 1's lower clamp, and each of the four blocks sends one conductor up from its upper clamp to the COM screw of relay channels 1, 2, 3 and 6. Four conductors all heading to the HAT is what makes it four blocks. Blocks 5 to 10 are the six switched conductors of the three valve actuators, two blocks per actuator, each taking a relay contact on its upper clamp and a field wire on its lower. Block 11 is the blower contactor coil. An end-plate gap separates it from blocks 12 to 16, the common bus, bridged by a five-way comb: all five of its conductors leave downward - the transformer common, the three actuator blacks, and the contactor coil return - so it takes five blocks, one each.">
+        <rect x="200" y="330" width="42" height="60" class="part-24"/>
+        <text x="221" y="346" text-anchor="middle" class="lbl-t">1</text>
+        <rect x="247" y="330" width="42" height="60" class="part-24"/>
+        <text x="268" y="346" text-anchor="middle" class="lbl-t">2</text>
+        <rect x="294" y="330" width="42" height="60" class="part-24"/>
+        <text x="315" y="346" text-anchor="middle" class="lbl-t">3</text>
+        <rect x="341" y="330" width="42" height="60" class="part-24"/>
+        <text x="362" y="346" text-anchor="middle" class="lbl-t">4</text>
+        <rect x="388" y="330" width="42" height="60" class="part-24"/>
+        <text x="409" y="346" text-anchor="middle" class="lbl-t">5</text>
+        <rect x="435" y="330" width="42" height="60" class="part-24"/>
+        <text x="456" y="346" text-anchor="middle" class="lbl-t">6</text>
+        <rect x="482" y="330" width="42" height="60" class="part-24"/>
+        <text x="503" y="346" text-anchor="middle" class="lbl-t">7</text>
+        <rect x="529" y="330" width="42" height="60" class="part-24"/>
+        <text x="550" y="346" text-anchor="middle" class="lbl-t">8</text>
+        <rect x="576" y="330" width="42" height="60" class="part-24"/>
+        <text x="597" y="346" text-anchor="middle" class="lbl-t">9</text>
+        <rect x="623" y="330" width="42" height="60" class="part-24"/>
+        <text x="644" y="346" text-anchor="middle" class="lbl-t">10</text>
+        <rect x="670" y="330" width="42" height="60" class="part-24"/>
+        <text x="691" y="346" text-anchor="middle" class="lbl-t">11</text>
+        <rect x="741" y="330" width="42" height="60" class="part-24"/>
+        <text x="762" y="346" text-anchor="middle" class="lbl-t">12</text>
+        <rect x="788" y="330" width="42" height="60" class="part-24"/>
+        <text x="809" y="346" text-anchor="middle" class="lbl-t">13</text>
+        <rect x="835" y="330" width="42" height="60" class="part-24"/>
+        <text x="856" y="346" text-anchor="middle" class="lbl-t">14</text>
+        <rect x="882" y="330" width="42" height="60" class="part-24"/>
+        <text x="903" y="346" text-anchor="middle" class="lbl-t">15</text>
+        <rect x="929" y="330" width="42" height="60" class="part-24"/>
+        <text x="950" y="346" text-anchor="middle" class="lbl-t">16</text>
+        <rect x="206" y="356" width="171" height="16" class="part-24" opacity="0.9"/>
+        <rect x="747" y="356" width="218" height="16" class="part-24" opacity="0.9"/>
         <text x="190" y="352" text-anchor="end" class="lbl-sm">rail B</text>
-        <rect x="404" y="150" width="97" height="100" class="part-lv"/>
-        <text x="452.5" y="168" text-anchor="middle" class="lbl">CH1</text>
-        <circle cx="404" cy="180" r="3.5" fill="var(--v24)"/>
-        <text x="412" y="196" class="lbl-sm">COM</text>
-        <path d="M 404 110 L 404 180" class="w4-24"/>
-        <circle cx="404" cy="110" r="3.5" fill="var(--v24)"/>
-        <circle cx="427" cy="250" r="3.5" fill="var(--v24)"/>
-        <text x="427" y="238" text-anchor="middle" class="lbl-sm">N.C.</text>
-        <path d="M 427 250 L 427 330" class="w4-24"/>
-        <circle cx="478" cy="250" r="3.5" fill="var(--v24)"/>
-        <text x="478" y="238" text-anchor="middle" class="lbl-sm">N.O.</text>
-        <path d="M 478 250 L 478 330" class="w4-24"/>
-        <rect x="506" y="150" width="97" height="100" class="part-lv"/>
-        <text x="554.5" y="168" text-anchor="middle" class="lbl">CH2</text>
-        <circle cx="506" cy="180" r="3.5" fill="var(--v24)"/>
-        <text x="514" y="196" class="lbl-sm">COM</text>
-        <path d="M 506 110 L 506 180" class="w4-24"/>
-        <circle cx="506" cy="110" r="3.5" fill="var(--v24)"/>
-        <circle cx="529" cy="250" r="3.5" fill="var(--v24)"/>
-        <text x="529" y="238" text-anchor="middle" class="lbl-sm">N.C.</text>
-        <path d="M 529 250 L 529 330" class="w4-24"/>
-        <circle cx="580" cy="250" r="3.5" fill="var(--v24)"/>
-        <text x="580" y="238" text-anchor="middle" class="lbl-sm">N.O.</text>
-        <path d="M 580 250 L 580 330" class="w4-24"/>
-        <rect x="608" y="150" width="97" height="100" class="part-lv"/>
-        <text x="656.5" y="168" text-anchor="middle" class="lbl">CH3</text>
-        <circle cx="608" cy="180" r="3.5" fill="var(--v24)"/>
-        <text x="616" y="196" class="lbl-sm">COM</text>
-        <path d="M 608 110 L 608 180" class="w4-24"/>
-        <circle cx="608" cy="110" r="3.5" fill="var(--v24)"/>
-        <circle cx="631" cy="250" r="3.5" fill="var(--v24)"/>
-        <text x="631" y="238" text-anchor="middle" class="lbl-sm">N.C.</text>
-        <path d="M 631 250 L 631 330" class="w4-24"/>
-        <circle cx="682" cy="250" r="3.5" fill="var(--v24)"/>
-        <text x="682" y="238" text-anchor="middle" class="lbl-sm">N.O.</text>
-        <path d="M 682 250 L 682 330" class="w4-24"/>
-        <rect x="710" y="150" width="46" height="100" class="part-lv"/>
-        <text x="733" y="168" text-anchor="middle" class="lbl">CH6</text>
-        <circle cx="710" cy="180" r="3.5" fill="var(--v24)"/>
-        <text x="718" y="196" class="lbl-sm">COM</text>
-        <path d="M 710 110 L 710 180" class="w4-24"/>
-        <circle cx="710" cy="110" r="3.5" fill="var(--v24)"/>
-        <circle cx="733" cy="250" r="3.5" fill="var(--v24)"/>
-        <text x="733" y="238" text-anchor="middle" class="lbl-sm">N.C.</text>
-        <path d="M 733 250 L 733 330" class="w4-24"/>
-        <text x="766" y="216" class="lbl-sm">N.C. unused</text>
-        <path d="M 235 110 L 710 110" class="w4-24"/>
-        <path d="M 235 330 L 235 110" class="w4-24"/>
-        <circle cx="235" cy="110" r="3.5" fill="var(--v24)"/>
-        <path d="M 274 330 L 274 110" class="w4-24"/>
-        <circle cx="274" cy="110" r="3.5" fill="var(--v24)"/>
-        <path d="M 325 330 L 325 110" class="w4-24"/>
-        <circle cx="325" cy="110" r="3.5" fill="var(--v24)"/>
-        <path d="M 376 330 L 376 110" class="w4-24"/>
-        <circle cx="376" cy="110" r="3.5" fill="var(--v24)"/>
-        <text x="245" y="101" class="lbl-sm">HOT BUS · one node · one conductor out of each block</text>
-        <rect x="400" y="540" width="90" height="60" class="part-24"/>
-        <text x="445" y="566" text-anchor="middle" class="lbl-t">gland 1</text>
-        <text x="445" y="583" text-anchor="middle" class="lbl-sm">intake</text>
-        <path d="M 427 390 L 427 540" class="w4-24"/>
-        <circle cx="427" cy="540" r="5" fill="#f2f2f2" stroke="var(--muted)" stroke-width="1"/>
-        <path d="M 478 390 L 478 540" class="w4-24"/>
-        <circle cx="478" cy="540" r="5" fill="#c0392b" stroke="var(--muted)" stroke-width="1"/>
-        <rect x="500" y="540" width="90" height="60" class="part-24"/>
-        <text x="545" y="566" text-anchor="middle" class="lbl-t">gland 2</text>
-        <text x="545" y="583" text-anchor="middle" class="lbl-sm">return</text>
-        <path d="M 529 390 L 529 540" class="w4-24"/>
-        <circle cx="529" cy="540" r="5" fill="#f2f2f2" stroke="var(--muted)" stroke-width="1"/>
-        <path d="M 580 390 L 580 540" class="w4-24"/>
-        <circle cx="580" cy="540" r="5" fill="#c0392b" stroke="var(--muted)" stroke-width="1"/>
-        <rect x="596" y="540" width="90" height="60" class="part-24"/>
-        <text x="641" y="566" text-anchor="middle" class="lbl-t">gland 3</text>
-        <text x="641" y="583" text-anchor="middle" class="lbl-sm">bypass</text>
-        <path d="M 631 390 L 631 540" class="w4-24"/>
-        <circle cx="631" cy="540" r="5" fill="#f2f2f2" stroke="var(--muted)" stroke-width="1"/>
-        <path d="M 682 390 L 682 540" class="w4-24"/>
-        <circle cx="682" cy="540" r="5" fill="#c0392b" stroke="var(--muted)" stroke-width="1"/>
-        <rect x="694" y="540" width="70" height="60" class="part-24"/>
-        <text x="729" y="566" text-anchor="middle" class="lbl-t">contactor</text>
-        <text x="729" y="583" text-anchor="middle" class="lbl-sm">blower</text>
-        <path d="M 733 390 L 733 540" class="w4-24"/>
-        <circle cx="733" cy="540" r="5" fill="#f2f2f2" stroke="var(--muted)" stroke-width="1"/>
+        <rect x="388" y="150" width="89" height="100" class="part-lv"/>
+        <text x="432.5" y="168" text-anchor="middle" class="lbl">CH1</text>
+        <circle cx="388" cy="180" r="3.5" fill="var(--v24)"/>
+        <text x="396" y="196" class="lbl-sm">COM</text>
+        <path d="M 388 110 L 388 180" class="w4-24"/>
+        <circle cx="388" cy="110" r="3.5" fill="var(--v24)"/>
+        <circle cx="409" cy="250" r="3.5" fill="var(--v24)"/>
+        <text x="409" y="238" text-anchor="middle" class="lbl-sm">N.C.</text>
+        <path d="M 409 250 L 409 330" class="w4-24"/>
+        <circle cx="456" cy="250" r="3.5" fill="var(--v24)"/>
+        <text x="456" y="238" text-anchor="middle" class="lbl-sm">N.O.</text>
+        <path d="M 456 250 L 456 330" class="w4-24"/>
+        <rect x="482" y="150" width="89" height="100" class="part-lv"/>
+        <text x="526.5" y="168" text-anchor="middle" class="lbl">CH2</text>
+        <circle cx="482" cy="180" r="3.5" fill="var(--v24)"/>
+        <text x="490" y="196" class="lbl-sm">COM</text>
+        <path d="M 482 110 L 482 180" class="w4-24"/>
+        <circle cx="482" cy="110" r="3.5" fill="var(--v24)"/>
+        <circle cx="503" cy="250" r="3.5" fill="var(--v24)"/>
+        <text x="503" y="238" text-anchor="middle" class="lbl-sm">N.C.</text>
+        <path d="M 503 250 L 503 330" class="w4-24"/>
+        <circle cx="550" cy="250" r="3.5" fill="var(--v24)"/>
+        <text x="550" y="238" text-anchor="middle" class="lbl-sm">N.O.</text>
+        <path d="M 550 250 L 550 330" class="w4-24"/>
+        <rect x="576" y="150" width="89" height="100" class="part-lv"/>
+        <text x="620.5" y="168" text-anchor="middle" class="lbl">CH3</text>
+        <circle cx="576" cy="180" r="3.5" fill="var(--v24)"/>
+        <text x="584" y="196" class="lbl-sm">COM</text>
+        <path d="M 576 110 L 576 180" class="w4-24"/>
+        <circle cx="576" cy="110" r="3.5" fill="var(--v24)"/>
+        <circle cx="597" cy="250" r="3.5" fill="var(--v24)"/>
+        <text x="597" y="238" text-anchor="middle" class="lbl-sm">N.C.</text>
+        <path d="M 597 250 L 597 330" class="w4-24"/>
+        <circle cx="644" cy="250" r="3.5" fill="var(--v24)"/>
+        <text x="644" y="238" text-anchor="middle" class="lbl-sm">N.O.</text>
+        <path d="M 644 250 L 644 330" class="w4-24"/>
+        <rect x="670" y="150" width="42" height="100" class="part-lv"/>
+        <text x="691" y="168" text-anchor="middle" class="lbl">CH6</text>
+        <circle cx="670" cy="180" r="3.5" fill="var(--v24)"/>
+        <text x="678" y="196" class="lbl-sm">COM</text>
+        <path d="M 670 110 L 670 180" class="w4-24"/>
+        <circle cx="670" cy="110" r="3.5" fill="var(--v24)"/>
+        <circle cx="691" cy="250" r="3.5" fill="var(--v24)"/>
+        <text x="691" y="238" text-anchor="middle" class="lbl-sm">N.C.</text>
+        <path d="M 691 250 L 691 330" class="w4-24"/>
+        <text x="722" y="216" class="lbl-sm">N.C. unused</text>
+        <path d="M 232 110 L 670 110" class="w4-24"/>
+        <path d="M 232 330 L 232 110" class="w4-24"/>
+        <circle cx="232" cy="110" r="3.5" fill="var(--v24)"/>
+        <path d="M 268 330 L 268 110" class="w4-24"/>
+        <circle cx="268" cy="110" r="3.5" fill="var(--v24)"/>
+        <path d="M 315 330 L 315 110" class="w4-24"/>
+        <circle cx="315" cy="110" r="3.5" fill="var(--v24)"/>
+        <path d="M 362 330 L 362 110" class="w4-24"/>
+        <circle cx="362" cy="110" r="3.5" fill="var(--v24)"/>
+        <text x="242" y="101" class="lbl-sm">HOT BUS · one node · one conductor out of each block, all four to the HAT</text>
+        <rect x="386" y="540" width="92" height="60" class="part-24"/>
+        <text x="432" y="566" text-anchor="middle" class="lbl-t">gland 1</text>
+        <text x="432" y="583" text-anchor="middle" class="lbl-sm">intake</text>
+        <path d="M 409 390 L 409 540" class="w4-24"/>
+        <circle cx="409" cy="540" r="5" fill="#f2f2f2" stroke="var(--muted)" stroke-width="1"/>
+        <path d="M 456 390 L 456 540" class="w4-24"/>
+        <circle cx="456" cy="540" r="5" fill="#c0392b" stroke="var(--muted)" stroke-width="1"/>
+        <rect x="485" y="540" width="87" height="60" class="part-24"/>
+        <text x="528.5" y="566" text-anchor="middle" class="lbl-t">gland 2</text>
+        <text x="528.5" y="583" text-anchor="middle" class="lbl-sm">return</text>
+        <path d="M 503 390 L 503 540" class="w4-24"/>
+        <circle cx="503" cy="540" r="5" fill="#f2f2f2" stroke="var(--muted)" stroke-width="1"/>
+        <path d="M 550 390 L 550 540" class="w4-24"/>
+        <circle cx="550" cy="540" r="5" fill="#c0392b" stroke="var(--muted)" stroke-width="1"/>
+        <rect x="579" y="540" width="87" height="60" class="part-24"/>
+        <text x="622.5" y="566" text-anchor="middle" class="lbl-t">gland 3</text>
+        <text x="622.5" y="583" text-anchor="middle" class="lbl-sm">bypass</text>
+        <path d="M 597 390 L 597 540" class="w4-24"/>
+        <circle cx="597" cy="540" r="5" fill="#f2f2f2" stroke="var(--muted)" stroke-width="1"/>
+        <path d="M 644 390 L 644 540" class="w4-24"/>
+        <circle cx="644" cy="540" r="5" fill="#c0392b" stroke="var(--muted)" stroke-width="1"/>
+        <rect x="673" y="540" width="75" height="60" class="part-24"/>
+        <text x="710.5" y="566" text-anchor="middle" class="lbl-t">contactor</text>
+        <text x="710.5" y="583" text-anchor="middle" class="lbl-sm">blower</text>
+        <path d="M 691 390 L 691 540" class="w4-24"/>
+        <circle cx="691" cy="540" r="5" fill="#f2f2f2" stroke="var(--muted)" stroke-width="1"/>
         <rect x="170" y="540" width="140" height="80" class="part-line"/>
         <text x="240" y="564" text-anchor="middle" class="lbl-t">TR100VA001</text>
         <text x="240" y="581" text-anchor="middle" class="lbl-sm">24 VAC secondary</text>
         <text x="240" y="598" text-anchor="middle" class="lbl-sm">100 VA · Class 2</text>
         <path d="M 212 390 L 212 540" class="w4-24"/>
         <text x="206" y="465" text-anchor="end" class="lbl-sm">hot</text>
-        <path d="M 772 650 L 937 650" class="w4-24"/>
-        <path d="M 270 650 L 772 650" class="w4-24"/>
-        <path d="M 772 390 L 772 650" class="w4-24"/>
-        <circle cx="772" cy="650" r="3.5" fill="var(--v24)"/>
-        <path d="M 796 390 L 796 650" class="w4-24"/>
-        <circle cx="796" cy="650" r="3.5" fill="var(--v24)"/>
-        <path d="M 835 390 L 835 650" class="w4-24"/>
-        <circle cx="835" cy="650" r="3.5" fill="var(--v24)"/>
-        <path d="M 886 390 L 886 650" class="w4-24"/>
-        <circle cx="886" cy="650" r="3.5" fill="var(--v24)"/>
-        <path d="M 937 390 L 937 650" class="w4-24"/>
-        <circle cx="937" cy="650" r="3.5" fill="var(--v24)"/>
-        <path d="M 445 650 L 445 600" class="w4-24"/>
-        <circle cx="445" cy="650" r="3.5" fill="var(--v24)"/>
-        <circle cx="445" cy="600" r="5" fill="#1a1a1a" stroke="var(--muted)" stroke-width="1"/>
-        <path d="M 545 650 L 545 600" class="w4-24"/>
-        <circle cx="545" cy="650" r="3.5" fill="var(--v24)"/>
-        <circle cx="545" cy="600" r="5" fill="#1a1a1a" stroke="var(--muted)" stroke-width="1"/>
-        <path d="M 641 650 L 641 600" class="w4-24"/>
-        <circle cx="641" cy="650" r="3.5" fill="var(--v24)"/>
-        <circle cx="641" cy="600" r="5" fill="#1a1a1a" stroke="var(--muted)" stroke-width="1"/>
-        <path d="M 729 650 L 729 600" class="w4-24"/>
-        <circle cx="729" cy="650" r="3.5" fill="var(--v24)"/>
-        <circle cx="729" cy="600" r="5" fill="#1a1a1a" stroke="var(--muted)" stroke-width="1"/>
+        <path d="M 270 650 L 950 650" class="w4-24"/>
+        <path d="M 762 390 L 762 650" class="w4-24"/>
+        <circle cx="762" cy="650" r="3.5" fill="var(--v24)"/>
+        <path d="M 809 390 L 809 650" class="w4-24"/>
+        <circle cx="809" cy="650" r="3.5" fill="var(--v24)"/>
+        <path d="M 856 390 L 856 650" class="w4-24"/>
+        <circle cx="856" cy="650" r="3.5" fill="var(--v24)"/>
+        <path d="M 903 390 L 903 650" class="w4-24"/>
+        <circle cx="903" cy="650" r="3.5" fill="var(--v24)"/>
+        <path d="M 950 390 L 950 650" class="w4-24"/>
+        <circle cx="950" cy="650" r="3.5" fill="var(--v24)"/>
+        <path d="M 432 650 L 432 600" class="w4-24"/>
+        <circle cx="432" cy="650" r="3.5" fill="var(--v24)"/>
+        <circle cx="432" cy="600" r="5" fill="#1a1a1a" stroke="var(--muted)" stroke-width="1"/>
+        <path d="M 528.5 650 L 528.5 600" class="w4-24"/>
+        <circle cx="528.5" cy="650" r="3.5" fill="var(--v24)"/>
+        <circle cx="528.5" cy="600" r="5" fill="#1a1a1a" stroke="var(--muted)" stroke-width="1"/>
+        <path d="M 622.5 650 L 622.5 600" class="w4-24"/>
+        <circle cx="622.5" cy="650" r="3.5" fill="var(--v24)"/>
+        <circle cx="622.5" cy="600" r="5" fill="#1a1a1a" stroke="var(--muted)" stroke-width="1"/>
+        <path d="M 710.5 650 L 710.5 600" class="w4-24"/>
+        <circle cx="710.5" cy="650" r="3.5" fill="var(--v24)"/>
+        <circle cx="710.5" cy="600" r="5" fill="#1a1a1a" stroke="var(--muted)" stroke-width="1"/>
         <path d="M 270 650 L 270 620" class="w4-24"/>
         <circle cx="270" cy="650" r="3.5" fill="var(--v24)"/>
         <text x="290" y="668" class="lbl-sm">COMMON BUS · one node · three actuator blacks, the coil return, and the transformer common</text>
@@ -1694,18 +1695,18 @@ The panel's own feed has two destinations, not five. An earlier
         <text x="864" y="192" class="lbl-sm">red    → N.O.</text>
         <circle cx="850" cy="210" r="5" fill="#1a1a1a" stroke="var(--muted)" stroke-width="1"/>
         <text x="864" y="214" class="lbl-sm">black  → common</text>
-        <rect x="269.775" y="402.97" width="59.45" height="12.6" fill="var(--ground)"/>
-        <text x="299.5" y="412" text-anchor="middle" class="lbl-band">HOT BUS</text>
-        <rect x="499.05" y="402.97" width="110.9" height="12.6" fill="var(--ground)"/>
-        <text x="554.5" y="412" text-anchor="middle" class="lbl-band">SWITCHED PAIRS</text>
-        <rect x="714.3" y="402.97" width="37.4" height="12.6" fill="var(--ground)"/>
-        <text x="733" y="412" text-anchor="middle" class="lbl-band">COIL</text>
-        <rect x="819.75" y="402.97" width="81.5" height="12.6" fill="var(--ground)"/>
-        <text x="860.5" y="412" text-anchor="middle" class="lbl-band">COMMON BUS</text>
-        <rect x="203.745" y="418.97" width="140.51" height="12.6" fill="var(--ground)"/>
-        <text x="274" y="428" text-anchor="middle" class="lbl-sm">one node · 4-way comb</text>
-        <rect x="713.745" y="418.97" width="140.51" height="12.6" fill="var(--ground)"/>
-        <text x="784" y="428" text-anchor="middle" class="lbl-sm">one node · 4-way comb</text>
+        <rect x="261.775" y="402.97" width="59.45" height="12.6" fill="var(--ground)"/>
+        <text x="291.5" y="412" text-anchor="middle" class="lbl-band">HOT BUS</text>
+        <rect x="471.05" y="402.97" width="110.9" height="12.6" fill="var(--ground)"/>
+        <text x="526.5" y="412" text-anchor="middle" class="lbl-band">SWITCHED PAIRS</text>
+        <rect x="672.3" y="402.97" width="37.4" height="12.6" fill="var(--ground)"/>
+        <text x="691" y="412" text-anchor="middle" class="lbl-band">COIL</text>
+        <rect x="815.25" y="402.97" width="81.5" height="12.6" fill="var(--ground)"/>
+        <text x="856" y="412" text-anchor="middle" class="lbl-band">COMMON BUS</text>
+        <rect x="221.245" y="418.97" width="140.51" height="12.6" fill="var(--ground)"/>
+        <text x="291.5" y="428" text-anchor="middle" class="lbl-sm">one node · 4-way comb</text>
+        <rect x="785.745" y="418.97" width="140.51" height="12.6" fill="var(--ground)"/>
+        <text x="856" y="428" text-anchor="middle" class="lbl-sm">one node · 5-way comb</text>
       </svg>
       <figcaption>
         Both buses are drawn as one line each, because that is what a comb makes
@@ -1747,47 +1748,54 @@ The panel's own feed has two destinations, not five. An earlier
     </p>
 
     <p>
-      The common bus could be three on the same reasoning, because its five
-      conductors genuinely do split across both faces &mdash; the transformer
-      common and the coil return head down, the three actuator blacks arrive from
-      the gland side. Make it four anyway. One block costs about a dollar, both
-      buses then look alike, and every conductor lands on the face it is already
-      pointing at.
+      The common bus is <b>five</b>, and there is no choice about it. Every one of
+      its conductors leaves downward &mdash; the transformer common, the contactor
+      coil return, and the three actuator blacks routed under the strip to their
+      glands. Five conductors on one face is five blocks. Its upper clamps are all
+      spare, which is a good place to put a meter probe.
+    </p>
+
+    <p>
+      Read the table by column and the whole rule is visible. Eleven entries in the
+      upper column, thirteen in the lower, and no cell doing double duty. Four COMs
+      stacked in the upper column is why the hot bus is four blocks; five returns
+      stacked in the lower column is why the common bus is five.
     </p>
 
     <table>
       <thead>
-        <tr><th class="num">Block</th><th>Group</th><th>Clamp A</th><th>Clamp B</th></tr>
+        <tr><th class="num">Block</th><th>Group</th><th>Upper clamp &mdash; toward the HAT</th><th>Lower clamp &mdash; toward the field</th></tr>
       </thead>
       <tbody>
-          <tr><td class="num">1</td><td>hot bus</td><td>transformer <b>hot</b> leg in</td><td>CH1 COM</td></tr>
-          <tr><td class="num">2</td><td>hot bus</td><td>CH2 COM</td><td><i>spare</i></td></tr>
-          <tr><td class="num">3</td><td>hot bus</td><td>CH3 COM</td><td><i>spare</i></td></tr>
-          <tr><td class="num">4</td><td>hot bus</td><td>CH6 COM</td><td><i>spare</i></td></tr>
-          <tr><td class="num">5</td><td>CH1 · intake</td><td>CH1 N.C. from the HAT</td><td>white &rarr; gland 1</td></tr>
-          <tr><td class="num">6</td><td>CH1 · intake</td><td>CH1 N.O. from the HAT</td><td>red &rarr; gland 1</td></tr>
-          <tr><td class="num">7</td><td>CH2 · return</td><td>CH2 N.C. from the HAT</td><td>white &rarr; gland 2</td></tr>
-          <tr><td class="num">8</td><td>CH2 · return</td><td>CH2 N.O. from the HAT</td><td>red &rarr; gland 2</td></tr>
-          <tr><td class="num">9</td><td>CH3 · bypass</td><td>CH3 N.C. from the HAT</td><td>white &rarr; gland 3</td></tr>
-          <tr><td class="num">10</td><td>CH3 · bypass</td><td>CH3 N.O. from the HAT</td><td>red &rarr; gland 3</td></tr>
-          <tr><td class="num">11</td><td>coil</td><td>CH6 N.O. from the HAT</td><td>contactor coil, leg A</td></tr>
-          <tr><td class="num">12</td><td>common bus</td><td>transformer <b>common</b> leg in</td><td>black &larr; gland 1</td></tr>
-          <tr><td class="num">13</td><td>common bus</td><td>black &larr; gland 2</td><td><i>spare</i></td></tr>
-          <tr><td class="num">14</td><td>common bus</td><td>black &larr; gland 3</td><td><i>spare</i></td></tr>
-          <tr><td class="num">15</td><td>common bus</td><td>contactor coil, leg B</td><td><i>spare</i></td></tr>
+          <tr><td class="num">1</td><td>hot bus</td><td>CH1 COM</td><td>transformer <b>hot</b> leg in</td></tr>
+          <tr><td class="num">2</td><td>hot bus</td><td>CH2 COM</td><td>&mdash;</td></tr>
+          <tr><td class="num">3</td><td>hot bus</td><td>CH3 COM</td><td>&mdash;</td></tr>
+          <tr><td class="num">4</td><td>hot bus</td><td>CH6 COM</td><td>&mdash;</td></tr>
+          <tr><td class="num">5</td><td>CH1 · intake</td><td>CH1 N.C.</td><td>white &rarr; gland 1</td></tr>
+          <tr><td class="num">6</td><td>CH1 · intake</td><td>CH1 N.O.</td><td>red &rarr; gland 1</td></tr>
+          <tr><td class="num">7</td><td>CH2 · return</td><td>CH2 N.C.</td><td>white &rarr; gland 2</td></tr>
+          <tr><td class="num">8</td><td>CH2 · return</td><td>CH2 N.O.</td><td>red &rarr; gland 2</td></tr>
+          <tr><td class="num">9</td><td>CH3 · bypass</td><td>CH3 N.C.</td><td>white &rarr; gland 3</td></tr>
+          <tr><td class="num">10</td><td>CH3 · bypass</td><td>CH3 N.O.</td><td>red &rarr; gland 3</td></tr>
+          <tr><td class="num">11</td><td>coil</td><td>CH6 N.O.</td><td>contactor coil, leg A</td></tr>
+          <tr><td class="num">12</td><td>common bus</td><td>&mdash;</td><td>transformer <b>common</b> leg in</td></tr>
+          <tr><td class="num">13</td><td>common bus</td><td>&mdash;</td><td>black &larr; gland 1</td></tr>
+          <tr><td class="num">14</td><td>common bus</td><td>&mdash;</td><td>black &larr; gland 2</td></tr>
+          <tr><td class="num">15</td><td>common bus</td><td>&mdash;</td><td>black &larr; gland 3</td></tr>
+          <tr><td class="num">16</td><td>common bus</td><td>&mdash;</td><td>contactor coil, leg B</td></tr>
       </tbody>
     </table>
 
     <p>
-      <b>Fifteen blocks and two four-way combs</b> &mdash; 30 clamps for 24
-      conductors, so six spare. That is the count to order
+      <b>Sixteen blocks, one four-way comb and one five-way</b> &mdash; 32 clamps
+      for 24 conductors, so eight spare. That is the count to order
       against, and it is the first time this plan has had one: the BOM line still
       reads <span class="tag">terminal blocks &mdash; no part chosen</span>.
     </p>
 
     <p class="note">
-      <b>Size it before you buy it.</b> Fifteen blocks at a typical 6.2&nbsp;mm
-      pitch is about 3.7&nbsp;in, comfortably inside rail&nbsp;B&rsquo;s 8&nbsp;in even
+      <b>Size it before you buy it.</b> Sixteen blocks at a typical 6.2&nbsp;mm
+      pitch is about 3.9&nbsp;in, comfortably inside rail&nbsp;B&rsquo;s 8&nbsp;in even
       after two end brackets. But pitch runs from roughly 5.2 to 8&nbsp;mm across
       the usual 2.5&ndash;6&nbsp;mm&sup2; range, so this is a number that depends on the
       part and there is no part chosen yet. Add end plates: a feed-through block
@@ -1796,8 +1804,9 @@ The panel's own feed has two destinations, not five. An earlier
 
     <p class="note">
       <b>The comb is the one part that can short the transformer.</b> It must be a
-      <em>four-way</em> piece on blocks 1&ndash;4 and another on 12&ndash;15, and
-      neither may reach a neighbour. A comb that over-runs block&nbsp;4 into
+      <em>four-way</em> piece on blocks 1&ndash;4 and a <em>five-way</em> on
+      12&ndash;16, and neither may reach a neighbour. The gap drawn before
+      block&nbsp;12 is an end plate, and it is there for this reason. A comb that over-runs block&nbsp;4 into
       block&nbsp;5 ties the hot bus to CH1&rsquo;s N.C. output, so white and red go
       live together and the intake actuator is driven both ways at once. One that
       reaches back from block&nbsp;12 into block&nbsp;11 ties CH6&rsquo;s N.O. to common,
@@ -1815,7 +1824,7 @@ The panel's own feed has two destinations, not five. An earlier
       goes straight to the contactor and the light straight to CH7, both looped
       from the Intermatic subpanel, and every equipment grounding conductor goes
       to the bolted PE bar rather than to a rail.
-      <b>Nineteen blocks on the panel altogether.</b>
+      <b>Twenty blocks on the panel altogether.</b>
     </p>
   </section>
 

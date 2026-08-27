@@ -16,16 +16,17 @@ the reason for this representation, not laziness.
 import sys, itertools
 
 # ---- the strip -------------------------------------------------------------
-BX, BW, BGAP = 200, 46, 5
-BY0, BY1, N  = 330, 390, 15
-bx = lambda i: BX + (i-1)*(BW+BGAP)
+BX, BW, BGAP = 200, 42, 5
+BY0, BY1, N  = 330, 390, 16
+GAPS = {12: 24}                      # end plate between the coil block and common
+bx = lambda i: BX + (i-1)*(BW+BGAP) + sum(g for k,g in GAPS.items() if i >= k)
 bc = lambda i: bx(i) + BW/2
-lc = lambda i: bx(i) + 11          # lower/left clamp
-rc = lambda i: bx(i) + BW - 11     # upper/right clamp
+lc = lambda i: bx(i) + 10          # lower clamp, toward the field
+rc = lambda i: bx(i) + BW - 10     # upper clamp, toward the HAT
 
-COMBS  = [(1,4), (12,15)]            # 1-4 hot bus, 12-15 common bus
+COMBS  = [(1,4), (12,16)]            # 1-4 hot bus, 12-16 common bus
 GROUPS = [(1,4,"HOT BUS"), (5,10,"SWITCHED PAIRS"), (11,11,"COIL"),
-          (12,15,"COMMON BUS")]
+          (12,16,"COMMON BUS")]
 
 # ---- relays, each directly over the blocks it lands on ----------------------
 RY0, RY1 = 150, 250
@@ -35,10 +36,10 @@ COMY, HOTBUS_Y = 180, 110
 # ---- what the strip feeds --------------------------------------------------
 FY0, FY1 = 540, 600
 # the contactor sits left of block 12 so the common bus risers clear it
-FIELD = [("g1", 400, 490, "gland 1", "intake",  5, 6),
-         ("g2", 500, 590, "gland 2", "return",  7, 8),
-         ("g3", 596, 686, "gland 3", "bypass",  9, 10),
-         ("kt", 694, 764, "contactor", "blower", 11, None)]
+FIELD = [("g1", 386, 478, "gland 1", "intake",  5, 6),
+         ("g2", 485, 572, "gland 2", "return",  7, 8),
+         ("g3", 579, 666, "gland 3", "bypass",  9, 10),
+         ("kt", 673, 748, "contactor", "blower", 11, None)]
 XF        = (170, 310, 540, 620)
 COMBUS_Y  = 650
 COMBUS_X  = 0                         # unused; risers are per block now
@@ -46,7 +47,7 @@ HOT_IN_X  = 212                       # transformer hot -> block 1
 
 CW = {"lbl-sm":6.31, "lbl-t":6.61, "lbl":7.05, "lbl-band":7.35}
 FS = {"lbl-sm":10.5, "lbl-t":11.0, "lbl":13.0, "lbl-band":10.5}
-VB = (130, 60, 890, 660)
+VB = (130, 60, 900, 660)
 
 out, late, rects, texts, segs = [], [], [], [], []
 def rect(x0,y0,x1,y1,cls,extra=""):
@@ -80,8 +81,8 @@ for a,b in COMBS:
 for a,b,s in GROUPS:
     text((bx(a)+bx(b)+BW)/2, 412, s, "lbl-band", "middle", bg=True)
 text(bx(1)-10, BY0+22, "rail B", "lbl-sm", "end")
-text((bx(1)+bx(3)+BW)/2, 428, "one node · 4-way comb", "lbl-sm", "middle", bg=True)
-text((bx(11)+bx(13)+BW)/2, 428, "one node · 4-way comb", "lbl-sm", "middle", bg=True)
+text((bx(1)+bx(4)+BW)/2,  428, "one node · 4-way comb", "lbl-sm", "middle", bg=True)
+text((bx(12)+bx(16)+BW)/2, 428, "one node · 5-way comb", "lbl-sm", "middle", bg=True)
 
 # ---- relays ----------------------------------------------------------------
 for (rid, nc, no) in RELAYS:
@@ -104,7 +105,7 @@ wire([(rc(1), HOTBUS_Y), (bx(11), HOTBUS_Y)])
 for i in (1, 2, 3, 4):
     x = rc(1) if i == 1 else bc(i)
     wire([(x, BY0), (x, HOTBUS_Y)]); dot(x, HOTBUS_Y)
-text(rc(1)+10, HOTBUS_Y-9, "HOT BUS · one node · one conductor out of each block", "lbl-sm")
+text(rc(1)+10, HOTBUS_Y-9, "HOT BUS · one node · one conductor out of each block, all four to the HAT", "lbl-sm")
 
 # ---- field -----------------------------------------------------------------
 for (fid, x0, x1, lab, sub, ba, bb) in FIELD:
@@ -125,9 +126,8 @@ text(HOT_IN_X-6, (BY1+XF[2])/2, "hot", "lbl-sm", "end")
 
 # common bus: five conductors on four blocks - block 12 carries two, the
 # transformer common on its lower clamp and gland 1's black on its upper
-wire([(lc(12), COMBUS_Y), (bc(15), COMBUS_Y)])
-wire([(270, COMBUS_Y), (lc(12), COMBUS_Y)])
-for x in (lc(12), rc(12), bc(13), bc(14), bc(15)):
+wire([(270, COMBUS_Y), (bc(16), COMBUS_Y)])
+for x in (bc(12), bc(13), bc(14), bc(15), bc(16)):
     wire([(x, BY1), (x, COMBUS_Y)]); dot(x, COMBUS_Y)
 for (fid, x0, x1, lab, sub, ba, bb) in FIELD:
     tap = (x0+x1)/2
@@ -144,18 +144,19 @@ for i,(col, lab) in enumerate((("#f2f2f2","white  \u2192 N.C."),
 
 svg = ('<svg viewBox="%d %d %d %d" role="img" aria-label="%s">\n  %s\n</svg>' % (
     VB[0], VB[1], VB[2], VB[3],
-    "Connection map of the 24 volt AC network on DIN rail B. Fifteen terminal "
-    "blocks in a row. Blocks 1 to 4 are the hot bus, bridged into one node by a "
-    "four-way comb, and one conductor leaves each of them for the COM screw of "
-    "relay channels 1, 2, 3 and 6 - four conductors all heading to the HAT, so "
-    "four blocks. Blocks 5 to 10 are the six switched conductors of the three "
-    "valve actuators, two blocks per actuator. Block 11 is the blower contactor "
-    "coil. Blocks 12 to 15 are the common bus, bridged by a second four-way comb. "
-    "The transformer's hot leg lands on block 1 and its common leg on block 12. "
-    "Each relay drops its N.C. and N.O. contacts onto its own pair of blocks, "
-    "which leave through glands 1 to 3 as the white and red conductors of each "
-    "actuator cable. The three black conductors return to the common bus, along "
-    "with the second leg of the contactor coil.",
+    "Connection map of the 24 volt AC network on DIN rail B. Sixteen terminal "
+    "blocks in a row, in four groups. Blocks 1 to 4 are the hot bus, bridged into "
+    "one node by a four-way comb: the transformer's hot leg lands on block 1's "
+    "lower clamp, and each of the four blocks sends one conductor up from its "
+    "upper clamp to the COM screw of relay channels 1, 2, 3 and 6. Four "
+    "conductors all heading to the HAT is what makes it four blocks. Blocks 5 to "
+    "10 are the six switched conductors of the three valve actuators, two blocks "
+    "per actuator, each taking a relay contact on its upper clamp and a field "
+    "wire on its lower. Block 11 is the blower contactor coil. An end-plate gap "
+    "separates it from blocks 12 to 16, the common bus, bridged by a five-way "
+    "comb: all five of its conductors leave downward - the transformer common, "
+    "the three actuator blacks, and the contactor coil return - so it takes five "
+    "blocks, one each.",
     "\n  ".join(out + late)))
 
 # ---- invariants ------------------------------------------------------------
