@@ -63,21 +63,47 @@ Record the full grid, not just whether it worked.
 
 ---
 
-## Test 1 — the card drives relays at all
+## Test 1 — which channel drives which relay
+
+**Counting eight clicks is not enough.** Two Sequent drivers detect this card
+at the same address and disagree about which bit drives which relay:
+
+| | ch1 | ch2 | ch3 | ch4 | ch5 | ch6 | ch7 | ch8 |
+|---|---|---|---|---|---|---|---|---|
+| `8relay` (last commit 2021) | 0 | 2 | 1 | 3 | 6 | 4 | 5 | 7 |
+| `8relind`, Industrial card (maintained) | 0 | 2 | 6 | 4 | 5 | 7 | 3 | 1 |
+
+They agree on channels 1&ndash;2 and diverge from 3 on. Detection proves the
+I2C address, nothing more — so the mapping has to be established by eye, once,
+on this card:
 
 ```bash
-git clone https://github.com/SequentMicrosystems/8relay-rpi.git
-cd 8relay-rpi && sudo make install
-8relay -list           # expect: 1,0  (one board, stack level 0)
-8relay 0 write 1 on    # CH1 energises, LED lights
-8relay 0 read 1        # expect: 1
-8relay 0 write 1 off   # LED goes out
+cd ~/8relay-rpi && make          # build only; see below on installing
+for n in 1 2 3 4 5 6 7 8; do
+  ./8relay 0 write $n on
+  printf "ch%d -> port 0x%s  " "$n" "$(i2cget -y 1 0x27 | sed 's/0x//')"
+  read -p "which REL LED is lit? " led; echo "  ch$n = REL$led"
+  ./8relay 0 write $n off
+done
 ```
 
-`8relay 0 test` cycles all eight. Do that once and **count the clicks** — eight
-distinct relays, no channel dead, none stuck. Note any channel that behaves
-differently, especially **relay 4**, which the silkscreen rates apart from the
-others.
+Record the full table. `ch<n> = REL<n>` throughout means the driver matches the
+board; any disagreement means it was written for a different product and the
+supervisor must carry its own mapping.
+
+Note **relay 4**, which the silkscreen rates at 3 A where its neighbours are
+8&ndash;10 A.
+
+### Installing it, or not
+
+`sudo make install` copies the binary to `/usr/bin` and sets it **setuid root**
+(`chmod 4755`). That is unnecessary here: you are in the `i2c` group, and the
+binary already runs fine as an ordinary user straight out of the build
+directory. Setuid root on a CLI that drives pool equipment gives every local
+account the ability to move valves. Install without it, or do not install it at
+all — the supervisor has better options than shelling out to a five-year-old
+binary whose channel mapping was written for a different card. One I2C write to
+`0x27` sets all eight relays at once.
 
 While CH1 is energised, confirm the **N.C. contact opens**: move the indicator
 to CH1 COM–N.C. and check it is lit when the relay is off and dark when on.
