@@ -1867,5 +1867,18 @@ Open:
   written to `0x27` directly, so it does not depend on the fix landing — which
   is just as well on a repo whose last commit was June 2021.
 
+- **SequentMicrosystems/8relay-rpi#8** — three proposed changes, asking for
+  direction before writing a PR: the `relayChSet` read-modify-write that reads
+  the input register to compute the output latch (a real bug, revision
+  independent); a README note on which hardware revisions the table is correct
+  for; and a `verify` subcommand that walks the channels and prints the correct
+  table for whatever board is present. That last is the only actual fix for the
+  class of problem, because a card with no microcontroller cannot tell software
+  which revision it is. https://github.com/SequentMicrosystems/8relay-rpi/issues/8
+
+  Filed as a question rather than a PR deliberately. The repo is dormant, and
+  an unrequested patch on a dormant repo is a way to spend effort rather than
+  to contribute.
+
 njsPC runs in **Nixie** mode: it is the controller. There is no Pentair
 outdoor control panel in this system after cutover.
