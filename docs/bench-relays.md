@@ -45,15 +45,19 @@ sudo apt install -y i2c-tools
 i2cdetect -y 1
 ```
 
-- **One address, 0x38 (or 0x20), and nothing else** — a bare I/O expander.
-  No microcontroller, therefore no watchdog, therefore nothing to feed, and
-  the rest of ADR-10 has to be built rather than inherited.
-- **A second address** — there is an MCU, the product page is right, and the
-  watchdog exists. Find its driver before going further: the ADR may already
-  be built, which is the outcome worth having.
+**Answered, 27 August 2026: `0x27` and nothing else.** That is
+`(0 + 0x20) ^ 0x07`, the driver's stack-level-0 address on its alternate base,
+and offsets `0x00`–`0x03` all return the same byte — the PCF8574 signature,
+since that part has no register pointer. A dumb expander, no microcontroller,
+no watchdog. Keep the step: it is one command, and it is how you would notice
+a card that is not the one you think you have.
 
-Also run `8relay -v` and `8relind -v`. Whichever tool reports a version is the
-one written for this card, and the other is for a different product.
+**Run Tests 2 and 3 with the HAT fed from its own 5 V input**, not powered
+through the Pi's header. In the panel the HDR-60-5 feeds the HAT and the HAT
+feeds the Pi, so the expander survives anything that only stops the Pi. Wire
+the bench the other way round and it will cheerfully show you relays dropping
+on power loss — a true result about the bench and a false one about the
+panel.
 
 Record the full grid, not just whether it worked.
 

@@ -329,8 +329,13 @@ resettable fuse), and it presents on the **Pi's GPIO UART**, not on USB.
 Three things have to be true, and none of them are by default:
 
 **1. The DIP switches.** TX and RX **ON**, so the Pi drives the bus directly.
-With them off the card is a MODBUS RTU slave and the Pi cannot talk to the
-pump at all.
+With them off the transceiver is simply not connected to the Pi's UART and the
+pump cannot be reached at all.
+
+*This used to say the card becomes a MODBUS RTU slave with them off. It cannot
+— the bus scan on 27 August 2026 found a single PCF8574-class port expander at
+`0x27` and no microcontroller, so there is no firmware to run a slave. That
+claim came from Sequent's Industrial relay card, a different product.*
 
 *As shipped they are off.* The V 7.1 card photographed on arrival had all six
 switches in the off position — the factory default, and wrong for this use.

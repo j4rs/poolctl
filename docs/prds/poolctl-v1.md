@@ -668,22 +668,51 @@ buys false confidence. Tie the heartbeat to the invariants actually holding.
 **Consequence:** Phase 2 bench testing kills each process in turn. Both cases
 must end with every relay de-energised.
 
-**Open, and it decides whether this is already built.** The relay HAT has a
-hardware watchdog on board. It does not de-energise anything directly — it
-**cuts power to the Pi** for a configurable off-period and then restores it,
-forcing a restart. Sequent's documentation does not say what happens to relay
-state while that happens, and the answer determines the whole design:
+**Closed, 27 August 2026, and the answer is that there is nothing to inherit.**
+This ADR assumed the relay HAT carries a hardware watchdog, because the product
+page advertises one. The card does not. With the HAT fitted and I2C enabled,
+the bus holds exactly one device:
 
-- **If the relays drop**, the HAT's watchdog *is* this ADR. Feed it from the
-  health condition above and there is nothing else to build.
-- **If the relays hold**, it is not. The card gates power to the Pi, so it
-  must stay powered itself — which makes holding the more likely outcome, and
-  means a wedged system keeps its relays energised through the trip.
+```
+20: -- -- -- -- -- -- -- 27 -- -- -- -- -- -- -- --      (nothing else, -r rescan)
+```
 
-Measure it before building anything: fit the card, start feeding the
-watchdog, energise a relay, stop feeding, and watch whether the relay drops
-when the Pi is power-cycled. Ten minutes on a bench, and it is the difference
-between wiring a heartbeat and designing a second interlock.
+`0x27` is what the driver computes for stack level 0 — `(0 + 0x20) ^ 0x07` —
+and reading offsets `0x00` through `0x03` returns the *same byte* each time,
+which is the PCF8574 signature: that part has no register pointer, so any
+offset is ignored. The driver's two base addresses, `0x38` and `0x20`, are
+PCF8574A and PCF8574 exactly.
+
+**A dumb port expander. No microcontroller, so no firmware, so no watchdog**,
+whatever the product page says — and by the same token the card cannot be the
+MODBUS RTU slave that `pi-bringup.md` claimed it becomes with the TX/RX
+switches off. Both statements appear to be inherited from Sequent's
+*Industrial* relay card, which is a different product with an MCU.
+
+**So this ADR has to be built, and one detail decides how.** The expander
+latches its output byte and holds it for as long as *it* is powered. Which
+means the fail-safe depends on which direction power flows, and the bench and
+the panel differ:
+
+- **On the bench**, the Pi is mains-powered and the HAT draws 5 V from the
+  GPIO header. Cutting the Pi drops the expander, and the relays fall open.
+- **In the panel as designed**, the HDR-60-5 feeds the *HAT*, which feeds the
+  Pi over GPIO. The HAT stays powered through anything that only stops the Pi
+  — so a wedged Pi, a killed process, or a hypothetical watchdog that
+  power-cycles only the Pi all leave every relay exactly where it was.
+
+A bench result proving relays drop on power loss therefore **does not
+generalise to the panel**, and it would be easy to be reassured by the wrong
+test. Options are a supervisor that de-energises on its way out (no help when
+wedged), Sequent's separate Super-Watchdog card cutting the **coil** supply
+rather than the Pi, or accepting it on the strength of ADR-9's wiring, where
+de-energised is the safe rest position for every channel. Not yet decided.
+
+What remains to measure is in `docs/bench-relays.md`: energise a channel, then
+take it through a clean shutdown, an abrupt power cut, a killed process and a
+reboot, and record which of those end de-energised. **Run the power tests with
+the HAT fed from its own 5 V input, not through the Pi**, or the result
+describes a bench that is wired the opposite way round from the panel.
 
 **What softens the bad case.** A trip reboots the Pi, and boot re-drives the
 valves to pool and leaves the heater off — so even if relays hold through the
