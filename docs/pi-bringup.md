@@ -96,10 +96,12 @@ toolchain — see section 3.
 
 Built on the laptop, copied as artifacts. The Pi runs; it does not build.
 
-From the laptop. `$PI` is wherever you can SSH to the box:
+From the laptop. `$PI` is wherever you can SSH to the box &mdash; **the user is
+whatever the imager created, not necessarily `pi`**, and this document said
+`pi` for months while the box answered to something else:
 
 ```bash
-export PI=pi@poolctl.local
+export PI=<user>@poolctl.local
 ./scripts/deploy.sh
 ```
 
@@ -287,6 +289,33 @@ it keeps the supervisor's program-to-circuit bindings valid.
 ---
 
 ## 6. When the HAT arrives
+
+### I2C first, or nothing on the card responds
+
+The relays are driven over **I2C**, not the UART. This document went to the
+pad without saying so, and the omission cost a reboot on the day the card
+arrived: the HAT was fitted, the Pi came up clean, and there was no
+`/dev/i2c-1` to talk to because I2C is **off by default on Raspberry Pi OS**.
+A loaded `i2c_brcmstb` module is not evidence to the contrary &mdash; that is
+the SoC's own internal bus, not the GPIO one the HAT sits on.
+
+```bash
+sudo raspi-config nonint do_i2c 0     # writes dtparam=i2c_arm=on
+sudo usermod -aG i2c "$USER"          # so i2cdetect needs no sudo
+sudo reboot
+```
+
+Then confirm, before touching any driver:
+
+```bash
+ls -l /dev/i2c-1          # must exist
+i2cdetect -y 1            # the card must appear, expected at 0x38 (or 0x20)
+```
+
+The address matters beyond "it works". A single address and nothing else means
+the card is a bare I/O expander with no microcontroller, and therefore no
+hardware watchdog whatever the product page claims &mdash; which decides whether
+ADR-10 is inherited or has to be built. See `bench-relays.md`.
 
 ### The serial bus, before anything else
 

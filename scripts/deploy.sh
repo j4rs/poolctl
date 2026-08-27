@@ -8,7 +8,7 @@
 # two pure-JS dependencies.
 #
 #   ./scripts/deploy.sh                 # deploy to $PI
-#   PI=pi@poolctl.local ./scripts/deploy.sh
+#   PI=<user>@poolctl.local ./scripts/deploy.sh
 #   ./scripts/deploy.sh --dry-run       # show what would change, touch nothing
 #
 # Never copies auth.json or state.json. Those are the Pi's own — a password
@@ -33,8 +33,8 @@ for arg in "$@"; do
 done
 
 if [[ -z "$PI" ]]; then
-  echo "Usage: PI=pi@poolctl.local $0 [--dry-run]" >&2
-  echo "   or: $0 pi@poolctl.local" >&2
+  echo "Usage: PI=<user>@poolctl.local $0 [--dry-run]" >&2
+  echo "   or: $0 <user>@poolctl.local" >&2
   exit 2
 fi
 
