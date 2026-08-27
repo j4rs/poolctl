@@ -453,6 +453,20 @@ curl -s http://127.0.0.1:4200/config/all \
       http://127.0.0.1:4200/app/rs485Port
 ```
 
+**Echoing every field is necessary here and still not sufficient.** The write
+above sends the whole comms object, and njsPC *still* altered a field that was
+sent unchanged: `screenlogic.password` went from `1234` to `""`. It also added
+`portSettings.flowControl: false`, which is harmless normalisation.
+
+Neither matters on this box &mdash; ScreenLogic is dormant, `systemName` is the
+placeholder `Pentair: 00-00-00`, the comms type is `local`, njsPC's own
+`/app/screenlogic` route is commented out, and `1234` is that feature's factory
+default. But it is worth knowing that `setPortAsync` does not round-trip its
+input: **diff the config before and after any write to this endpoint**, rather
+than assuming an echo preserves what it echoed. `binding.js` documents the
+opposite trap for circuit writes, where omitting a field silently sets it
+false; this is the same lesson from the other side.
+
 **What "working" looks like before the bus exists.** njsPC opens the port, sees
 nothing for `inactivityRetry` seconds, closes it and reopens:
 
