@@ -105,18 +105,67 @@ lighting LEDs "1,3,5,8", which was a counting artefact and not a mapping fault.
 The terminal blocks carry the same numbering in much larger text if the LED
 labels are unreadable under glare.
 
-**Partial result, 27 August 2026.** Confirmed by label on two channels at
-widely separated bits:
+## The measured mapping, 27 August 2026
 
-| Channel | Bit written | LED label |
+All eight walked and read off the silkscreen. **`8relay`'s channel numbering
+does not match this card.** Channels 1&ndash;5 are correct; 6, 7 and 8 are
+rotated:
+
+| `8relay` channel | Bit it sets | Relay that actually closes |
 |---|---|---|
-| 1 | 0 | `REL1` |
-| 7 | 5 | `R7` |
+| 1 | 0 | REL1 |
+| 2 | 2 | REL2 |
+| 3 | 1 | REL3 |
+| 4 | 3 | REL4 |
+| 5 | 6 | REL5 |
+| **6** | 4 | **REL7** |
+| **7** | 5 | **REL8** |
+| **8** | 7 | **REL6** |
 
-Both agree with `8relay`'s table, and they discriminate against `8relind`'s,
-which maps channel 7 to bit 3. **The other six channels are inferred, not
-measured.** Finish the walk before an actuator is wired to anything: CH1&ndash;3
-are valves, and a mapping error there moves the wrong body of water.
+Inverted, which is the form anything driving this card actually needs:
+
+| Relay | Bit | Mask |
+|---|---|---|
+| REL1 | 0 | `0x01` |
+| REL2 | 2 | `0x04` |
+| REL3 | 1 | `0x02` |
+| REL4 | 3 | `0x08` |
+| REL5 | 6 | `0x40` |
+| REL6 | 7 | `0x80` |
+| REL7 | 4 | `0x10` |
+| REL8 | 5 | `0x20` |
+
+Write that mask to register `0x01` at `0x27` and the relay named is the relay
+that closes. No driver required.
+
+### What the rotation would have done
+
+Against this project's channel map the three wrong ones are the blower, the
+light and the spare &mdash; and one of them is the worst channel on the board
+to get wrong:
+
+| Intent | Correct driver channel | What the driver's own numbering does instead |
+|---|---|---|
+| CH6, blower contactor coil | `write 8` | `write 6` closes REL7 &mdash; **the pool light** |
+| CH7, pool light | `write 6` | `write 7` closes REL8 &mdash; the unwired spare, so the light never comes on |
+| CH8, spare | `write 7` | `write 8` closes REL6 &mdash; **the blower contactor starts the blower** |
+
+The last row is the one that matters. CH8 is nominally spare and therefore the
+channel least likely to be tested, and writing it starts a 7.3 A motor whose
+welded-contact failure mode is *stuck on* &mdash; the load ADR-13 phases last
+precisely because it is the most dangerous thing here.
+
+### How this was nearly missed
+
+Reading back the output latch after each write confirmed the driver sets the
+bits its own table specifies. That check passes whether or not the table
+matches the board, so it proves nothing about which relay closes, and twice
+looked like confirmation. Only a label read catches it.
+
+The first observation &mdash; channels 1,3,5,7 lighting 1,3,5,**8** &mdash;
+was correct and was talked out of on the strength of a silkscreen order
+inferred from a photograph. Trust the eyes on the board over the inference
+about the board.
 
 Note **relay 4**, which the silkscreen rates at 3 A where its neighbours are
 8&ndash;10 A.

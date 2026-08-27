@@ -772,6 +772,20 @@ Figure 4).
 Channels 4–5 must be **isolated from the 24 VAC transformer**; the Raypak
 supplies its own low voltage on that terminal block.
 
+**The channel numbers in this table are relay numbers on the board, and the
+Sequent driver does not agree with them.** Measured on the V 7.1 card, 27
+August 2026: `8relay` channels 1–5 close relays 1–5, but 6, 7 and 8 close
+relays **7, 8 and 6**. So `8relay 0 write 8 on` — nominally the spare, and
+therefore the least-tested channel — closes REL6 and **starts the blower**,
+whose welded-contact failure mode is stuck-on and which Phase 5 defers for
+exactly that reason.
+
+Anything driving this card must use the measured relay→bit table in
+`docs/bench-relays.md` and write `0x27` register `0x01` directly, rather than
+passing a channel number to that binary. The whole card is one byte; the
+indirection buys nothing and costs a rotation nobody would see until a motor
+ran.
+
 **Contact rating, settled from the card in hand.** The V 7.1 board is marked
 `ALL RELAYS 120VAC/30VDC`, with per-channel current limits silkscreened beside
 each connector group:
