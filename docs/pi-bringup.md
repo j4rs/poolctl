@@ -458,3 +458,19 @@ boots with and compute schedules against the wrong day, silently. njsPC came
 back bound to `127.0.0.1` only, the supervisor came back on the LAN behind
 its password, and the session survived because sessions are signed rather
 than stored.
+
+**The UART change, verified 27 August 2026 after its own reboot:**
+
+```
+/dev/serial0 -> ttyAMA0        the PL011 is on the header, not the mini-UART
+fuser /dev/serial0             nothing holding it; the console is off
+hciconfig                      no adapter, so disable-bt took
+i2cdetect -y 1                 0x27 still present; the overlay did not disturb I2C
+njspc, poolctl                 both active, no failed units
+```
+
+Permissions are already right and need no step of their own: `njspc.service`
+runs as the login user, that user is in `dialout`, and `/dev/ttyAMA0` is
+`root:dialout 660`. Worth checking on a fresh image, because a port that
+exists but cannot be opened fails in a way that looks like a wiring problem
+and gets debugged at the equipment pad instead of on a desk.
