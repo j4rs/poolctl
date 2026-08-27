@@ -17,6 +17,7 @@ apart once already.
 | `emit.py` | renders Figures 1 and 5 from `plate.py` |
 | `build.py` | `--artifact` inlines images as data URIs; `--pdf` renders via Chrome |
 | `check.py` | fails if `index.html`'s figures are stale against `plate.py` |
+| `rail.py` | Figure 6: the rail B connection map, geometry and render in one |
 
 ## Regenerating the figures
 
@@ -26,7 +27,12 @@ mounts portrait.
 
 ```bash
 python3 emit.py          # writes fig_plate.svg and fig_wired.svg
+python3 rail.py          # writes fig_rail.svg
 ```
+
+`rail.py` keeps its geometry and its renderer together because it draws one
+figure and shares nothing; `plate.py`/`emit.py` are split because two figures
+depend on the same numbers.
 
 `emit.py` checks two invariants before writing and will refuse on the first:
 no cable run may pass through a part, and every crossing is drawn as a hop so

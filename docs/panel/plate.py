@@ -20,7 +20,7 @@ BANDS = [("band-lv",   38, 200, 160, "LOGIC &middot; 5 VDC / SIGNAL"),
 PARTS = {
  "pihat": (378, 58,196,116,"part-lv",  "Pi 4 + 8-Relay HAT","CH1-8 and RS-485 on HAT"),
  "hdr":   (148, 58, 92,152,"part-lv",  "HDR-60-5",          "5 V 6.5 A"),
- "tb":    (148,296,324, 62,"part-24",  "DIN rail B &middot; 8 in","TB1 COM . TB2-4 valves . TB5 coil"),
+ "tb":    (148,296,324, 62,"part-24",  "DIN rail B &middot; 8 in","1-3 hot &middot; 4-9 valves &middot; 10 coil &middot; 11-13 common"),
  "lt":    (148,452,250, 60,"part-line","Line terminals &middot; rail C","L . N &mdash; PE bar bolts to the plate"),
  "xfmr":  (148,530,176,116,"part-line","Transformer",       "TR100VA001 . 100 VA"),
  "cont":  (452,530,122,116,"part-line","Contactor",         "C25CNB130T"),

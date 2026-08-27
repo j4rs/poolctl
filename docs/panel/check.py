@@ -14,8 +14,21 @@ here = pathlib.Path(__file__).parent
 subprocess.run([sys.executable, "emit.py"], cwd=here, check=True)
 
 html = (here / "index.html").read_text()
-stale = [f for f in ("fig_plate.svg", "fig_wired.svg")
-         if (here / f).read_text() not in html]
+
+# The plate body is a substring of the wired body, so a plain `in` test can be
+# satisfied by a match inside the WRONG figure - Figure 1 could be stale and
+# still pass. Locate the wired body first, blank its span, and require the
+# plate body to survive somewhere else.
+stale = []
+wired = (here / "fig_wired.svg").read_text()
+i = html.find(wired)
+if i < 0:
+    stale.append("fig_wired.svg")
+    rest = html
+else:
+    rest = html[:i] + html[i + len(wired):]
+if (here / "fig_plate.svg").read_text() not in rest:
+    stale.append("fig_plate.svg")
 
 for f in ("fig_plate.svg", "fig_wired.svg"):
     (here / f).unlink(missing_ok=True)
