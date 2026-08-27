@@ -382,8 +382,9 @@ CFG
 # leaving the rest of that single line intact
 sudo sed -i 's/console=serial0,[0-9]* //' /boot/firmware/cmdline.txt
 
-# hciuart has nothing to attach to once BT is off; it would just fail on boot
-sudo systemctl disable hciuart
+# Older images attach BT via hciuart, which has nothing to do once BT is off.
+# Trixie and later have no such unit - "does not exist" here is fine, not an error.
+sudo systemctl disable hciuart 2>/dev/null || true
 
 sudo reboot
 ```
