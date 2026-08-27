@@ -677,13 +677,20 @@ the bus holds exactly one device:
 20: -- -- -- -- -- -- -- 27 -- -- -- -- -- -- -- --      (nothing else, -r rescan)
 ```
 
-`0x27` is what the driver computes for stack level 0 — `(0 + 0x20) ^ 0x07` —
-and reading offsets `0x00` through `0x03` returns the *same byte* each time,
-which is the PCF8574 signature: that part has no register pointer, so any
-offset is ignored. The driver's two base addresses, `0x38` and `0x20`, are
-PCF8574A and PCF8574 exactly.
+`0x27` is what the driver computes for stack level 0 — `(0 + 0x20) ^ 0x07`.
+Probing the offsets with four relays energised gives `0x00`=`0x63`,
+`0x01`=`0x63`, `0x02`=`0x00`, `0x03`=`0x00`: input port, output latch,
+polarity inversion, configuration — a **PCA9554-class register-mapped
+expander**, with configuration `0x00` meaning all eight pins are outputs.
 
-**A dumb port expander. No microcontroller, so no firmware, so no watchdog**,
+*(A first pass read all four offsets as `0x00` and called that a PCF8574,
+which has no register pointer so returns the same byte for any offset. That
+was read with every relay off, when a PCA9554 reads all zeros too. The
+inference was unsound; energising four channels separated the two in one
+command.)*
+
+**A dumb port expander either way. No microcontroller, so no firmware, so no
+watchdog**,
 whatever the product page says — and by the same token the card cannot be the
 MODBUS RTU slave that `pi-bringup.md` claimed it becomes with the TX/RX
 switches off. Both statements appear to be inherited from Sequent's
@@ -1443,6 +1450,11 @@ eyes on bonding.
 - [ ] **Spill confirmation.** Verify the pool returns actually go dead when
       the return diverter moves to full-spa. If they keep flowing, the spill
       is plumbed off an independent tee and the model needs revision.
+- [x] **Does the microSD come out with the HAT fitted?** *Answered 27 August
+      2026 on the bench — yes, there is enough clearance.* The card sits on
+      11 mm standoffs over the SoC, and the concern was that reflashing would
+      mean dismantling the panel. It does not.
+
 - [ ] **Enclosure thermals.** Bench figures are in ADR-3; the assembled case
       is untested. Re-measure with the HAT fitted, the box closed, and the
       transformer energised, on a hot afternoon. Mitigations in rough order

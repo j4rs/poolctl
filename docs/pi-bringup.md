@@ -333,7 +333,7 @@ With them off the transceiver is simply not connected to the Pi's UART and the
 pump cannot be reached at all.
 
 *This used to say the card becomes a MODBUS RTU slave with them off. It cannot
-— the bus scan on 27 August 2026 found a single PCF8574-class port expander at
+— the bus scan on 27 August 2026 found a single PCA9554-class port expander at
 `0x27` and no microcontroller, so there is no firmware to run a slave. That
 claim came from Sequent's Industrial relay card, a different product.*
 

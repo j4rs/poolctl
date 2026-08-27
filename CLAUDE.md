@@ -15,7 +15,7 @@ open question (`ALL RELAYS 120VAC/30VDC`, so CH7 drives the light directly) and
 revealed that the two connector groups are mirrored: `RELAY 1-4` is
 N.C./COM/N.O. and `RELAY 5-8` is N.O./COM/N.C. Bench procedure in
 `docs/bench-relays.md`, and its first test is done: the I2C bus holds a single
-PCF8574-class port expander at `0x27` and nothing else, so **the card has no
+PCA9554-class port expander at `0x27` and nothing else, so **the card has no
 microcontroller and no hardware watchdog** despite the product page. ADR-10
 must be built rather than inherited, and the expander latches its outputs — so
 in the panel, where the HAT is fed by the HDR-60-5 and feeds the Pi, a wedged

@@ -46,11 +46,17 @@ i2cdetect -y 1
 ```
 
 **Answered, 27 August 2026: `0x27` and nothing else.** That is
-`(0 + 0x20) ^ 0x07`, the driver's stack-level-0 address on its alternate base,
-and offsets `0x00`–`0x03` all return the same byte — the PCF8574 signature,
-since that part has no register pointer. A dumb expander, no microcontroller,
-no watchdog. Keep the step: it is one command, and it is how you would notice
-a card that is not the one you think you have.
+`(0 + 0x20) ^ 0x07`, the driver's stack-level-0 address on its alternate base.
+A dumb expander, no microcontroller, no watchdog. Keep the step: it is one
+command, and it is how you would notice a card that is not the one you think
+you have.
+
+**Probe the offsets with relays energised, not idle.** With everything off all
+four read `0x00` and prove nothing, because a registerless PCF8574 and a
+register-mapped PCA9554 look identical. With four channels on they separate at
+once — this card gave `0x00`=`0x63`, `0x01`=`0x63`, `0x02`=`0x00`,
+`0x03`=`0x00`, which is input / output-latch / polarity / config, so PCA9554
+class with all pins configured as outputs.
 
 **Run Tests 2 and 3 with the HAT fed from its own 5 V input**, not powered
 through the Pi's header. In the panel the HDR-60-5 feeds the HAT and the HAT
