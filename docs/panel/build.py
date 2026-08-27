@@ -40,7 +40,14 @@ PRINT_CSS = """<style>
     html, body { background: #fff !important; }
     * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .wrap { max-width: none; padding: 0; gap: 30px; }
-    figure, .part, .note, table, .card, ol.steps li { break-inside: avoid; }
+    /* Keep a DRAWING whole, but let its caption and a long table flow. Binding
+       figure+figcaption together as one unbreakable block left five pages with
+       a blank bottom third: the caption made the unit taller than the space
+       left, so the whole thing jumped and stranded the heading. */
+    figure svg, .part, .note, .card, ol.steps li, tr { break-inside: avoid; }
+    figure, table { break-inside: auto; }
+    thead { display: table-header-group; }
+    figcaption { break-before: avoid; }
     h1, h2, h3 { break-after: avoid; }
     svg { max-height: 235mm; }
     .parts { grid-template-columns: repeat(3, 1fr) !important; gap: 10px !important; }
