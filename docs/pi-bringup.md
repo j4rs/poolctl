@@ -355,17 +355,43 @@ and the cell to each other outside the panel instead, and the panel becomes an
 end of the bus, and this switch goes **on**. Check which you actually built
 before trusting either answer.
 
-**2. Enable the UART and take the console off it.** Linux claims
-`/dev/serial0` as a login console out of the box, so njsPC cannot open it:
+**2. Enable the UART, take the console off it, and take Bluetooth off the good
+one.** Linux claims `/dev/serial0` as a login console out of the box, so njsPC
+cannot open it. And on a Pi 4 there is a second trap underneath that one.
+
+The Pi 4 has two usable UARTs on GPIO 14/15: the **PL011** (`ttyAMA0`), a real
+UART, and the **mini-UART** (`ttyS0`), whose baud rate is derived from the VPU
+core clock. By default Bluetooth owns the PL011 and the header gets the
+mini-UART — confirmed on this box, where `hciconfig` reports
+`hci0: Type: Primary Bus: UART`. A clock-derived baud rate is the classic
+source of intermittent serial corruption on Pi 3/4, and this is a bus we are
+going to decode Pentair frames off with a decoder (`src/lib/rs485.js`) that has
+never been checked against real traffic. Starting on the flaky UART means every
+bad frame has two possible causes. Nothing here uses Bluetooth, so give the
+header the real UART:
 
 ```bash
-# add to /boot/firmware/config.txt
+sudo tee -a /boot/firmware/config.txt >/dev/null <<'CFG'
+
+# RS-485 on GPIO 14/15: give the header the PL011, not the mini-UART
 enable_uart=1
+dtoverlay=disable-bt
+CFG
 
 # remove console=serial0,115200 from /boot/firmware/cmdline.txt,
 # leaving the rest of that single line intact
 sudo sed -i 's/console=serial0,[0-9]* //' /boot/firmware/cmdline.txt
+
+# hciuart has nothing to attach to once BT is off; it would just fail on boot
+sudo systemctl disable hciuart
+
 sudo reboot
+```
+
+After the reboot `/dev/serial0` should point at `ttyAMA0`, not `ttyS0`:
+
+```bash
+ls -l /dev/serial0        # -> ttyAMA0
 ```
 
 Afterwards `/dev/serial0` should exist and nothing should be holding it:
@@ -381,8 +407,14 @@ and restart.
 
 The supervisor checks the result rather than trusting it: if njsPC's
 configured port does not exist on the box, it raises **"njsPC cannot open
-/dev/…"** on the Water screen and names the three fixes. Today, with no HAT
-fitted, that finding is expected.
+/dev/…"** on the Water screen and names the three fixes.
+
+*State on 27 August 2026, read off the box:* `rs485Port` is still
+`/dev/ttyUSB0`, `baudRate` is `9600`, `netConnect` is `false`, port 0 enabled.
+So the baud is already right for a Pentair bus and only the path is wrong.
+Leave it pointing at the USB path until the bus is physically attached &mdash;
+the supervisor's finding is accurate while that is true, and switching it early
+just replaces a true finding with a silent port that never sees a frame.
 
 ### The rest
 
