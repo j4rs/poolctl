@@ -1125,7 +1125,7 @@ telemetry, not marketing copy.
 | Mean Well HDR-60-5 DIN-rail supply, 5 V 6.5 A | **$24.46** |
 | IP68 breather screw, M12×1.5, dual-port, 2-pack | **$6.99** |
 | VEVOR outdoor junction box **SP-CAG-334318**, 16.93×12.99×7.09 in — ABS, IP67/IK08, hinged, 304 stainless latches, detachable **ABS** backplate | ~$70 |
-| DIN rail, terminal blocks (**17**: 13 on rail B, 4 on rail C, plus two 3-way and two 2-way combs), ferrules, wire | ~$40 |
+| DIN rail, terminal blocks (**19**: 15 on rail B, 4 on rail C, plus two 4-way and two 2-way combs), ferrules, wire | ~$40 |
 | Liquid-tight cable glands / cord grips, ~9 | ~$22 |
 | Ground bar / PE terminal strip, plus the jumper to the incoming EGC | ~$10 |
 

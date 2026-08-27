@@ -16,36 +16,39 @@ the reason for this representation, not laziness.
 import sys, itertools
 
 # ---- the strip -------------------------------------------------------------
-BX, BW, BGAP = 210, 50, 6
-BY0, BY1, N  = 330, 390, 13
+BX, BW, BGAP = 200, 46, 5
+BY0, BY1, N  = 330, 390, 15
 bx = lambda i: BX + (i-1)*(BW+BGAP)
 bc = lambda i: bx(i) + BW/2
+lc = lambda i: bx(i) + 11          # lower/left clamp
+rc = lambda i: bx(i) + BW - 11     # upper/right clamp
 
-COMBS  = [(1,3), (11,13)]            # 1-3 hot bus, 11-13 common bus
-GROUPS = [(1,3,"HOT BUS"), (4,9,"SWITCHED PAIRS"), (10,10,"COIL"),
-          (11,13,"COMMON BUS")]
+COMBS  = [(1,4), (12,15)]            # 1-4 hot bus, 12-15 common bus
+GROUPS = [(1,4,"HOT BUS"), (5,10,"SWITCHED PAIRS"), (11,11,"COIL"),
+          (12,15,"COMMON BUS")]
 
 # ---- relays, each directly over the blocks it lands on ----------------------
 RY0, RY1 = 150, 250
-RELAYS = [("CH1", 4, 5), ("CH2", 6, 7), ("CH3", 8, 9), ("CH6", 10, None)]
+RELAYS = [("CH1", 5, 6), ("CH2", 7, 8), ("CH3", 9, 10), ("CH6", 11, None)]
 COMY, HOTBUS_Y = 180, 110
 
 # ---- what the strip feeds --------------------------------------------------
 FY0, FY1 = 540, 600
-FIELD = [("g1", 370, 480, "gland 1", "intake",  4, 5),
-         ("g2", 490, 600, "gland 2", "return",  6, 7),
-         ("g3", 610, 720, "gland 3", "bypass",  8, 9),
-         ("kt", 730, 850, "contactor", "blower", 10, None)]
-XF        = (180, 320, 540, 620)
+# the contactor sits left of block 12 so the common bus risers clear it
+FIELD = [("g1", 400, 490, "gland 1", "intake",  5, 6),
+         ("g2", 500, 590, "gland 2", "return",  7, 8),
+         ("g3", 596, 686, "gland 3", "bypass",  9, 10),
+         ("kt", 694, 764, "contactor", "blower", 11, None)]
+XF        = (170, 310, 540, 620)
 COMBUS_Y  = 650
-COMBUS_X  = 900                       # riser clear of the contactor at 850
-HOT_IN_X  = 222                       # transformer hot -> block 1
+COMBUS_X  = 0                         # unused; risers are per block now
+HOT_IN_X  = 212                       # transformer hot -> block 1
 
 CW = {"lbl-sm":6.31, "lbl-t":6.61, "lbl":7.05, "lbl-band":7.35}
 FS = {"lbl-sm":10.5, "lbl-t":11.0, "lbl":13.0, "lbl-band":10.5}
-VB = (140, 60, 910, 660)
+VB = (130, 60, 890, 660)
 
-out, rects, texts, segs = [], [], [], []
+out, late, rects, texts, segs = [], [], [], [], []
 def rect(x0,y0,x1,y1,cls,extra=""):
     rects.append((x0,y0,x1,y1,cls))
     out.append('<rect x="%g" y="%g" width="%g" height="%g" class="%s"%s/>'
@@ -57,12 +60,13 @@ def wire(pts, cls="w4-24"):
 def text(x,y,s,cls="lbl-sm",anchor="start",bg=False):
     w = len(s)*CW[cls]; fs = FS[cls]
     x0 = x if anchor=="start" else (x-w/2 if anchor=="middle" else x-w)
-    if bg:   # knockout, so a wire passing behind does not strike the text
-        out.append('<rect x="%g" y="%g" width="%g" height="%g" fill="var(--ground)"/>'
-                   % (x0-4, y-fs*.86, w+8, fs*1.2))
     texts.append((x0, y-fs*.78, x0+w, y+fs*.24, s, bg))
     a = '' if anchor=="start" else ' text-anchor="%s"'%anchor
-    out.append('<text x="%g" y="%g"%s class="%s">%s</text>'%(x,y,a,cls,s))
+    dest = late if bg else out       # knocked-out labels paint last, over the wires
+    if bg:
+        dest.append('<rect x="%g" y="%g" width="%g" height="%g" fill="var(--ground)"/>'
+                    % (x0-4, y-fs*.86, w+8, fs*1.2))
+    dest.append('<text x="%g" y="%g"%s class="%s">%s</text>'%(x,y,a,cls,s))
 def dot(x,y,r=3.5,fill="var(--v24)",ring=False):
     out.append('<circle cx="%g" cy="%g" r="%g" fill="%s"%s/>'
                %(x,y,r,fill,' stroke="var(--muted)" stroke-width="1"' if ring else ""))
@@ -76,8 +80,8 @@ for a,b in COMBS:
 for a,b,s in GROUPS:
     text((bx(a)+bx(b)+BW)/2, 412, s, "lbl-band", "middle", bg=True)
 text(bx(1)-10, BY0+22, "rail B", "lbl-sm", "end")
-text((bx(1)+bx(3)+BW)/2, 428, "one node · 3-way comb", "lbl-sm", "middle", bg=True)
-text((bx(11)+bx(13)+BW)/2, 428, "one node · 3-way comb", "lbl-sm", "middle", bg=True)
+text((bx(1)+bx(3)+BW)/2, 428, "one node · 4-way comb", "lbl-sm", "middle", bg=True)
+text((bx(11)+bx(13)+BW)/2, 428, "one node · 4-way comb", "lbl-sm", "middle", bg=True)
 
 # ---- relays ----------------------------------------------------------------
 for (rid, nc, no) in RELAYS:
@@ -91,11 +95,16 @@ for (rid, nc, no) in RELAYS:
         if blk is None: continue
         dot(bc(blk), RY1); text(bc(blk), RY1-12, name, "lbl-sm", "middle")
         wire([(bc(blk), RY1), (bc(blk), BY0)])
-text(bx(10)+BW+10, RY0+66, "N.C. unused", "lbl-sm")
+text(bx(11)+BW+10, RY0+66, "N.C. unused", "lbl-sm")
 
-# the hot bus itself: one node, four conductors leaving it
-wire([(HOT_IN_X+14, BY0), (HOT_IN_X+14, HOTBUS_Y), (bx(10), HOTBUS_Y)])
-text(HOT_IN_X+24, HOTBUS_Y-9, "HOT BUS · one node · four conductors to four COM screws", "lbl-sm")
+# One riser per block. Four COM conductors all head for the HAT, so each takes
+# its own block and its own upper clamp - drawing a single riser for the group
+# hid exactly the fact that forces the block count.
+wire([(rc(1), HOTBUS_Y), (bx(11), HOTBUS_Y)])
+for i in (1, 2, 3, 4):
+    x = rc(1) if i == 1 else bc(i)
+    wire([(x, BY0), (x, HOTBUS_Y)]); dot(x, HOTBUS_Y)
+text(rc(1)+10, HOTBUS_Y-9, "HOT BUS · one node · one conductor out of each block", "lbl-sm")
 
 # ---- field -----------------------------------------------------------------
 for (fid, x0, x1, lab, sub, ba, bb) in FIELD:
@@ -114,35 +123,40 @@ text((XF[0]+XF[1])/2, XF[2]+58, "100 VA · Class 2", "lbl-sm", "middle")
 wire([(HOT_IN_X, BY1), (HOT_IN_X, XF[2])])                   # transformer hot in
 text(HOT_IN_X-6, (BY1+XF[2])/2, "hot", "lbl-sm", "end")
 
-# the common bus: one node, five conductors
-wire([(COMBUS_X, BY1), (COMBUS_X, COMBUS_Y), (280, COMBUS_Y)])
+# common bus: five conductors on four blocks - block 12 carries two, the
+# transformer common on its lower clamp and gland 1's black on its upper
+wire([(lc(12), COMBUS_Y), (bc(15), COMBUS_Y)])
+wire([(270, COMBUS_Y), (lc(12), COMBUS_Y)])
+for x in (lc(12), rc(12), bc(13), bc(14), bc(15)):
+    wire([(x, BY1), (x, COMBUS_Y)]); dot(x, COMBUS_Y)
 for (fid, x0, x1, lab, sub, ba, bb) in FIELD:
     tap = (x0+x1)/2
     wire([(tap, COMBUS_Y), (tap, FY1)]); dot(tap, COMBUS_Y)
     dot(tap, FY1, 5, "#1a1a1a", True)
-wire([(280, COMBUS_Y), (280, XF[3])]); dot(280, COMBUS_Y)
-text(300, COMBUS_Y+18, "COMMON BUS · one node · three actuator blacks, the coil return, and the transformer common", "lbl-sm")
+wire([(270, COMBUS_Y), (270, XF[3])]); dot(270, COMBUS_Y)
+text(290, COMBUS_Y+18, "COMMON BUS · one node · three actuator blacks, the coil return, and the transformer common", "lbl-sm")
 
 for i,(col, lab) in enumerate((("#f2f2f2","white  \u2192 N.C."),
                                ("#c0392b","red    \u2192 N.O."),
                                ("#1a1a1a","black  \u2192 common"))):
-    y = FY0 + 14 + i*20
-    dot(922, y-4, 5, col, True); text(936, y, lab, "lbl-sm")
+    y = 170 + i*22
+    dot(850, y-4, 5, col, True); text(864, y, lab, "lbl-sm")
 
 svg = ('<svg viewBox="%d %d %d %d" role="img" aria-label="%s">\n  %s\n</svg>' % (
     VB[0], VB[1], VB[2], VB[3],
-    "Connection map of the 24 volt AC network on DIN rail B. Thirteen terminal "
-    "blocks in a row. Blocks 1 to 3 are the hot bus, bridged into one node by a "
-    "three-way comb; blocks 4 to 9 are the six switched conductors of the three "
-    "valve actuators, two blocks per actuator; block 10 is the blower contactor "
-    "coil; blocks 11 to 13 are the common bus, bridged by a second comb. The "
-    "transformer's hot leg lands on block 1 and four conductors leave the hot bus "
-    "for the COM screws of relay channels 1, 2, 3 and 6. Each relay drops its "
-    "N.C. and N.O. contacts onto its own pair of blocks, which leave through "
-    "glands 1 to 3 as the white and red conductors of each actuator cable. The "
-    "three black conductors return to the common bus, along with the second leg "
-    "of the contactor coil and the transformer's common leg.",
-    "\n  ".join(out)))
+    "Connection map of the 24 volt AC network on DIN rail B. Fifteen terminal "
+    "blocks in a row. Blocks 1 to 4 are the hot bus, bridged into one node by a "
+    "four-way comb, and one conductor leaves each of them for the COM screw of "
+    "relay channels 1, 2, 3 and 6 - four conductors all heading to the HAT, so "
+    "four blocks. Blocks 5 to 10 are the six switched conductors of the three "
+    "valve actuators, two blocks per actuator. Block 11 is the blower contactor "
+    "coil. Blocks 12 to 15 are the common bus, bridged by a second four-way comb. "
+    "The transformer's hot leg lands on block 1 and its common leg on block 12. "
+    "Each relay drops its N.C. and N.O. contacts onto its own pair of blocks, "
+    "which leave through glands 1 to 3 as the white and red conductors of each "
+    "actuator cable. The three black conductors return to the common bus, along "
+    "with the second leg of the contactor coil.",
+    "\n  ".join(out + late)))
 
 # ---- invariants ------------------------------------------------------------
 fail = []
