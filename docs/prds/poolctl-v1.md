@@ -786,6 +786,15 @@ passing a channel number to that binary. The whole card is one byte; the
 indirection buys nothing and costs a rotation nobody would see until a motor
 ran.
 
+**And write the whole byte from our own shadow state — never read-modify-write.**
+Both Sequent bindings change one channel by reading the port, flipping a bit and
+writing it back, and they read the *input* register (`0x00`, pin levels) to
+compute a value for the *output latch* (`0x01`). Those agree while every pin is
+a healthy output, which is why it works; when they diverge, one channel's write
+silently carries the other seven to whatever the pins happened to read. The
+supervisor owns all eight channels, so it always knows the byte it wants. Write
+that. It is one transaction instead of two, and the failure mode cannot occur.
+
 **Contact rating, settled from the card in hand.** The V 7.1 board is marked
 `ALL RELAYS 120VAC/30VDC`, with per-channel current limits silkscreened beside
 each connector group:
