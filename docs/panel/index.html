@@ -934,33 +934,59 @@ The panel's own feed has two destinations, not five. An earlier
       </table>
     </div>
 
-    <div class="note stop">
-      <h3>Blocking: the board's own rating contradicts its product page</h3>
+    <div class="note">
+      <h3>Contact rating &mdash; settled from the card in hand</h3>
       <p>
-        <strong>Do not land 120&nbsp;V on this card until Sequent confirms the
-        channel rating.</strong> The product page says <span class="mono">4&nbsp;A at
-        120&nbsp;VAC / 24&nbsp;VDC</span> for all eight channels. The silkscreen on the
-        v6.0 board says <span class="mono">RELAYS&nbsp;1&ndash;3: 5A/48VAC/DC</span>,
-        <span class="mono">RELAYS&nbsp;5&ndash;8: 5A/48VAC/DC</span> and
-        <span class="mono">RELAY4: 3A/48V</span> &mdash; visible in the photo in this
-        very document.
+        <strong>Resolved, and in the favourable direction.</strong> The board
+        that arrived is <span class="mono">V&nbsp;7.1</span>, not the v6.0 the
+        product photograph in this document shows, and its silkscreen differs
+        in exactly the place that mattered. It reads
+        <span class="mono">ALL RELAYS 120VAC/30VDC</span>, with per-channel
+        current beside each connector group:
+        <span class="mono">REL1,3: 10A</span>,
+        <span class="mono">REL2: 8A</span>,
+        <span class="mono">REL4: 3A</span>,
+        <span class="mono">REL5: 3A</span>,
+        <span class="mono">REL6,8: 10A</span>,
+        <span class="mono">REL7: 5A</span>.
       </p>
       <p>
-        The silkscreen is the more conservative and the more specific: it
-        singles out relay 4 at a different figure, which reads as a layout
-        constraint rather than a slip. Markings like that usually describe the
-        terminal block or the certified creepage on the mains side, either of
-        which binds whatever the relay inside is rated for &mdash; and the Songle
-        relays fitted are 10&nbsp;A/250&nbsp;VAC parts, so the relay is not the limit.
+        So <strong>120&nbsp;VAC is rated outright and CH7 drives the light
+        directly</strong> &mdash; the interposing relay this BOM lacked is not
+        needed. The light draws under 1&nbsp;A into a 5&nbsp;A channel; the
+        actuators are 0.75&nbsp;A into 8&ndash;10&nbsp;A; the heater dry contacts
+        are milliamps into 3&nbsp;A. Nothing here is close to a limit.
       </p>
       <p>
-        <strong>If 48&nbsp;V is the real limit, CH7 cannot drive the light
-        directly</strong> and needs an interposing relay this BOM does not
-        contain. Everything else already sits below 48&nbsp;V &mdash; CH1&ndash;3 at
-        24&nbsp;VAC, CH4&ndash;5 dry, CH6 on a 24&nbsp;V coil &mdash; so the contactor decision
-        for the blower happens to have put most of the panel on the safe side
-        of the stricter reading. CH7 is the only exposure, and separately it is
-        the channel that drags a 120&nbsp;V pair into the logic band.
+        The v6.0 figure of <span class="mono">5A/48VAC/DC</span> was never wrong
+        &mdash; it was a fact about a different board. Worth asking Sequent why
+        the revisions disagree: if it is a creepage change it bears on any spare
+        bought later, and if it is a correction then v6 cards in circulation are
+        mismarked. Not blocking anything now.
+      </p>
+    </div>
+
+    <div class="note">
+      <h3>The two connector groups are mirrored</h3>
+      <p>
+        Read off the V&nbsp;7.1 card, the halves of the board disagree with each
+        other:
+      </p>
+      <table>
+        <thead><tr><th>Group</th><th>Terminal order</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">RELAY 1&ndash;4</td><td class="mono">N.C. &middot; COM &middot; N.O.</td></tr>
+          <tr><td class="mono">RELAY 5&ndash;8</td><td class="mono">N.O. &middot; COM &middot; N.C.</td></tr>
+        </tbody>
+      </table>
+      <p>
+        The three actuators are CH1&ndash;3, so they sit in the first group and
+        take <span class="mono">N.C.</span> first &mdash; which is what
+        Figure&nbsp;4&rsquo;s inset draws. Swapping the two on those channels
+        inverts which position a valve rests in with the coil off, and ADR-9
+        turns on relay&nbsp;3 resting in <em>flow</em>. On a board whose halves
+        are mirrored, count the screws rather than carrying muscle memory from
+        the other end.
       </p>
     </div>
 
@@ -1306,7 +1332,7 @@ The panel's own feed has two destinations, not five. An earlier
         <text x="780" y="502" class="lbl-t">N.C. → white</text>
         <text x="780" y="528" class="lbl-t">COM ← 24 VAC hot</text>
         <text x="780" y="554" class="lbl-t">N.O. → red</text>
-        <text x="40" y="592" class="lbl-sm">Right edge of the board, top to bottom, as silkscreened. Confirm against your own card — the photo is a V6.0 product shot.</text>
+        <text x="40" y="592" class="lbl-sm">Group RELAY 1–4, top to bottom, as silkscreened on the V 7.1 card. The RELAY 5–8 group is mirrored: N.O. first.</text>
       </svg>
       <figcaption>
         Channel&nbsp;1 and the intake actuator, drawn from the transformer

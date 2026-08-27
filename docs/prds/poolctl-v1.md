@@ -718,21 +718,40 @@ one of two lines energized at all times, and an SPDT relay selects which.
 NO-only relays cannot drive them — this is precisely why the IntelliConnect's
 relays are useless for valves.
 
-**Screw order: N.C. / COM / N.O., top to bottom, on the right edge of the
-board.** Read off the silkscreen in the V6.0 product photograph — the same
-legend that carries the `5A/48VAC/DC` rating §10's blocking question turns on.
-Confirm against the card in hand before landing anything: swapping N.C. and
-N.O. on these three inverts which position the valve rests in with the coil
-off, and ADR-9 turns on relay 3's de-energized rest being *flow*. The panel
-plan draws one valve end to end for exactly this reason (`docs/panel/`,
+**Screw order, and the two groups are mirrored.** Read off the card in hand
+(V 7.1, photographed August 2026), not from a product shot:
+
+| Group | Terminal order |
+|---|---|
+| `RELAY 1`–`RELAY 4` | **N.C. · COM · N.O.** |
+| `RELAY 5`–`RELAY 8` | **N.O. · COM · N.C.** |
+
+The actuators are CH1–3, so they sit in the first group and take N.C. first.
+Getting this backwards inverts which position a valve rests in with the coil
+off, and ADR-9 turns on relay 3's de-energized rest being *flow* — so the
+mirroring is worth checking twice on a board where the halves disagree. The
+panel plan draws one valve end to end for exactly this reason (`docs/panel/`,
 Figure 4).
 
 Channels 4–5 must be **isolated from the 24 VAC transformer**; the Raypak
 supplies its own low voltage on that terminal block.
 
-**Before wiring any 120 V channel, see the blocking open question in §10.**
-The board's silkscreen rates the channels 5 A/48 VAC while the product page
-says 4 A/120 VAC. If the former holds, CH7 cannot drive the light directly.
+**Contact rating, settled from the card in hand.** The V 7.1 board is marked
+`ALL RELAYS 120VAC/30VDC`, with per-channel current limits silkscreened beside
+each connector group:
+
+| Channel | Rated | Load in this design | Margin |
+|---|---|---|---|
+| 1, 3 | 10 A | actuator, 0.75 A | 13× |
+| 2 | 8 A | actuator, 0.75 A | 10× |
+| 4 | 3 A | heater dry contact, mA | large |
+| 5 | 3 A | heater dry contact, mA | large |
+| 6, 8 | 10 A | contactor coil ~80 mA / spare | 100×+ |
+| 7 | 5 A | pool light, < 1 A | 5× |
+
+**120 VAC is explicitly rated, so CH7 drives the light directly and no
+interposing relay is needed.** This closes §10's blocking question — see there
+for why the earlier reading said otherwise.
 
 **Channel 8 is spare: the chlorinator gate is dropped.** *Owner's answer on the
 existing wiring:* the chlorinator has its own transformer fed from the
@@ -1359,38 +1378,31 @@ eyes on bonding.
 
 ## 10. Open questions
 
-- [ ] **BLOCKING — the relay HAT's actual contact rating. Do not land 120 V on
-      the card until this is answered.** Two sources disagree, and this repo
-      has been carrying the wrong one.
+- [x] **The relay HAT's contact rating.** *Resolved 27 August 2026, from the
+      card in hand.* The board that arrived is **V 7.1**, not the V6.0 the
+      product photograph showed, and its silkscreen is different in exactly
+      the place that mattered:
 
       | Source | Rating |
       |---|---|
       | Sequent product page and this BOM | 4 A at 120 VAC / 24 VDC, all eight channels |
-      | Silkscreen on the v6.0 board itself | `RELAYS 1–3: 5A/48VAC/DC`, `RELAYS 5–8: 5A/48VAC/DC`, `RELAY4: 3A/48V` |
+      | Silkscreen, V6.0 product photograph | `RELAYS 1–3: 5A/48VAC/DC`, `RELAYS 5–8: 5A/48VAC/DC`, `RELAY4: 3A/48V` |
+      | **Silkscreen, the V 7.1 card in hand** | **`ALL RELAYS 120VAC/30VDC`**, with per-channel current: `REL1,3: 10A`, `REL2: 8A`, `REL4: 3A`, `REL5: 3A`, `REL6,8: 10A`, `REL7: 5A` |
 
-      The silkscreen is the more conservative and the more specific — it
-      singles out relay 4 at a different figure, which reads as a real layout
-      constraint rather than a slip. Markings like that usually reflect the
-      pluggable terminal block's rating or certified creepage on the mains
-      side, either of which binds regardless of what the relay part inside is
-      rated for. The Songle SRD-05VDC-SL-C relays are themselves 10 A/250 VAC,
-      so the part is not the limit; the board is.
+      **120 VAC is rated outright, so CH7 drives the light directly and the
+      interposing relay this BOM lacked is not needed.** Every channel has at
+      least 5× margin on current; the table is in §4.
 
-      **If 48 V is the real limit, no 120 V load may land on this board at
-      all**, and **CH7 — the light, wired direct — becomes non-compliant.** It
-      would need an interposing relay or its own contactor, which is a part
-      this BOM does not have.
+      The lesson is the one this document keeps relearning: the V6.0 figure was
+      never wrong, it was a fact about a *different board*. A photograph found
+      on the internet is not the part you own. Two revisions of the same
+      product disagreed about whether a mains load may land on the card, and
+      only the one in the box counts.
 
-      What is *not* affected: CH1–3 at 24 VAC, CH4–5 as dry contacts on the
-      Raypak's own low voltage, and CH6 pulling a 24 V coil. All sit under
-      48 V already, so the contactor decision for the blower happens to have
-      put most of the design on the safe side of the stricter reading. CH7 is
-      the sole exposure — and independently it is also the channel that drags
-      a 120 V pair up into the logic band to reach the HAT.
-
-      **Resolve with Sequent**, not from a photograph or a product page.
-      Ask what the per-channel rating is, what the silkscreen refers to, and
-      why relay 4 differs.
+      *Still worth asking Sequent* — not blocking anything — why v6 was marked
+      48 V and v7 is marked 120 V. If it is a creepage change, the answer bears
+      on any spare bought later; if it is a correction to v6's marking, older
+      cards in circulation are mismarked.
 
 - [x] **Chlorinator path.** *Resolved* — Path A (ADR-6). What remains is
       narrower and tracked there: whether an iChlor 30 emits the case-18 salt

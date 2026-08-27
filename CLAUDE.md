@@ -7,7 +7,14 @@ nodejs-poolController.
 the supervisor on the LAN behind a password, both systemd services verified
 across a reboot. Deployed with `scripts/deploy.sh`; see `docs/pi-bringup.md`.
 No equipment is attached, so njsPC has no serial port and every reading is
-null; that waits on the relay HAT. 521 tests; `npm test`.
+null; that waits on the bus being attached. 521 tests; `npm test`.
+
+**The relay HAT arrived 27 August 2026** — a **V 7.1** card, not the V6.0 every
+product photograph in this repo shows. Its silkscreen closed the one blocking
+open question (`ALL RELAYS 120VAC/30VDC`, so CH7 drives the light directly) and
+revealed that the two connector groups are mirrored: `RELAY 1-4` is
+N.C./COM/N.O. and `RELAY 5-8` is N.O./COM/N.C. Bench procedure in
+`docs/bench-relays.md`; nothing there has been run yet.
 
 **This file is the operating manual for working in this repo — nothing more.**
 The full record lives elsewhere and is deliberately not duplicated here:

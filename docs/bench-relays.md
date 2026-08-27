@@ -3,11 +3,21 @@
 Run this with the HAT on a Pi on a desk. **Nothing connected to the relay
 terminals except the indicator below. No mains, no loads, no actuators.**
 
-It answers ADR-10's open question, though not the way the PRD framed it. The
-PRD assumed this card has a hardware watchdog and asked what relays do when it
-trips. The driver says there is no watchdog to trip — see Test 0 — so the real
-question is the one underneath it: **does every failure mode end with the
-relays de-energised?**
+It answers ADR-10's open question, and Test 0 first settles which version of
+that question applies.
+
+**The evidence on whether this card has a watchdog is contradictory, and the
+card in hand is V 7.1.** The `8relay-rpi` driver exposes no watchdog command
+and probes a four-register I/O expander at `0x38`, which would mean no
+microcontroller and nothing to feed — but that driver's README says it is for
+*Ver. 3*. Against it: the product page advertises an on-board hardware
+watchdog, Sequent's application note refers to an "onboard MCU", and
+`pi-bringup.md` records that with the TX/RX switches off **the card is a MODBUS
+RTU slave** — which takes firmware, and firmware can host a watchdog. Do not
+assume either way; Test 0 costs one command.
+
+Either way the question underneath is the same, and it is the one that matters:
+**does every failure mode end with the relays de-energised?**
 
 ---
 
@@ -38,8 +48,12 @@ i2cdetect -y 1
 - **One address, 0x38 (or 0x20), and nothing else** — a bare I/O expander.
   No microcontroller, therefore no watchdog, therefore nothing to feed, and
   the rest of ADR-10 has to be built rather than inherited.
-- **A second unexplained address** — something else is on the card. Stop and
-  find out what it is before concluding anything.
+- **A second address** — there is an MCU, the product page is right, and the
+  watchdog exists. Find its driver before going further: the ADR may already
+  be built, which is the outcome worth having.
+
+Also run `8relay -v` and `8relind -v`. Whichever tool reports a version is the
+one written for this card, and the other is for a different product.
 
 Record the full grid, not just whether it worked.
 

@@ -303,6 +303,12 @@ Three things have to be true, and none of them are by default:
 With them off the card is a MODBUS RTU slave and the Pi cannot talk to the
 pump at all.
 
+*As shipped they are off.* The V 7.1 card photographed on arrival had all six
+switches in the off position — the factory default, and wrong for this use.
+The bank is `SW1`, labelled `ID2 ID1 ID0` on one side and `485-TX 485-RX
+485-TERM` on the other. Set TX and RX on; leave the three ID switches off,
+which is stack level 0 and correct for a single card.
+
 **And the third one: termination OFF.** The same switch bank carries a
 termination switch alongside TX and RX, and it had no home in this document
 until the bus topology was settled. The pump and the cell each home-run to the
