@@ -14,7 +14,12 @@ import { BIT, MASK, CHANNEL, byteFor, relaysIn, describe } from "./relays.js";
 
 suite("the measured bit map", () => {
   it("is the table read off the V 7.1 card, not any published one", () => {
-    expect(BIT).toEqual({ 1: 0, 2: 2, 3: 1, 4: 3, 5: 6, 6: 7, 7: 4, 8: 5 });
+    /* Measured one bit at a time, 27 August 2026. An earlier attempt lit four
+       channels at once and paired the lit LEDs with the channels in order;
+       five of these eight entries were wrong as a result. If this ever needs
+       changing, change it by writing single bits and reading labels, not by
+       reasoning. */
+    expect(BIT).toEqual({ 1: 0, 2: 2, 3: 6, 4: 4, 5: 5, 6: 7, 7: 3, 8: 1 });
   });
 
   it("is a permutation — eight relays, eight distinct bits, none above 7", () => {
@@ -24,13 +29,24 @@ suite("the measured bit map", () => {
     expect(Math.max(...bits)).toBe(7);
   });
 
-  it("disagrees with Sequent's driver on exactly channels 6, 7 and 8", () => {
-    /* 8relay-rpi's relayChRemap, reported wrong for this revision as #7. */
+  it("disagrees with Sequent's driver on six of eight channels", () => {
+    /* 8relay-rpi's relayChRemap. Only channels 1 and 2 land where its table
+       claims; everything from 3 up goes somewhere else. Reported upstream as
+       #7 — which first said "6, 7 and 8" on the strength of the bad
+       measurement and has since been corrected. */
     const theirs = [0, 2, 1, 3, 6, 4, 5, 7];
     const differ = theirs
       .map((bit, i) => (BIT[i + 1] === bit ? null : i + 1))
       .filter(Boolean);
-    expect(differ).toEqual([6, 7, 8]);
+    expect(differ).toEqual([3, 4, 5, 6, 7, 8]);
+  });
+
+  it("maps Sequent's channel numbers to the relays they really close", () => {
+    /* The table a reader needs if they insist on using that binary. */
+    const theirs = [0, 2, 1, 3, 6, 4, 5, 7];
+    const bitToRelay = Object.fromEntries(
+      Object.entries(BIT).map(([relay, bit]) => [bit, Number(relay)]));
+    expect(theirs.map((bit) => bitToRelay[bit])).toEqual([1, 2, 8, 7, 3, 4, 5, 6]);
   });
 });
 

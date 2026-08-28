@@ -107,68 +107,82 @@ labels are unreadable under glare.
 
 ## The measured mapping, 27 August 2026
 
-All eight walked and read off the silkscreen. **`8relay`'s channel numbering
-does not match this card.** Channels 1&ndash;5 are correct; 6, 7 and 8 are
-rotated:
+Established by writing **one bit at a time** to register `0x01` and reading the
+silkscreen label beside the lit LED. Eight writes, eight labels, no inference.
 
-| `8relay` channel | Bit it sets | Relay that actually closes |
-|---|---|---|
-| 1 | 0 | REL1 |
-| 2 | 2 | REL2 |
-| 3 | 1 | REL3 |
-| 4 | 3 | REL4 |
-| 5 | 6 | REL5 |
-| **6** | 4 | **REL7** |
-| **7** | 5 | **REL8** |
-| **8** | 7 | **REL6** |
+| Bit | Relay | | Relay | Bit | Mask |
+|---|---|---|---|---|---|
+| 0 | REL1 | | REL1 | 0 | `0x01` |
+| 1 | REL8 | | REL2 | 2 | `0x04` |
+| 2 | REL2 | | REL3 | 6 | `0x40` |
+| 3 | REL7 | | REL4 | 4 | `0x10` |
+| 4 | REL4 | | REL5 | 5 | `0x20` |
+| 5 | REL5 | | REL6 | 7 | `0x80` |
+| 6 | REL3 | | REL7 | 3 | `0x08` |
+| 7 | REL6 | | REL8 | 1 | `0x02` |
 
-Inverted, which is the form anything driving this card actually needs:
-
-| Relay | Bit | Mask |
-|---|---|---|
-| REL1 | 0 | `0x01` |
-| REL2 | 2 | `0x04` |
-| REL3 | 1 | `0x02` |
-| REL4 | 3 | `0x08` |
-| REL5 | 6 | `0x40` |
-| REL6 | 7 | `0x80` |
-| REL7 | 4 | `0x10` |
-| REL8 | 5 | `0x20` |
-
-Write that mask to register `0x01` at `0x27` and the relay named is the relay
+Write the mask to register `0x01` at `0x27` and the relay named is the relay
 that closes. No driver required.
 
-### What the rotation would have done
+### It matches 8relind-rpi exactly
 
-Against this project's channel map the three wrong ones are the blower, the
-light and the spare &mdash; and one of them is the worst channel on the board
-to get wrong:
+`relayChRemap` in [8relind-rpi](https://github.com/SequentMicrosystems/8relind-rpi),
+the driver for Sequent's *8-Relay-Industrial* card, is `[0, 2, 6, 4, 5, 7, 3, 1]`
+— **all eight entries identical to the measurement above.** One chance in
+40,320, so it is not chance.
 
-| Intent | Correct driver channel | What the driver's own numbering does instead |
-|---|---|---|
-| CH6, blower contactor coil | `write 8` | `write 6` closes REL7 &mdash; **the pool light** |
-| CH7, pool light | `write 6` | `write 7` closes REL8 &mdash; the unwired spare, so the light never comes on |
-| CH8, spare | `write 7` | `write 8` closes REL6 &mdash; **the blower contactor starts the blower** |
+So the card bought as *Eight RELAYS 8-Layer Stackable HAT* (Amazon B07KRKS67G)
+carries the Industrial card's pin routing, and the driver named by that
+product's README, `8relay-rpi`, is simply the wrong one for it.
 
-The last row is the one that matters. CH8 is nominally spare and therefore the
-channel least likely to be tested, and writing it starts a 7.3 A motor whose
-welded-contact failure mode is *stuck on* &mdash; the load ADR-13 phases last
-precisely because it is the most dangerous thing here.
+Two consequences worth keeping. **The measurement is independently
+corroborated** — a table read off LEDs by one person on one board is a
+measurement; the same table appearing in a vendor driver written for different
+hardware is confirmation. And **the upstream report needed retracting**:
+issue #7 was filed against `8relay-rpi` claiming a stale table, which was wrong
+twice over, and has been corrected and retitled. #8 was withdrawn.
 
-### How this was nearly missed
+### What Sequent's driver actually does
 
-Reading back the output latch after each write confirmed the driver sets the
-bits its own table specifies. That check passes whether or not the table
-matches the board, so it proves nothing about which relay closes, and twice
-looked like confirmation. Only a label read catches it.
+Its `relayChRemap` is `[0, 2, 1, 3, 6, 4, 5, 7]`. Against the copper above,
+its channel numbers reach:
 
-The first observation &mdash; channels 1,3,5,7 lighting 1,3,5,**8** &mdash;
-was correct and was talked out of on the strength of a silkscreen order
-inferred from a photograph. Trust the eyes on the board over the inference
-about the board.
+| driver channel | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
+|---|---|---|---|---|---|---|---|---|
+| relay that closes | 1 | 2 | **8** | **7** | **3** | **4** | **5** | **6** |
 
-Note **relay 4**, which the silkscreen rates at 3 A where its neighbours are
-8&ndash;10 A.
+Only channels 1 and 2 land where the driver claims. Against this project's map
+the worst row is unchanged from the first analysis: `8relay 0 write 8 on` is
+nominally the **spare** — the channel least likely to be exercised — and it
+closes REL6, the **blower contactor**. A 7.3 A motor whose welded contact fails
+stuck-on, started by writing the channel everyone believes is unused.
+
+### How this was got wrong, twice
+
+Worth recording at length, because both mistakes were mine and both looked
+like verification at the time.
+
+**The first attempt lit four channels at once.** Channels 1, 3, 5 and 7 went
+on, four LEDs lit, and the set was read correctly as `{1, 3, 5, 8}`. The error
+was pairing that set with the channels *in order* — assuming ch1→REL1,
+ch3→REL3, ch5→REL5, ch7→REL8. The set was evidence; the pairing was an
+assumption, and it was false. Five of the eight entries were wrong.
+
+**Reading the latch back felt like corroboration and was not.** After each
+write the output register was read and always agreed with the driver's table.
+That only ever proves the code set the bit it intended. It says nothing about
+which relay the bit reaches, which is the entire question — and it made the
+wrong table feel twice-checked.
+
+**The owner's readings were right every time.** "1, 3, 5, 8" was correct.
+"Now 5 is ON" for channel 7 was correct. "LED 8" for bit 1 was correct. Each
+was argued with, on the strength of a silkscreen order inferred from a
+photograph and a mapping derived from the bad pairing. The annotated photo
+settled in one image what three rounds of reasoning had got wrong.
+
+**The rule this leaves:** one bit, one LED, one label. A single lit relay is
+the only observation that cannot be misassigned, and eight of them cost less
+than one wrong table.
 
 ### Installing it, or not
 

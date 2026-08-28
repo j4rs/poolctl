@@ -21,8 +21,9 @@ must be built rather than inherited, and the expander latches its outputs — so
 in the panel, where the HAT is fed by the HDR-60-5 and feeds the Pi, a wedged
 Pi leaves every relay exactly where it was.
 
-**Do not address relays by Sequent driver channel.** Measured on this card:
-its channels 6, 7 and 8 close relays **7, 8 and 6**. Writing channel 8 — the
+**Do not address relays by Sequent driver channel.** The card's routing matches
+`8relind-rpi`, not the `8relay-rpi` its product page names; that driver's
+channels close relays **1, 2, 8, 7, 3, 4, 5, 6**, so writing channel 8 — the
 nominal spare — starts the blower. Use the relay→bit table in
 `docs/bench-relays.md` and write `0x27` register `0x01` directly.
 

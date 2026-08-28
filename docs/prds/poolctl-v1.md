@@ -772,13 +772,15 @@ Figure 4).
 Channels 4–5 must be **isolated from the 24 VAC transformer**; the Raypak
 supplies its own low voltage on that terminal block.
 
-**The channel numbers in this table are relay numbers on the board, and the
-Sequent driver does not agree with them.** Measured on the V 7.1 card, 27
-August 2026: `8relay` channels 1–5 close relays 1–5, but 6, 7 and 8 close
-relays **7, 8 and 6**. So `8relay 0 write 8 on` — nominally the spare, and
-therefore the least-tested channel — closes REL6 and **starts the blower**,
-whose welded-contact failure mode is stuck-on and which Phase 5 defers for
-exactly that reason.
+**The channel numbers in this table are relay numbers on the board, and
+`8relay-rpi` is the wrong driver for this card.** Measured on the V 7.1 card,
+27 August 2026, one bit at a time: its channel numbers close relays
+**1, 2, 8, 7, 3, 4, 5, 6** — only the first two land where that driver claims.
+The correct routing is `8relind-rpi`'s, whose `relayChRemap` matches our
+measurement in all eight entries. So `8relay 0 write 8 on` — nominally the
+spare, and therefore the least-tested channel — closes REL6 and **starts the
+blower**, whose welded-contact failure mode is stuck-on and which Phase 5
+defers for exactly that reason.
 
 Anything driving this card must use the measured relay→bit table in
 `docs/bench-relays.md` and write `0x27` register `0x01` directly, rather than
@@ -1857,18 +1859,24 @@ temperature (read from source).
 ADR-13 commits this project to patching upstream rather than working around.
 Open:
 
-- **SequentMicrosystems/8relay-rpi#7** — the channel remap table is wrong for
-  V 7.1 hardware; channels 6, 7 and 8 close relays 7, 8 and 6. Affects the C
-  tool and the Python library alike, and no sibling repo carries the correct
-  table. Filed 27 August 2026 with the measured mapping and an offer to PR the
-  fix. https://github.com/SequentMicrosystems/8relay-rpi/issues/7
+- **SequentMicrosystems/8relay-rpi#7** — *filed wrong, corrected in place.* It
+  claimed a stale remap table needing a patch, on the strength of a mapping
+  measured by lighting four channels at once and pairing the lit LEDs with the
+  channels in order. That pairing was an assumption and it was false. Re-measured
+  one bit at a time, the card matches `8relind-rpi` in all eight entries, so
+  there is no stale table — `8relay-rpi` is simply the wrong driver for hardware
+  sold under the Eight Relays name. Retitled, corrected, and left open only
+  because a README pointer would still help the next buyer.
+  https://github.com/SequentMicrosystems/8relay-rpi/issues/7
 
   *Not blocking us.* The supervisor addresses relays by the measured bit mask
   written to `0x27` directly, so it does not depend on the fix landing — which
   is just as well on a repo whose last commit was June 2021.
 
-- **SequentMicrosystems/8relay-rpi#8** — three proposed changes, asking for
-  direction before writing a PR: the `relayChSet` read-modify-write that reads
+- **SequentMicrosystems/8relay-rpi#8** — *withdrawn and closed*, because two of
+  its three proposals rested on the bad measurement above. The surviving item is
+  the `relayChSet` read-modify-write, offered as a standalone PR if wanted.
+  Originally: three proposed changes, asking for direction before writing a PR: the `relayChSet` read-modify-write that reads
   the input register to compute the output latch (a real bug, revision
   independent); a README note on which hardware revisions the table is correct
   for; and a `verify` subcommand that walks the channels and prints the correct

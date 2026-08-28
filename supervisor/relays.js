@@ -26,14 +26,24 @@
  */
 
 /**
- * Relay number to bit position, measured on the V 7.1 card by energising each
- * channel and reading the silkscreen label beside the lit LED.
+ * Relay number to bit position, measured on the V 7.1 card by writing **one
+ * bit at a time** and reading the silkscreen label beside the lit LED.
  *
  * Do not derive this from anything. It is a fact about one board revision's
  * copper, it disagrees with every published table, and the only way to know it
  * is to look.
+ *
+ * **Measured twice, because the first attempt was wrong in five of eight
+ * entries.** That attempt lit four channels at once, read the set of four LEDs
+ * that came on, and paired them with the channels in order. The set was read
+ * correctly; the pairing was an assumption, and it was false. Reading the
+ * output latch back afterwards felt like corroboration and was not — it only
+ * ever proves the code set the bit it meant to, which says nothing about which
+ * relay that bit reaches.
+ *
+ * One bit, one LED, one label. Anything else is inference.
  */
-export const BIT = { 1: 0, 2: 2, 3: 1, 4: 3, 5: 6, 6: 7, 7: 4, 8: 5 };
+export const BIT = { 1: 0, 2: 2, 3: 6, 4: 4, 5: 5, 6: 7, 7: 3, 8: 1 };
 
 /** `1 << BIT[n]`, precomputed, because this is written on every evaluation. */
 export const MASK = Object.fromEntries(

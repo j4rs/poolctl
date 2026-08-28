@@ -539,6 +539,26 @@ const intents = {
     if (mode !== "pool" && mode !== "spa") throw new Error(`unknown mode ${mode}`);
     /* njsPC's shared-body model does the whole switch off one circuit. */
     await njs.setCircuit(mode === "spa" ? SPA_CIRCUIT : POOL_CIRCUIT, true);
+
+    /* ADR-9's first clause: the bypass **follows the mode** — flow in spa,
+       around in pool. Until the relays were wired this line was missing and
+       nothing noticed, because `own.bypass` was a string no actuator read:
+       it was only ever assigned by the pool-heat intent below, so switching
+       to spa left it wherever pool had put it. The first spa switch after the
+       card went in came out as 0x07 — REL1, REL2 and the bypass — when spa
+       must be 0x05. Deriving it here rather than leaving it to drift is the
+       whole of the fix.
+
+       Not derived at read time, deliberately. The cutoff path leaves the
+       bypass where it is on purpose, because a valve may only move once a
+       purge has elapsed and that duration is unmeasured; a pure derivation
+       would silently override that. Mode changes are the one transition
+       where ADR-9 says it must follow. */
+    own.bypass = bypassFor(mode, mode === "pool" && own.poolHeatDemand);
+
+    /* Spa owns the heater (ADR-4), so a pool call cannot survive the switch. */
+    if (mode === "spa") own.poolHeatDemand = false;
+    publish();
   },
   /**
    * Targets are cutoffs, not setpoints (ADR-4). Clamping them to the heater's
