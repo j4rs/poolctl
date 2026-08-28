@@ -485,8 +485,11 @@ field silently sets it false; this is the same lesson from the other side.
 None of it matters on this box &mdash; ScreenLogic is dormant, `systemName` was
 already the placeholder `Pentair: 00-00-00`, njsPC's own `/app/screenlogic`
 route is commented out, and `1234` is that feature's factory default. Somebody
-running ScreenLogic for real loses a credential silently, which is why this is
-worth reporting upstream.
+running ScreenLogic for real loses a credential silently, so it is filed
+upstream as
+[njsPC#1236](https://github.com/tagyoureit/nodejs-poolController/issues/1236)
+&mdash; with the fix, since `setPortAsync` already uses the guarded
+`if (portId === 0 && !cfg.screenlogic)` form twenty lines further down.
 
 **What "working" looks like before the bus exists.** njsPC opens the port, sees
 nothing for `inactivityRetry` seconds, closes it and reopens:
