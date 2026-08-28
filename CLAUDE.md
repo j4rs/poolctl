@@ -16,10 +16,12 @@ revealed that the two connector groups are mirrored: `RELAY 1-4` is
 N.C./COM/N.O. and `RELAY 5-8` is N.O./COM/N.C. Bench procedure in
 `docs/bench-relays.md`, and its first test is done: the I2C bus holds a single
 PCA9554-class port expander at `0x27` and nothing else, so **the card has no
-microcontroller and no hardware watchdog** despite the product page. ADR-10
-must be built rather than inherited, and the expander latches its outputs — so
-in the panel, where the HAT is fed by the HDR-60-5 and feeds the Pi, a wedged
-Pi leaves every relay exactly where it was.
+microcontroller and no hardware watchdog** despite the product page. ADR-12
+had to be built rather than inherited, and now is: a systemd watchdog that
+restarts a wedged supervisor, verified on the Pi. It buys **recovery, not
+safety** — the expander latches its outputs, so in the panel, where the HAT is
+fed by the HDR-60-5 and feeds the Pi, a wedged Pi leaves every relay exactly
+where it was. Measured: relays held through all 51 s of a deliberate wedge.
 
 **Do not address relays by Sequent driver channel.** The card's routing matches
 `8relind-rpi`, not the `8relay-rpi` its product page names; that driver's

@@ -26,7 +26,7 @@ flowchart TB
     SEQ["supervisor<br/>heat/pump floor · bypass policy · cutoffs<br/>programs · service mode · persistence<br/>valve travel NOT BUILT"]
     NJS["njsPC in Nixie mode (the controller)<br/>bodies · circuits · valves · schedules<br/>delays/lockouts · RS-485 · telemetry"]
     REM["relayEquipmentManager<br/>GPIO / relay driver"]
-    WD["hardware watchdog<br/>both processes healthy"]
+    WD["systemd watchdog<br/>evaluate() still running"]
   end
 
   HAT["Sequent 8-relay HAT<br/>8 relays · RS-485 with TVS"]
@@ -49,7 +49,7 @@ flowchart TB
   SEQ -.->|state stream| UI
   NJS --> HAT
   REM --> HAT
-  WD -.->|de-energise on timeout| HAT
+  WD -.->|SIGABRT, then restart| SEQ
   HAT -->|RS-485| PUMP
   HAT -->|RS-485| CELL
   HAT -->|dry contacts 22/23/24| HTR
@@ -67,7 +67,7 @@ flowchart TB
 | **njsPC (Nixie)** | The controller. Bodies, circuits, valves, pumps, schedules, and the delay/interlock manager in `Lockouts.ts`. RS-485 master, chlorinator telemetry, MQTT/REST/WebSocket. | Running on a laptop; not on the Pi until the HAT |
 | **supervisor** | The interlocks njsPC lacks, plus translation, intents and durable preferences. The only external writer. | Built and deployed to the Pi behind a password; valve travel and preheat outstanding |
 | **REM** | GPIO and relay I/O for the HAT. | Not installed |
-| **watchdog** | De-energises every relay unless njsPC and the supervisor are both healthy. | Not built, and deliberately so — the HAT's own watchdog cuts Pi power rather than dropping relays, and whether relay state survives that decides the design. ADR-12 has the bench test |
+| **watchdog** | Restarts the supervisor when `evaluate()` stops running. Health is that the checking is happening, not that the checks pass — `supervisor/watchdog.js` argues why. | Built, deployed, and verified on the Pi. It does **not** de-energise anything; see below |
 
 **njsPC is not a bus library and cannot be treated as one.** Nixie mode is a
 full controller: `HeaterCooldownDelay` drives circuits from its own timer,
@@ -135,10 +135,11 @@ client surfaces every one.
 
 | Failure | Detected by | Response |
 |---|---|---|
-| Supervisor dies or wedges | watchdog stops being fed | all relays de-energise to fail-safe |
-| njsPC dies or wedges | supervisor's calls fail; watchdog stops being fed | all relays de-energise to fail-safe |
-| REM dies | njsPC relay ops fail | supervisor refuses transitions, stops feeding the watchdog |
-| Pi loses power | — | relays de-energise: valves to pool, bypass to flow, heater open, blower off |
+| Supervisor dies or wedges | systemd watchdog: pings withheld once `evaluate()` goes stale or throws | SIGABRT, restart 5 s later. **Relays hold their last position throughout** — see below |
+| njsPC dies or wedges | supervisor's calls fail; readings go null | supervisor keeps running and reports. It does not restart itself: `evaluate()` still completes, and a restart would not fix njsPC |
+| REM dies | njsPC relay ops fail | nothing — the supervisor drives the relays itself, and njsPC's valves are configured with no device binding |
+| Pi loses power | — | **nothing** — the HDR-60-5 feeds the HAT upstream of the Pi, so the expander stays powered and latched |
+| HAT loses power | — | relays de-energise: valves to pool, bypass to flow, heater open, blower off |
 | Client loses network | client's own staleness timer | nothing happens to equipment — the entire point of ADR-7 |
 | Valve position drifts | nothing; there is no feedback | re-driven to pool on every boot |
 | Valve de-energises mid-hold | nothing yet | open question — REM `latch` semantics against a PE24GVA SPDT selector |
@@ -147,6 +148,19 @@ client surfaces every one.
 The fail-safe direction is fixed in hardware by NO/NC selection, not in
 software: **valves to pool, bypass to flow, heater contacts open, blower off.**
 A heater with flow and no call is harmless; a call with no flow is not.
+
+**Nothing de-energises the relays when software fails.** The HAT carries a
+single PCA9554-class expander and no microcontroller, so it has no hardware
+watchdog whatever the product page says, and the expander latches its outputs.
+In the panel it is fed by the HDR-60-5 upstream of the Pi, so a wedged, killed
+or rebooting Pi leaves every relay exactly where it was. Measured during a
+deliberate wedge on 28 August 2026: `SIGSTOP` the supervisor and the byte at
+`0x27` register `0x01` stayed at `0x40` for the whole 51 s until systemd killed
+it. Only losing power to the HAT drops the relays.
+
+So the watchdog buys **recovery, not safety**. It shortens how long a wedged
+supervisor stays wedged; it does not make the equipment safe in the meantime,
+and no row above should be read as if it did.
 
 ---
 

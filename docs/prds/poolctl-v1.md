@@ -445,8 +445,11 @@ mode sequences.
   fail-safe is *flow*. The actuator costs nothing either way — it keeps one
   of its two lines energized in both positions — so the standing cost is the
   coil alone, ~80 mA.
-- A watchdog trip or power loss swings the bypass toward the heater. That is
-  the safe direction: flow with no call is harmless.
+- Losing power *to the HAT* swings the bypass toward the heater. That is the
+  safe direction: flow with no call is harmless. Note that this is the only
+  event that does it — the expander latches, so a wedged Pi, a killed
+  supervisor or a watchdog restart all leave relay 3 where it was. See
+  ADR-12.
 - Calling for pool heat costs one 45 sec valve move before the contact
   closes. Releasing it costs a purge plus another 45 sec.
 
@@ -650,7 +653,8 @@ unnecessary. Reading beat reasoning; running beat reading.
 
 ### ADR-12 — Watchdog health spans both processes
 
-**Status: proposed.** Revised alongside ADR-10.
+**Status: built 28 August 2026, and narrower than the decision below** — see
+the resolution at the end. Revised alongside ADR-10.
 
 **Decision:** the hardware watchdog is fed only while **both** njsPC and the
 supervisor are alive and the supervisor's invariant check passes. Feeding is
@@ -727,6 +731,42 @@ trip, a safe state is re-established within a boot. That turns the question
 from "is this unsafe" into "how long is too long to hold a bad combination",
 which is answerable: the dangerous one is a heat call with the pump stopped,
 and it wants a number rather than a shrug.
+
+**Built and measured, 28 August 2026 — and it is narrower than this ADR
+asked for.** `supervisor/watchdog.js` is a systemd watchdog: `WatchdogSec=60`,
+petted every 20 s, with `NotifyAccess=all` because the ping comes from a
+`systemd-notify` child rather than the main PID.
+
+It deliberately does **not** do what the decision above says. Feeding
+conditional on "the invariant check passes" is wrong on inspection: a breached
+invariant is a fact about the *equipment*, and restarting the supervisor does
+not move water. The breach survives the restart, the next pet fails too, and
+the result is a restart loop re-asserting relays against a bad state — which
+is the same mistake as an invariant that corrects rather than reports, with a
+blunter instrument. So health here is that **the checking is happening**:
+`evaluate()` completed, within the window, without throwing. A real breach
+stays on the Water screen where a person can see it.
+
+Verified by freezing the process outright:
+
+```
+10:55:58  SIGSTOP, relay byte 0x40
+10:56:49  Watchdog timeout (limit 1min)! — SIGABRT — status=6/ABRT
+10:56:54  Scheduled restart job, restart counter is at 1
+10:56:55  relays -> 0x00 (boot), njsPC link up, relays -> 0x40
+```
+
+Fifty-one seconds to detection (the window runs from the last ping, not the
+wedge), fifty-seven from wedge to healthy. Two things fell out of it. Linux
+wakes a stopped task to take a fatal signal, so SIGABRT killed it in 13 ms and
+the `TimeoutStopSec` escalation never ran. And **the relay byte held `0x40`
+for the entire wedge** — the latching argued above, now observed.
+
+That also settles the *Consequence* line above: "both cases must end with
+every relay de-energised" is not achievable on this card and is withdrawn. The
+watchdog buys recovery, not safety, and the open question is unchanged — how
+long is too long to hold a heat call with the pump stopped. The ~65 s worst
+case now has a number attached to compare it against.
 
 Do not build a feeder before that measurement. The health condition already
 exists in `evaluate()` and the invariant check; what is missing is the relay
@@ -889,10 +929,12 @@ Relay NO/NC selection must place the de-energized state at:
 - Heater contacts → open
 - Blower → off
 
-A hardware watchdog drops all relays if the **sequencer** stops asserting
-health — see ADR-12. Earlier drafts pointed this at njsPC, which was correct
-while njsPC was going to be the entire controller and is not correct under
-ADR-10.
+**This is the resting state of the wiring, not something software restores.**
+Earlier drafts here promised a hardware watchdog that drops all relays when
+the sequencer stops asserting health. There is no such watchdog on this card,
+and the expander latches — so the list above is reached by de-energising the
+coils and by nothing else. ADR-12 has the measurement and what was built
+instead.
 
 ### Enclosure
 
@@ -1391,8 +1433,9 @@ Deliverable: the ADR-6 chlorinator decision, plus confirmation that the pump
 responds.
 
 **Phase 2 — bench.** Full controller assembled on a desk: actuators spinning
-in free air, relays clicking, sequencer exercised, watchdog tested by killing
-the process. Do not debug a state machine at the equipment pad.
+in free air, relays clicking, sequencer exercised, watchdog tested by wedging
+the process (done, 28 August 2026 — `docs/pi-bringup.md`). Do not debug a
+state machine at the equipment pad.
 
 **Phase 3 — heater.** 3-wire control wired, valves still manual. Smallest
 change with the largest immediate payoff.
@@ -1420,7 +1463,7 @@ preheat, and a physical weatherproof "spa on" button near the spa itself.
 | Dead-reckoned valve position drifts | Re-drive to pool on every boot |
 | Software bug overheats spa | Impossible by construction — heater firmware owns the cap (ADR-4) |
 | Blower relay welds closed | Definite-purpose contactor sized for inrush |
-| Pi crashes mid-transition | Hardware watchdog drops relays to fail-safe |
+| Pi crashes mid-transition | **Unmitigated.** Relays latch where they were; the systemd watchdog restarts the supervisor within ~65 s and boot re-drives valves to pool with the heater off. See ADR-12 |
 | Pi overheats in the sealed enclosure | Measured +14 °C over ambient at njsPC-like load, so fine on workload — but untested with the HAT fitted, the box sealed, and the transformer dissipating alongside it. Re-measure assembled; mitigations below |
 | Actuator stalls against a valve stop | Verify travel before install; cams set to hard stops |
 | Losing Pentair Home features owner values | ADR-6 Path B preserves them |

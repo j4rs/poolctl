@@ -495,14 +495,58 @@ its own the moment a pump is on the other end.
 - **No TLS.** The supervisor serves plain HTTP, so the password crosses the
   LAN readable by anything that can intercept traffic. Deferred deliberately;
   PRD §11 has the options and the reasoning.
-- **No watchdog.** Nothing de-energises the relays when njsPC or the
-  supervisor is unhealthy. `docs/architecture.md` carries it as not built.
-- **The watchdog is unbuilt, deliberately, pending one measurement.** The HAT
-  has a hardware watchdog, but it works by cutting power to the Pi rather than
-  by dropping relays, and nothing documents what relay state does while that
-  happens. ADR-12 has the test — energise a relay, stop feeding the watchdog,
-  see whether it drops — and which way it goes decides whether anything needs
-  building at all. First thing to try with the card fitted.
+- **Nothing de-energises the relays when software fails.** The systemd
+  watchdog below restarts a wedged supervisor, and that is all it does. The
+  card has no hardware watchdog — the I2C scan found one PCA9554-class
+  expander at `0x27` and no microcontroller, whatever the product page says —
+  and the expander latches, so a wedged, killed or rebooting Pi leaves every
+  relay where it was. In the panel the HDR-60-5 feeds the HAT upstream of the
+  Pi, so even pulling the Pi's power does not drop them. Recovery, not safety;
+  `docs/architecture.md` has the failure table.
+
+---
+
+## Verified: the watchdog kills a wedged supervisor and it comes back
+
+Enabled with a drop-in, because the pet arrives from a `systemd-notify` child
+rather than from the main PID — with the default `NotifyAccess=main` systemd
+would discard every ping and kill a perfectly healthy supervisor at 60 s:
+
+```
+# /etc/systemd/system/poolctl.service.d/watchdog.conf
+[Service]
+WatchdogSec=60
+NotifyAccess=all
+```
+
+Tested 28 August 2026 by freezing the process outright — `kill -STOP` on the
+main PID, which stops the pets without giving the supervisor any chance to
+shut down tidily:
+
+```
+10:55:58  SIGSTOP, relay byte 0x40
+10:56:49  poolctl.service: Watchdog timeout (limit 1min)!
+10:56:49  Killing process 1681 (node) with signal SIGABRT
+10:56:49  Main process exited, code=killed, status=6/ABRT
+10:56:54  Scheduled restart job, restart counter is at 1
+10:56:55  relays -> 0x00 (all off) — boot
+10:56:55  njsPC link up
+10:56:55  relays -> 0x40  REL3
+```
+
+Fifty-one seconds from the wedge to detection — the window is measured from
+the last successful ping, not from the wedge, so anything up to 60 s is
+expected on a 20 s cadence. Fifty-seven seconds from wedge to healthy again.
+
+Two details worth keeping. **SIGABRT killed a stopped process**: Linux wakes a
+`SIGSTOP`ped task to take a fatal signal, so the 15 s `TimeoutStopSec`
+escalation to SIGKILL never ran — it died 13 ms after the signal. And **the
+relays held `0x40` for the whole 51 s**, which is the latching behaviour above,
+observed rather than argued.
+
+What this does not cover: the withhold path. `evaluationHealth` also stops
+petting when `evaluate()` throws or goes stale while the process is otherwise
+alive, and that half is unit-tested only.
 
 ---
 
