@@ -487,9 +487,13 @@ already the placeholder `Pentair: 00-00-00`, njsPC's own `/app/screenlogic`
 route is commented out, and `1234` is that feature's factory default. Somebody
 running ScreenLogic for real loses a credential silently, so it is filed
 upstream as
-[njsPC#1236](https://github.com/tagyoureit/nodejs-poolController/issues/1236)
-&mdash; with the fix, since `setPortAsync` already uses the guarded
-`if (portId === 0 && !cfg.screenlogic)` form twenty lines further down.
+[njsPC#1236](https://github.com/tagyoureit/nodejs-poolController/issues/1236),
+with the one-guard fix in
+[njsPC#1237](https://github.com/tagyoureit/nodejs-poolController/pull/1237)
+&mdash; `setPortAsync` already uses the guarded
+`if (portId === 0 && !cfg.screenlogic)` form further down the same function,
+so the patch only makes the two consistent. Until that lands, treat the
+ScreenLogic block as collateral of any write to this endpoint.
 
 **What "working" looks like before the bus exists.** njsPC opens the port, sees
 nothing for `inactivityRetry` seconds, closes it and reopens:
