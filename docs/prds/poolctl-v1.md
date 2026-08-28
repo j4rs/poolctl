@@ -850,6 +850,11 @@ each connector group:
 | 6, 8 | 10 A | contactor coil ~80 mA / spare | 100×+ |
 | 7 | 5 A | pool light, < 1 A | 5× |
 
+**Read off the V 7.1 silkscreen, 28 August 2026, and it agrees with the table
+above in all six entries.** Worth doing rather than inheriting: the channel
+*routing* changed between board revisions without the documentation following,
+so the ratings could have moved the same way. They did not.
+
 **120 VAC is explicitly rated, so CH7 drives the light directly and no
 interposing relay is needed.** This closes §10's blocking question — see there
 for why the earlier reading said otherwise.
