@@ -148,6 +148,13 @@ const heatCall = () => ui?.heaterCall ?? "off";
 
 function publish() {
   ui = toUiState(njsRaw, own);
+  /* Drive the card from the very view being broadcast, so the relays and the
+     screen cannot disagree. Doing this in `evaluate()` instead left every
+     intent that only publishes — the light, the blower, a pool heat call —
+     waiting up to a full heartbeat for its relay, with the UI already
+     claiming the change had happened. Five seconds of the app lying about
+     equipment state is worse than five seconds of latency. */
+  driveRelays(ui);
   const msg = JSON.stringify({ type: "state", state: ui });
   for (const client of wss.clients) {
     if (client.readyState === 1) client.send(msg);
@@ -182,7 +189,6 @@ function evaluate() {
     applyCutoff(view);
     const settled = toUiState(njsRaw, own);
     own.violations = checkInvariants(settled);
-    driveRelays(settled);
     publish();
     lastEvaluatedAt = Date.now();
     lastEvaluationError = null;
