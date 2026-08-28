@@ -1480,6 +1480,35 @@ eyes on bonding.
       11 mm standoffs over the SoC, and the concern was that reflashing would
       mean dismantling the panel. It does not.
 
+- [ ] **The bypass leads the body valves through a mode change.** Seen on the
+      bench, 27 August 2026, the first evening relays were driven:
+
+      ```
+      20:40:31  relays -> 0x45  REL1 REL2 REL3   spa valves, pool bypass
+      20:40:32  relays -> 0x40  REL3             njsPC catches up
+      ```
+
+      `setMode` assigns `own.bypass` immediately, but njsPC's `isDiverted`
+      flags only flip once it has processed the circuit change — about a
+      second later. So for that second the published state, and now the
+      relays, hold a combination that should never exist.
+
+      Harmless as observed: no heat was called, so no invariant was breached,
+      and nothing is wired. It will not stay harmless. With actuators fitted
+      this commands two valves to move at once, which the transition
+      invariants forbid — *no valve command while another valve move is in
+      flight* — and if it happens out of a **spa** heat call, the second of
+      `bypass === 'around'` with `heaterCall !== 'off'` is a real breach of
+      invariant 3, which exists to stop a live call into a bypassed exchanger.
+
+      This is the known gap arriving rather than a new fault: §5 records that
+      the transition invariants "describe transitions, cannot be seen in a
+      single state, and belong with valve driving". Valve driving now exists,
+      so they are due. The narrow fix is to derive the bypass from njsPC's
+      settled valve state rather than from the requested mode; the honest fix
+      is the sequencing layer that has always been deferred. **Decide before
+      an actuator is wired**, not after.
+
 - [ ] **Enclosure thermals.** Bench figures are in ADR-3; the assembled case
       is untested. Re-measure with the HAT fitted, the box closed, and the
       transformer energised, on a hot afternoon. Mitigations in rough order
