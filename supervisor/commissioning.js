@@ -46,16 +46,16 @@ export function checkCommissioning({
 /**
  * Whether njsPC owns a heater at all.
  *
- * The heat contacts are ours to close — CH4 pool, CH5 spa — but what they
- * follow is njsPC's `heatStatus`, and njsPC reports `Off` forever for a body
- * with no heater configured. So an empty heater list is not a cosmetic gap:
- * it means the Heat screen can be operated all day and no relay will ever
- * move. Exactly the shape of fault this file exists for — everything looks
- * right, nothing happens, and nothing says why.
+ * A **note**, and it was briefly a warning by mistake. The first version of
+ * this rule said calls for heat "can never reach the equipment" without a
+ * heater in njsPC, which was true only while `heaterCall` was derived from
+ * njsPC's `heatStatus`. It no longer is: the heat contacts follow this
+ * process's own call, because njsPC's heater has no device binding and
+ * actuates nothing. So an empty list stops nothing.
  *
- * The same class as the pump, which has to exist in njsPC before a program
- * can bind because the speed has nowhere else to live. A heat call has
- * nowhere to live either.
+ * It is still worth saying. njsPC's body setpoints, its heat modes and
+ * everything dashPanel shows about heating are meaningless without one, and
+ * `state.setpoint` — which the Heat screen renders — stays null.
  *
  * Undefined means the configuration could not be read, which is not a
  * finding. An empty array is njsPC positively saying there are none.
@@ -64,13 +64,13 @@ export function checkHeater(heaters) {
   if (!Array.isArray(heaters) || heaters.length > 0) return [];
   return [{
     id: "heater-missing",
-    severity: "warn",
+    severity: "note",
     what: "njsPC has no heater configured",
     detail:
-      "Calls for heat can never reach the equipment: the heat contacts " +
-      "follow njsPC's heat status, and a body with no heater reports Off " +
-      "forever. Add the heat pump in dashPanel, or " +
-      "`PUT /config/heater {type: 'heatpump', body: 'poolspa'}`. " +
+      "The heat contacts are driven from this app's own call, so they still " +
+      "work — but njsPC has no setpoint or heat mode to report, so the " +
+      "Heat screen shows no setpoint and dashPanel shows no heater. Add it " +
+      "with `PUT /config/heater {type: 'heatpump', body: 'poolspa'}`; " +
       "docs/pi-bringup.md has the command.",
   }];
 }

@@ -670,44 +670,62 @@ describe("the evaluation loop", () => {
     expect((await client.intent("setPoolHeat", { on: true })).ok).toBe(false);
   });
 
+  /* The heat call is provoked by asking for it, not by njsPC claiming to
+     heat. njsPC's `heatStatus` no longer reaches a contact — its heater has
+     no device binding and actuates nothing — so a call it reports is not a
+     call anybody is making. Driving these from `setPoolHeat` also means the
+     invariant is exercised through the path that will exist at the pad. */
+  const callForPoolHeat = async () => {
+    njspc.setTemps({ temp: 70 });
+    await settles((s) => s.waterTemp === 70, 8000);
+    await client.intent("setTarget", { body: "pool", degrees: 85 });
+    expect((await client.intent("setPoolHeat", { on: true })).ok).toBe(true);
+    await settles((s) => s.heaterCall === "pool", 8000);
+  };
+
   it("catches a heat call running below the heater's flow minimum", async () => {
+    await callForPoolHeat();
     njspc.setPumpRpm(800);
-    njspc.setTemps({ heatStatus: { name: "heating" } });
     const state = await settles((s) => s.violations.length > 0, 8000);
     expect(state.violations.map((v) => v.id)).toContain("heat-below-floor");
     expect(state.violations[0].severity).toBe("alarm");
+    await client.intent("setPoolHeat", { on: false });
   });
 
   it("clears the alarm when the equipment comes right", async () => {
+    await callForPoolHeat();
     njspc.setPumpRpm(800);
-    njspc.setTemps({ heatStatus: { name: "heating" } });
     await settles((s) => s.violations.length > 0, 8000);
 
     njspc.setPumpRpm(2400);
     const state = await settles(
       (s) => !s.violations.some((v) => v.id === "heat-below-floor"), 8000);
     expect(state.violations.map((v) => v.id)).not.toContain("heat-below-floor");
+    await client.intent("setPoolHeat", { on: false });
   });
 
   it("does not alarm on a pump that is simply not answering", async () => {
     /* Which is every pump on this rig right now. A monitor that fires
        permanently is one nobody reads. */
-    njspc.setTemps({ heatStatus: { name: "heating" } });
+    await callForPoolHeat();
+    njspc.setPumpRpm(null);
     await new Promise((r) => setTimeout(r, 1500));
     expect((await now()).violations.map((v) => v.id)).not.toContain("heat-below-floor");
+    await client.intent("setPoolHeat", { on: false });
   });
 
   it("keeps checking while njsPC says nothing at all", async () => {
     /* njsPC only speaks when something changes, and "nothing changed" is
        exactly what a stuck heat call looks like. The heartbeat evaluates
        rather than merely republishing. */
+    await callForPoolHeat();
     njspc.setPumpRpm(800);
-    njspc.setTemps({ heatStatus: { name: "heating" } });
     await settles((s) => s.violations.length > 0, 8000);
     /* No further njsPC events from here — the alarm must persist on our own
        clock rather than needing to be re-provoked. */
     const later = await settles((s) => s.violations.length > 0, 8000);
     expect(later.violations.map((v) => v.id)).toContain("heat-below-floor");
+    await client.intent("setPoolHeat", { on: false });
   });
 });
 

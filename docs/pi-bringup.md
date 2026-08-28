@@ -581,8 +581,45 @@ Two things this does *not* do, and they matter:
   leaves both at `Off` / `0`, so `heatStatus` is still `Off`.
 - It therefore does not, on its own, make any heat relay close.
 
-The second of those is not only a configuration question — see the note under
-*Not done, and known* about which authority owns the pool call.
+Neither of those matters any more, and that is the point of the next section:
+the heat contacts do not follow njsPC's heat status.
+
+### Who closes the heat contacts
+
+**The supervisor, both of them.** Decided 28 August 2026, after reading how
+njsPC actually drives a heater here.
+
+njsPC's Nixie heater is configured with no `connectionId` and no
+`deviceBinding` — the same choice made for the valves — and in that case
+`setHeaterStateAsync` assigns `hstate.isOn` and returns. It actuates nothing.
+Wiring CH4 to `heatStatus` would be a physical contact following a simulation,
+and it would give one Raypak two authorities that swap on a mode change njsPC
+can trigger by itself, which is the split ADR-7 forbids.
+
+So `heaterCall` is derived in `map.js` from this process's own state:
+
+| contact | closes when | cut off by |
+|---|---|---|
+| CH5 spa heat | the spa is the active body | the heater's own thermostat, capped at 104 °F |
+| CH4 pool heat | `poolHeatDemand`, set by the Heat screen | `targets.pool`, via `applyCutoff` |
+
+Spa is implied by the mode because the 3-wire carries no temperature: the
+contact only says *you may heat toward the spa setpoint*, and the Raypak
+regulates from there. That is ADR-4 working as designed rather than a
+shortcut.
+
+**Nothing was given up.** `NixieHeatpump.getCooldownTime()` returns 0 —
+*"There is no cooldown delay at this time for a heatpump"* — so njsPC's
+`HeaterCooldownDelay` never constructs for this heater type and there was no
+cooldown to lose. What njsPC's heatpump does have is a `minCycleTime`
+short-cycle deferral, default 2 min, which we do not currently reimplement;
+the Raypak has its own anti-short-cycle protection in firmware, and that is
+the layer ADR-4 relies on anyway.
+
+**`targets.spa` still does nothing**, exactly as before this change:
+`applyCutoff` is pool-only. Cutting the spa call at our own target would fight
+the heater's thermostat rather than help it — the heater is already holding
+that temperature — so it stays display-only until there is a reason.
 
 ### The rest
 
@@ -596,26 +633,6 @@ The second of those is not only a configuration question — see the note under
 
 ## Not done, and known
 
-- **Nothing closes the pool heat contact.** `byteFor` sets CH4 on
-  `heaterCall === "pool"`, and `heaterCall` comes from njsPC's `heatStatus`.
-  But the pool call is the supervisor's own — `setPoolHeat` sets
-  `own.poolHeatDemand` and moves the bypass, and tells njsPC nothing, by
-  design: ADR-4 says the heater owns its setpoint, and the 3-wire interface
-  cannot carry one anyway, so writing a setpoint into njsPC would be theatre.
-  The result is that the two halves do not meet. Demonstrated with the pure
-  function rather than inferred:
-
-  ```
-  byteFor({poolHeatDemand: true, heaterCall: "off"})  ->  0x00  (all off)
-  byteFor({heaterCall: "pool"})                       ->  0x10  REL4
-  ```
-
-  So today a pool heat call moves CH3 and nothing else. Wiring the heater
-  before this is settled means wiring a contact nothing can close. The likely
-  answer is that CH4 should follow `own.poolHeatDemand` while CH5 follows
-  njsPC — "the pool call is the only one we own" is already the comment in
-  `applyCutoff` — but that also decides what `heaterCall` should mean to the
-  invariants, so it is a decision rather than a patch.
 - **No TLS.** The supervisor serves plain HTTP, so the password crosses the
   LAN readable by anything that can intercept traffic. Deferred deliberately;
   PRD §11 has the options and the reasoning.

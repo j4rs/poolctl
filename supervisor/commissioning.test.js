@@ -206,13 +206,14 @@ describe("the heater njsPC does not have", () => {
     expect(checkHeater(null)).toEqual([]);
   });
 
-  it("catches an empty list, because the contacts can then never close", () => {
-    /* The failure this exists for: the Heat screen works, the intent is
-       accepted, and no relay ever moves — heaterCall is derived from njsPC's
-       heatStatus, and a body with no heater reports Off forever. */
+  it("notes an empty list without calling it a fault", () => {
+    /* A note, not a warning: the heat contacts follow this app's own call,
+       so a missing njsPC heater costs the setpoint display and dashPanel,
+       not the relays. It was a warning for about an hour, on the older
+       assumption that heaterCall came from njsPC. */
     const [f] = checkHeater([]);
     expect(f.id).toBe("heater-missing");
-    expect(f.severity).toBe("warn");
+    expect(f.severity).toBe("note");
     expect(f.detail).toMatch(/heatpump/);
   });
 });

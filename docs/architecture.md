@@ -100,7 +100,7 @@ wearing a disguise. This is where each piece belongs.
 | panel mode (auto/service) | njsPC | `toggleServiceMode`; stands the schedules down |
 | schedules | njsPC | ADR-11 |
 | `targets.pool/spa` | supervisor | cutoffs clamped to `HEATER_CAP`; njsPC assumes it owns setpoints (ADR-4) |
-| `heaterCall` | njsPC heaters | supervisor enforces the pump floor and bypass around it |
+| `heaterCall` | **supervisor** | what CH4/CH5 are commanded to do. njsPC's heater has no device binding and actuates nothing, so its `heatStatus` is an opinion and is carried separately for display. Spa follows the mode; pool is explicit and cut off at `targets.pool` |
 | bypass position | supervisor | njsPC has no bypass concept (ADR-9) |
 | `pumpRpm`, watts | njsPC | telemetry off the bus |
 | salt ppm, cell output | njsPC | telemetry, if ADR-6 lands on Path A |

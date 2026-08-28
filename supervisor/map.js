@@ -12,6 +12,7 @@
 
 import { pumpLimits } from "./binding.js";
 import { toUiSchedule, isRealSchedule } from "./schedules.js";
+import { bypassFor } from "./interlocks.js";
 
 /** njsPC's shared-equipment model fixes these circuit ids. */
 const SPA_CIRCUIT = 1;
@@ -44,13 +45,33 @@ export function toUiState(njs, own) {
      spa-drain. We only have two modes, so anything not 'spa' is pool. */
   const mode = nameOf(njs.valveMode) === "spa" ? "spa" : "pool";
 
-  /* heatStatus is njsPC's authority on whether the heater is actually calling;
-     setPoint is what it is calling toward. Neither is our cutoff (ADR-4). */
+  /* `heatStatus` is njsPC's opinion, kept for display and diagnostics. It is
+     deliberately *not* what drives the heat contacts.
+
+     njsPC cannot reach this heater. Its Nixie heater is configured with no
+     `connectionId` and no `deviceBinding` — the same choice made for the
+     valves — and in that case `setHeaterStateAsync` assigns `hstate.isOn` and
+     returns. It actuates nothing. Deriving a physical contact from it would
+     be hardware following a simulation, and it would give one Raypak two
+     authorities that swap on a mode change njsPC can trigger by itself, which
+     is the split ADR-7 exists to forbid.
+
+     So the call is ours, both halves:
+
+       spa   — implied by the mode. The 3-wire carries no temperature, so the
+               contact only says "you may heat toward the spa setpoint"; the
+               heater's own thermostat regulates from there, and its 104 °F
+               cap is what makes that safe (ADR-4).
+       pool  — explicit, and cut off at `targets.pool` by `applyCutoff`.
+
+     Nothing is lost by taking it: `NixieHeatpump.getCooldownTime()` returns 0
+     — "There is no cooldown delay at this time for a heatpump" — so njsPC's
+     `HeaterCooldownDelay` never constructs for this heater type. */
   const heatStatus = nameOf(activeBody.heatStatus) || "off";
   const heaterCall =
-    heatStatus === "off" || heatStatus === "cooldown"
-      ? "off"
-      : mode === "spa" ? "spa" : "pool";
+    mode === "spa" ? "spa"
+      : own.poolHeatDemand ? "pool"
+        : "off";
 
   return {
     mode,
@@ -63,8 +84,23 @@ export function toUiState(njs, own) {
     valves: {
       intake: intake?.isDiverted ? "spa" : "pool",
       returns: returns?.isDiverted ? "spa" : "split",
-      /* njsPC has no bypass concept — the supervisor owns this one. */
-      bypass: own.bypass ?? "around",
+      /* njsPC has no bypass concept — the supervisor owns this one, and
+         derives it rather than latching it.
+
+         It used to be a stored field written by `setMode` and `setPoolHeat`.
+         That is only correct while every mode change comes through an intent,
+         and njsPC changes the body on its own — a schedule, dashPanel, the
+         Spa circuit's egg timer expiring. Driving the spa circuit straight
+         through njsPC's API left the stored value at `around` from pool mode,
+         and the card came out `0x65`: spa valves, spa heat call, and the
+         bypass still routed around the exchanger. A heat call at zero flow,
+         which is precisely the pair ADR-5's interlock exists to prevent.
+
+         Deriving it makes that state unreachable rather than merely reported.
+         The supervisor observes and reacts (ADR-11); its bypass policy has to
+         be a function of what is true, not a memory of what it last asked
+         for. */
+      bypass: bypassFor(mode, mode === "pool" && Boolean(own.poolHeatDemand)),
     },
 
     /* No `?? 0`. A pump we cannot hear from is not a pump at rest, and
