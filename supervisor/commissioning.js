@@ -62,7 +62,29 @@ export function checkCommissioning({
  * network, say — and undefined is never a finding.
  */
 export function checkSerialPort(rs485) {
-  if (!rs485 || rs485.enabled === false || rs485.mock) return [];
+  if (!rs485) return [];
+
+  /* Turning the port off is the right move on a bench: with a pump
+     configured and no bus, njsPC transmits anyway and logs an error for every
+     attempt — 1165 an hour, measured. But it is also the setting whose
+     symptom is silence, and disabling it switches off the missing-port check
+     below, so the one thing that would have said "the bus is broken" goes
+     quiet at the same time. A note, not a warning: right now it is correct. */
+  if (rs485.enabled === false) {
+    return [{
+      id: "rs485-disabled",
+      severity: "note",
+      what: "njsPC's RS-485 port is switched off",
+      detail:
+        "Nothing is transmitted to the pump or the chlorinator, and every " +
+        "reading from them stays null. Correct while no bus is attached. " +
+        "Re-enable it — comms `enabled: true` in njsPC — before wiring the " +
+        "bus, or the equipment will simply never answer and nothing will say " +
+        "why.",
+    }];
+  }
+
+  if (rs485.mock) return [];
   /* A port reached over the network is not this box's to check. */
   if (rs485.netConnect) return [];
   if (!rs485.port || rs485.exists !== false) return [];

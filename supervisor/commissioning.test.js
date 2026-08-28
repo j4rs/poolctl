@@ -173,9 +173,19 @@ describe("the RS-485 port", () => {
     expect(checkSerialPort({ ...ok, netConnect: true, exists: false })).toEqual([]);
   });
 
-  it("says nothing when the port is disabled or mocked", () => {
-    expect(checkSerialPort({ ...ok, enabled: false, exists: false })).toEqual([]);
+  it("says nothing about a mocked port", () => {
     expect(checkSerialPort({ ...ok, mock: true, exists: false })).toEqual([]);
+  });
+
+  it("says the port is switched off, and only that", () => {
+    /* Disabling comms is the bench fix for njsPC transmitting at an absent
+       pump. It also silences the missing-port check, so without this the one
+       setting whose symptom is silence would itself be silent. */
+    const found = checkSerialPort({ ...ok, enabled: false, exists: false });
+    expect(found).toHaveLength(1);
+    expect(found[0].id).toBe("rs485-disabled");
+    expect(found[0].severity).toBe("note");
+    expect(found[0].detail).toMatch(/before wiring the bus/i);
   });
 
   it("says nothing when njsPC reported no port at all", () => {

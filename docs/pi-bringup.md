@@ -458,14 +458,35 @@ above sends the whole comms object, and njsPC *still* altered a field that was
 sent unchanged: `screenlogic.password` went from `1234` to `""`. It also added
 `portSettings.flowControl: false`, which is harmless normalisation.
 
-Neither matters on this box &mdash; ScreenLogic is dormant, `systemName` is the
-placeholder `Pentair: 00-00-00`, the comms type is `local`, njsPC's own
-`/app/screenlogic` route is commented out, and `1234` is that feature's factory
-default. But it is worth knowing that `setPortAsync` does not round-trip its
-input: **diff the config before and after any write to this endpoint**, rather
-than assuming an echo preserves what it echoed. `binding.js` documents the
-opposite trap for circuit writes, where omitting a field silently sets it
-false; this is the same lesson from the other side.
+The first reading of this was that the endpoint fails to round-trip whatever
+you hand it. Reading the source is worse than that. `Comms.ts` `setPortAsync`
+resets the whole block before it looks at the request at all:
+
+```ts
+if (portId === 0) {
+    pdata.screenlogic = {
+        connectionType: "local",
+        systemName: "Pentair: 00-00-00",
+        password: ""
+    }
+}
+```
+
+`data.screenlogic` is read back only under `if (pdata.type === 'screenlogic')`,
+and this box is `type: 'local'`. So **every** `PUT /app/rs485Port` against port
+0 destroys the ScreenLogic password, whatever the body says, and no amount of
+echoing prevents it. Echo the rest of the object anyway — `pdata.mock` and
+`pdata.type` are assigned unconditionally from the request, so omitting either
+sets it `undefined` — but treat the ScreenLogic block as collateral you cannot
+protect, and **diff the config before and after any write to this endpoint**.
+`binding.js` documents the opposite trap for circuit writes, where omitting a
+field silently sets it false; this is the same lesson from the other side.
+
+None of it matters on this box &mdash; ScreenLogic is dormant, `systemName` was
+already the placeholder `Pentair: 00-00-00`, njsPC's own `/app/screenlogic`
+route is commented out, and `1234` is that feature's factory default. Somebody
+running ScreenLogic for real loses a credential silently, which is why this is
+worth reporting upstream.
 
 **What "working" looks like before the bus exists.** njsPC opens the port, sees
 nothing for `inactivityRetry` seconds, closes it and reopens:
@@ -479,6 +500,45 @@ Serial Port 0 - /dev/serial0 has been closed.
 That cycle is the correct signal, not a fault. It says the port is real and
 openable and nobody is talking, which is exactly true on a bench. It stops on
 its own the moment a pump is on the other end.
+
+**Once a pump is configured, it stops being quiet.** njsPC then has something
+to say on the bus and says it — `requestPumpStatus` every few seconds,
+`setDriveState` on every change — and each one fails against an absent
+IntelliFlo:
+
+```
+warn:  Message aborted after 2 attempt(s): 165,0,96,33,6,1,10,1,55
+error: Error sending setDriveState for IntelliFlo: Message aborted after 2 attempt(s)
+```
+
+Measured 28 August 2026: **1165 error lines an hour**, which buries anything
+real in the journal and writes to the SD card for no purpose. This was the
+foreseeable cost of pointing njsPC at `/dev/serial0` and it was dismissed at
+the time; pointing it at a port it can actually open is what let it start
+transmitting.
+
+On a bench with no bus, turn the port off rather than the pump — the pump
+config is wanted, the transmitting is not:
+
+```bash
+# read comms, flip `enabled`, send the whole object back
+curl -s http://127.0.0.1:4200/config/all \
+  | python3 -c 'import json,sys; print(json.dumps(json.load(sys.stdin)["controller"]["comms"]))' \
+  | python3 -c 'import json,sys; d=json.load(sys.stdin); d["enabled"]=False; print(json.dumps(d))' \
+  | curl -s -X PUT -H "Content-Type: application/json" --data-binary @- \
+      http://127.0.0.1:4200/app/rs485Port
+```
+
+njsPC closes the port and does not reopen it. Everything that does not need
+the bus carries on: Nixie bodies, circuits, valves, schedules and egg timers
+are internal, the supervisor's link stays up, and the relays keep being driven
+&mdash; verified with `/health` reporting `njspc: true` throughout.
+
+> **This must be undone before the bus is attached.** With
+> `comms.enabled: false` njsPC will never talk to the pump, the chlorinator or
+> anything else on RS-485, and the symptom is silence rather than an error —
+> the worst kind of setting to forget. It is not yet on the supervisor's
+> commissioning checklist.
 
 ### The rest
 
