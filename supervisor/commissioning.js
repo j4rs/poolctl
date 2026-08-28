@@ -30,16 +30,49 @@ export const NJSPC_DEFAULT_EGG_TIMER = 720;
  * not the same as knowing something is wrong.
  */
 export function checkCommissioning({
-  spaCircuit, options, njspcOnLan, passwordSet, rs485, clock,
+  spaCircuit, options, njspcOnLan, passwordSet, rs485, clock, heaters,
 } = {}) {
   return [
     ...checkPassword(passwordSet),
     ...checkExposure(njspcOnLan),
     ...checkSerialPort(rs485),
+    ...checkHeater(heaters),
     ...checkClock(clock),
     ...checkSpaEggTimer(spaCircuit),
     ...checkValveDelay(options),
   ];
+}
+
+/**
+ * Whether njsPC owns a heater at all.
+ *
+ * The heat contacts are ours to close — CH4 pool, CH5 spa — but what they
+ * follow is njsPC's `heatStatus`, and njsPC reports `Off` forever for a body
+ * with no heater configured. So an empty heater list is not a cosmetic gap:
+ * it means the Heat screen can be operated all day and no relay will ever
+ * move. Exactly the shape of fault this file exists for — everything looks
+ * right, nothing happens, and nothing says why.
+ *
+ * The same class as the pump, which has to exist in njsPC before a program
+ * can bind because the speed has nowhere else to live. A heat call has
+ * nowhere to live either.
+ *
+ * Undefined means the configuration could not be read, which is not a
+ * finding. An empty array is njsPC positively saying there are none.
+ */
+export function checkHeater(heaters) {
+  if (!Array.isArray(heaters) || heaters.length > 0) return [];
+  return [{
+    id: "heater-missing",
+    severity: "warn",
+    what: "njsPC has no heater configured",
+    detail:
+      "Calls for heat can never reach the equipment: the heat contacts " +
+      "follow njsPC's heat status, and a body with no heater reports Off " +
+      "forever. Add the heat pump in dashPanel, or " +
+      "`PUT /config/heater {type: 'heatpump', body: 'poolspa'}`. " +
+      "docs/pi-bringup.md has the command.",
+  }];
 }
 
 /**

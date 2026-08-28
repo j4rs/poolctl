@@ -197,17 +197,65 @@ all — the supervisor has better options than shelling out to a five-year-old
 binary whose channel mapping was written for a different card. One I2C write to
 `0x27` sets all eight relays at once.
 
-While CH1 is energised, confirm the **N.C. contact opens**: move the indicator
-to CH1 COM–N.C. and check it is lit when the relay is off and dark when on.
-This is the check that catches a swapped connector, and on CH1&ndash;3 a swap
-inverts the fail-safe direction of a valve.
+---
+
+## Test 1b — which *contact* closes
+
+Test 1 establishes which LED a bit lights. It says nothing about which of the
+three screws under that LED goes live, and that is a separate fact you cannot
+read off the board with confidence, because **the two connector groups are
+mirrored**:
+
+```
+RELAY 1-4   N.C. / COM / N.O.
+RELAY 5-8   N.O. / COM / N.C.
+```
+
+So a habit learned on CH1&ndash;3 is wrong from CH5 onward. Meter it.
+
+With the card **de-energised and disconnected from everything**, put a
+continuity tester on COM and each outer screw in turn, then energise that one
+relay and repeat:
+
+```bash
+i2cset -y 1 0x27 0x01 0x10     # REL4 on
+i2cset -y 1 0x27 0x01 0x00     # all off
+```
+
+| relay | bit | byte |
+|---|---|---|
+| REL1 | 0 | `0x01` |
+| REL2 | 2 | `0x04` |
+| REL3 | 6 | `0x40` |
+| REL4 | 4 | `0x10` |
+| REL5 | 5 | `0x20` |
+| REL6 | 7 | `0x80` |
+| REL7 | 3 | `0x08` |
+| REL8 | 1 | `0x02` |
+
+For each channel you intend to wire, record which screw is closed **with the
+coil off**. That screw is the fail-safe position, and this design depends on it
+being the harmless one:
+
+| channel | de-energised must be |
+|---|---|
+| CH1 intake, CH2 return | valve to **pool** |
+| CH3 bypass | **flow** through the heater — ADR-9 turns on this one |
+| CH4 pool heat, CH5 spa heat | **open**, no call |
+| CH6 blower, CH7 light | **off** |
+
+A swap on CH1&ndash;3 inverts a valve's resting position. A swap on CH4/CH5
+leaves the heater called with the controller powered down, which is the one
+outcome the whole 3-wire argument (ADR-4) exists to prevent. CH4 and CH5 are a
+matched pair that straddles the mirror, so they do **not** wire the same way as
+each other.
 
 ---
 
 ## Test 2 — clean shutdown
 
 ```bash
-8relay 0 write 1 on     # LED lit
+i2cset -y 1 0x27 0x01 0x01     # REL1 on, LED lit
 sudo shutdown -h now
 ```
 
@@ -225,7 +273,7 @@ Watch the LED through the shutdown and after the Pi is fully down.
 The one that models a tripped breaker.
 
 ```bash
-8relay 0 write 1 on     # LED lit
+i2cset -y 1 0x27 0x01 0x01     # REL1 on, LED lit
 ```
 
 Now pull the power. The LED must go out **immediately**. If it lingers, note
@@ -238,12 +286,15 @@ for how long — that is stored energy somewhere, and it is worth knowing.
 The failure ADR-10 exists for, and the one with no hardware answer.
 
 ```bash
-8relay 0 write 1 on
-sudo systemctl stop poolctl-supervisor   # or kill the process by PID
+i2cset -y 1 0x27 0x01 0x01
+sudo systemctl stop poolctl              # or kill the process by PID
 ```
 
-Expect the LED to **stay lit**: nothing commands the expander, so it holds its
-output register. That is not a bug, it is the gap. Record it, because it is the
+**Answered, 28 August 2026 — it stays lit.** Measured a different way: the
+supervisor was frozen with `kill -STOP` and the byte at register `0x01` held
+`0x40` for the whole 51 s until systemd's watchdog killed it (see
+`docs/pi-bringup.md`). Nothing commands the expander, so it holds its output
+register. That is not a bug, it is the gap. Record it, because it is the
 evidence that the fail-safe has to come from somewhere else — a supervisor that
 de-energises on its own way out, an external watchdog cutting the **coil**
 supply rather than the Pi, or an accepted risk documented against ADR-9's
@@ -256,7 +307,7 @@ Repeat with njsPC stopped instead of the supervisor.
 ## Test 5 — reboot transient
 
 ```bash
-8relay 0 write 1 on
+i2cset -y 1 0x27 0x01 0x01
 sudo reboot
 ```
 

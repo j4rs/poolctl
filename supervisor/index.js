@@ -446,6 +446,7 @@ async function reviewCommissioning() {
       passwordSet: authRequired(),
       rs485: rs485.value,
       clock: clock.value,
+      heaters: config.value?.heaters,
     });
     const changed = JSON.stringify(findings) !== JSON.stringify(own.commissioning);
     own.commissioning = findings;

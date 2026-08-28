@@ -547,6 +547,43 @@ are internal, the supervisor's link stays up, and the relays keep being driven
 > the worst kind of setting to forget. It is not yet on the supervisor's
 > commissioning checklist.
 
+### Give njsPC a heater
+
+Without this the Heat screen is decorative. `heaterCall` is derived from
+njsPC's `heatStatus`, the heat contacts follow `heaterCall`, and a body with
+no heater configured reports `Off` for ever — so the call is accepted, the
+intent succeeds, and CH4 never closes. The supervisor now raises a
+commissioning warning for it rather than leaving you to find it with a meter.
+
+```bash
+curl -sS -X PUT -H "Content-Type: application/json" -d '{
+  "id": 0,
+  "type": "heatpump",
+  "name": "Raypak",
+  "body": "poolspa",
+  "isActive": true,
+  "heatingEnabled": true,
+  "coolingEnabled": false
+}' http://127.0.0.1:4200/config/heater
+```
+
+`id: 0` means *add* — Nixie heaters are assigned an id above 256, and the
+response says which (`256` on this box). `body: "poolspa"` is one heater
+serving both, which is the physical truth: one Raypak with two call terminals.
+Leave `address` and any device binding unset — the heat pump is not on the
+RS-485 bus and the contacts are the supervisor's to close, not REM's.
+
+**Done, 28 August 2026.** Both bodies then report `heaterOptions.heatpump: 1`.
+
+Two things this does *not* do, and they matter:
+
+- It does not set a **heat mode** or a **setpoint** on either body. njsPC
+  leaves both at `Off` / `0`, so `heatStatus` is still `Off`.
+- It therefore does not, on its own, make any heat relay close.
+
+The second of those is not only a configuration question — see the note under
+*Not done, and known* about which authority owns the pool call.
+
 ### The rest
 
 - Install REM per its own documentation.
@@ -559,6 +596,26 @@ are internal, the supervisor's link stays up, and the relays keep being driven
 
 ## Not done, and known
 
+- **Nothing closes the pool heat contact.** `byteFor` sets CH4 on
+  `heaterCall === "pool"`, and `heaterCall` comes from njsPC's `heatStatus`.
+  But the pool call is the supervisor's own — `setPoolHeat` sets
+  `own.poolHeatDemand` and moves the bypass, and tells njsPC nothing, by
+  design: ADR-4 says the heater owns its setpoint, and the 3-wire interface
+  cannot carry one anyway, so writing a setpoint into njsPC would be theatre.
+  The result is that the two halves do not meet. Demonstrated with the pure
+  function rather than inferred:
+
+  ```
+  byteFor({poolHeatDemand: true, heaterCall: "off"})  ->  0x00  (all off)
+  byteFor({heaterCall: "pool"})                       ->  0x10  REL4
+  ```
+
+  So today a pool heat call moves CH3 and nothing else. Wiring the heater
+  before this is settled means wiring a contact nothing can close. The likely
+  answer is that CH4 should follow `own.poolHeatDemand` while CH5 follows
+  njsPC — "the pool call is the only one we own" is already the comment in
+  `applyCutoff` — but that also decides what `heaterCall` should mean to the
+  invariants, so it is a decision rather than a patch.
 - **No TLS.** The supervisor serves plain HTTP, so the password crosses the
   LAN readable by anything that can intercept traffic. Deferred deliberately;
   PRD §11 has the options and the reasoning.

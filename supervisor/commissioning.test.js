@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect } from "vitest";
 import {
-  checkCommissioning, checkExposure, checkSerialPort, checkClock,
+  checkCommissioning, checkExposure, checkSerialPort, checkClock, checkHeater,
   NJSPC_DEFAULT_EGG_TIMER,
 } from "./commissioning.js";
 import { SPA_TIMEOUT_MIN } from "../src/lib/sequences.js";
@@ -192,6 +192,28 @@ describe("the RS-485 port", () => {
     expect(checkSerialPort(null)).toEqual([]);
     expect(checkSerialPort(undefined)).toEqual([]);
     expect(checkSerialPort({ enabled: true })).toEqual([]);
+  });
+});
+
+describe("the heater njsPC does not have", () => {
+  it("says nothing when a heater is configured", () => {
+    expect(checkHeater([{ id: 256, type: 3, name: "Raypak" }])).toEqual([]);
+  });
+
+  it("says nothing when the configuration could not be read", () => {
+    /* Not knowing is not the same as knowing there is none. */
+    expect(checkHeater(undefined)).toEqual([]);
+    expect(checkHeater(null)).toEqual([]);
+  });
+
+  it("catches an empty list, because the contacts can then never close", () => {
+    /* The failure this exists for: the Heat screen works, the intent is
+       accepted, and no relay ever moves — heaterCall is derived from njsPC's
+       heatStatus, and a body with no heater reports Off forever. */
+    const [f] = checkHeater([]);
+    expect(f.id).toBe("heater-missing");
+    expect(f.severity).toBe("warn");
+    expect(f.detail).toMatch(/heatpump/);
   });
 });
 
