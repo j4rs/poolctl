@@ -988,6 +988,78 @@ The panel's own feed has two destinations, not five. An earlier
         are mirrored, count the screws rather than carrying muscle memory from
         the other end.
       </p>
+      <p>
+        <strong>Confirmed with a meter, 28&nbsp;August 2026</strong>, one relay
+        at a time on a bare card &mdash; not read off the silkscreen and
+        trusted. Both groups are exactly as printed, and COM is the middle
+        screw on all eight. The mirroring has a dull cause: the board is laid
+        out with 180&deg; rotational symmetry, so one silkscreen reads two ways
+        depending on which half you are facing.
+      </p>
+    </div>
+
+    <div class="note">
+      <h3>Where each relay physically is</h3>
+      <p>
+        Board landscape, GPIO header along the top, terminal blocks down the
+        left and right edges, screws running vertically in each block:
+      </p>
+      <pre class="mono">                      top
+   +-----------------------------------+
+ 8 |                                   | 1
+ 7 |          header, DIP              | 2
+ 6 |                                   | 3
+ 5 |                                   | 4
+   +-----------------------------------+</pre>
+      <p>
+        The right edge runs <span class="mono">1&ndash;2&ndash;3&ndash;4</span>
+        top to bottom; the left edge runs
+        <span class="mono">5&ndash;6&ndash;7&ndash;8</span> <em>bottom to
+        top</em>. Measured by latching each relay in turn and finding the block
+        whose contact moved, then marking the numbers on the card in
+        permanent marker.
+      </p>
+      <p>
+        This is not guessable and it is not printed anywhere useful. Everything
+        established before this point mapped <em>bits to LED labels</em>;
+        nothing tied an LED to the terminal block beside it, and on this card
+        that adjacency is not a safe assumption. Work from the numbers on the
+        card, or repeat the measurement &mdash;
+        <span class="mono">docs/bench-relays.md</span>, Test&nbsp;1b.
+      </p>
+      <table>
+        <thead><tr><th>Channel</th><th>Relay</th><th>Edge</th><th>Safe state</th><th>Screw to use</th></tr></thead>
+        <tbody>
+          <tr><td>Intake valve</td><td class="mono">1</td><td>right, 1st</td><td>pool</td><td class="mono">top &middot; N.C.</td></tr>
+          <tr><td>Return valve</td><td class="mono">2</td><td>right, 2nd</td><td>pool</td><td class="mono">top &middot; N.C.</td></tr>
+          <tr><td>Bypass valve</td><td class="mono">3</td><td>right, 3rd</td><td>flow through heater</td><td class="mono">top &middot; N.C.</td></tr>
+          <tr><td>Pool heat</td><td class="mono">4</td><td>right, 4th</td><td>contact open</td><td class="mono">bottom &middot; N.O.</td></tr>
+          <tr><td>Spa heat</td><td class="mono">5</td><td>left, bottom</td><td>contact open</td><td class="mono">top &middot; N.O.</td></tr>
+          <tr><td>Blower</td><td class="mono">6</td><td>left, 3rd</td><td>off</td><td class="mono">top &middot; N.O.</td></tr>
+          <tr><td>Light</td><td class="mono">7</td><td>left, 2nd</td><td>off</td><td class="mono">top &middot; N.O.</td></tr>
+          <tr><td>Spare</td><td class="mono">8</td><td>left, top</td><td>&mdash;</td><td>&mdash;</td></tr>
+        </tbody>
+      </table>
+      <p>
+        Every one of these pairs with COM, the middle screw.
+      </p>
+    </div>
+
+    <div class="note stop">
+      <h3>The heater pair does not wire symmetrically</h3>
+      <p>
+        Pool heat and spa heat straddle the boundary between the two groups, so
+        the matched pair takes <em>different</em> screws:
+        <span class="mono">CH4</span> is the <strong>bottom</strong> screw and
+        <span class="mono">CH5</span> is the <strong>top</strong> one. Both are
+        N.O., because a heat call must be absent when the coil is.
+      </p>
+      <p>
+        This is the easiest mistake available on this card and it fails in the
+        worst direction. Wire the two alike and one of them sits closed while
+        the supervisor believes the heater is idle &mdash; a heat call nobody
+        made and nothing in software can see.
+      </p>
     </div>
 
     <div class="note stop">
