@@ -183,8 +183,42 @@ function publish() {
 let lastEvaluatedAt = null;
 let lastEvaluationError = null;
 
+/**
+ * Break `evaluate()` on purpose, to exercise the half of the watchdog that
+ * cannot be reached any other way.
+ *
+ * The wedge test — `kill -STOP` — freezes the whole process, so it proves
+ * systemd notices a supervisor that has stopped pinging. It says nothing
+ * about the case the health condition was actually written for: a process
+ * that is alive, answering HTTP, holding sockets open, and no longer
+ * thinking. That one has to be manufactured.
+ *
+ * `SIGUSR2` makes every subsequent evaluation throw. Persistent, not
+ * one-shot: a single throw is cleared by the next good tick long before the
+ * 60 s window elapses, so it would prove nothing. Only a restart clears it —
+ * and if the watchdog is doing its job, the restart is what clears it.
+ *
+ * There is deliberately no network path to this, for the same reason
+ * `passwd.js` has none. It needs a shell on the box, and anyone with a shell
+ * can `systemctl stop poolctl`, which is strictly worse.
+ *
+ * Note that this displaces Node's default `SIGUSR2` behaviour, which is to
+ * terminate. That is the point: without a listener the signal would kill the
+ * process outright and the test would prove nothing about the watchdog.
+ */
+let injectedFault = null;
+
+process.on("SIGUSR2", () => {
+  if (injectedFault) return;
+  injectedFault = "fault injected by SIGUSR2";
+  console.error("SIGUSR2: evaluate() will throw from now on. The watchdog should");
+  console.error("         withhold its ping and systemd should restart this");
+  console.error("         service. Only a restart clears this.");
+});
+
 function evaluate() {
   try {
+    if (injectedFault) throw new Error(injectedFault);
     const view = toUiState(njsRaw, own);
     applyCutoff(view);
     const settled = toUiState(njsRaw, own);
@@ -987,9 +1021,21 @@ const server = createServer(async (req, res) => {
   if (req.url === "/health") {
     /* Left open, and kept free of pool state for that reason. A watchdog
        needs to reach this without a session, and "is the process alive" is
-       not worth protecting. */
+       not worth protecting.
+
+       `thinking` is the distinction this endpoint could not previously make.
+       A supervisor whose evaluation loop has died still binds the port, still
+       answers here, and still holds every socket open — so `ok: true` alone
+       reports a healthy process that has stopped supervising. This is the
+       same condition the watchdog withholds its ping on, read from the same
+       function, so a human can see the state that is about to cause a
+       restart rather than only its aftermath in the journal. */
+    const think = evaluationStatus();
     res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ ok: true, njspc: own.connected, lastSeen: own.lastSeen }));
+    res.end(JSON.stringify({
+      ok: true, njspc: own.connected, lastSeen: own.lastSeen,
+      thinking: think.ok, ...(think.ok ? {} : { why: think.why }),
+    }));
     return;
   }
   if (req.url === "/state") {
@@ -1094,14 +1140,19 @@ async function deEnergise(why) {
 const heartbeat = setInterval(evaluate, HEARTBEAT_MS);
 const recheck = setInterval(reviewCommissioning, COMMISSIONING_MS);
 
-const watchdog = createWatchdog({
-  isHealthy: () => evaluationHealth({
+/* One definition, two readers: the watchdog decides whether to ping on it and
+   /health reports it. They must not be able to disagree about whether this
+   process is still thinking. */
+function evaluationStatus() {
+  return evaluationHealth({
     lastEvaluatedAt, lastError: lastEvaluationError,
     now: Date.now(),
     /* Three heartbeats. One missed tick is scheduling; three is a wedge. */
     staleAfterMs: HEARTBEAT_MS * 3,
-  }),
-});
+  });
+}
+
+const watchdog = createWatchdog({ isHealthy: evaluationStatus });
 
 server.listen(PORT, async () => {
   console.log(`supervisor v0 on http://localhost:${PORT}  ->  njsPC at ${NJSPC_URL}`);

@@ -611,9 +611,44 @@ escalation to SIGKILL never ran — it died 13 ms after the signal. And **the
 relays held `0x40` for the whole 51 s**, which is the latching behaviour above,
 observed rather than argued.
 
-What this does not cover: the withhold path. `evaluationHealth` also stops
-petting when `evaluate()` throws or goes stale while the process is otherwise
-alive, and that half is unit-tested only.
+### The other half: alive, and no longer thinking
+
+A frozen process is the easy case. The condition in `evaluationHealth` was
+written for the subtler one — a supervisor that still binds the port, still
+answers HTTP and still holds every socket open, whose evaluation loop has
+died. `kill -STOP` cannot produce that, so the supervisor can produce it on
+demand: **`kill -USR2` makes every subsequent `evaluate()` throw**, and only a
+restart clears it. There is no network path to it, deliberately.
+
+`/health` gained a second field for the same reason. `ok: true` alone reports
+a process, not a supervisor:
+
+```
+before   {"ok":true,"njspc":true,"thinking":true}
+after    {"ok":true,"njspc":true,"thinking":false,
+          "why":"last evaluation threw: fault injected by SIGUSR2"}
+```
+
+Run 28 August 2026:
+
+```
+11:53:00  kill -USR2, relay byte 0x40
+11:53:13  watchdog: withholding the ping — last evaluation threw: ...
+11:53:54  poolctl.service: Watchdog timeout (limit 1min)!  SIGABRT
+11:53:59  restarted — relays 0x00 (boot), then 0x40
+```
+
+Thirteen seconds to notice (the watchdog ticks every 20 s), 54 s to the kill,
+59 s to healthy. The withholding line appeared **exactly once** across the
+whole minute, which is the "say it once" rule doing its job — the journal has
+to explain the kill that follows, not bury it.
+
+One thing this exposed. `evaluate()` is not the only caller of `publish()` —
+the njsPC link publishes on every reconnect attempt — so **a phone goes on
+receiving state frames from a supervisor that has stopped supervising**. The
+stream never went quiet. That is why the state needed reporting somewhere a
+human can read it, rather than being inferred from traffic; it is asserted in
+`index.test.js` so nobody later "fixes" it by assuming silence.
 
 ---
 

@@ -68,6 +68,8 @@ export async function start({ stateFile, njspcUrl, authFile } = {}) {
     port,
     output,
     url: (path) => `http://127.0.0.1:${port}${path}`,
+    /** Send a signal and carry on — the process is expected to survive it. */
+    signal(sig) { proc.kill(sig); },
     /** SIGTERM, then wait. Resolves with how it exited. */
     async term({ patience = 4000 } = {}) {
       proc.kill("SIGTERM");

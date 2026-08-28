@@ -426,6 +426,79 @@ describe("across a restart", () => {
   }, 30000);
 });
 
+describe("a supervisor that has stopped thinking", () => {
+  /**
+   * The half of the watchdog `kill -STOP` cannot reach.
+   *
+   * A frozen process obviously stops pinging. The condition in
+   * `evaluationHealth` was written for something subtler and more likely: a
+   * process that is alive, bound, answering HTTP and holding sockets open,
+   * whose evaluation loop has died. `SIGUSR2` manufactures exactly that.
+   */
+  /* `thinking` is false for the first few seconds of every boot — the first
+     evaluation happens one heartbeat in, and until then there is genuinely
+     nothing to report. Wait for it rather than sleeping a guess. The
+     watchdog's own first tick is a third of its window away, so this window
+     never costs a restart in production. */
+  const thinking = async (sup, want, ms = HEARTBEAT_MS * 3) => {
+    const deadline = Date.now() + ms;
+    for (;;) {
+      const h = await (await fetch(sup.url("/health"))).json();
+      if (h.thinking === want) return h;
+      if (Date.now() > deadline) {
+        throw new Error(`thinking never became ${want}: ${JSON.stringify(h)}`);
+      }
+      await new Promise((r) => setTimeout(r, 250));
+    }
+  };
+
+  it("keeps serving, stops publishing, and says it is not thinking", async () => {
+    const sup = await start();
+    const client = await connect(sup.port);
+    await thinking(sup, true);
+
+    sup.signal("SIGUSR2");
+    /* Still a live HTTP server — this is the whole point. A dead process
+       would be caught by anything; this one looks fine from the outside. */
+    const after = await thinking(sup, false);
+    expect(after.ok, "the process should still be answering").toBe(true);
+    expect(after.why).toMatch(/last evaluation threw/);
+
+    /* And it keeps talking to the phones. `evaluate()` is not the only
+       caller of publish() — the njsPC link publishes on every reconnect
+       attempt — so a client goes on receiving state from a supervisor that
+       has stopped supervising. Asserted rather than merely noted, because it
+       is the reason this endpoint needed a second field: "frames are still
+       arriving" is not evidence that anything is being checked. */
+    const seen = client.frames.length;
+    await new Promise((r) => setTimeout(r, HEARTBEAT_MS + 1000));
+    expect(client.frames.length, "the stream should not have gone quiet")
+      .toBeGreaterThan(seen);
+
+    await sup.stop();
+  }, 40000);
+
+  it("is one-way: a second signal changes nothing", async () => {
+    /* A toggle would invite using this as a live switch. The only thing that
+       clears the fault is a restart — which, on the Pi, the watchdog
+       provides. */
+    const sup = await start();
+    await connect(sup.port);
+    await thinking(sup, true);
+    sup.signal("SIGUSR2");
+    await thinking(sup, false);
+    sup.signal("SIGUSR2");
+    await new Promise((r) => setTimeout(r, HEARTBEAT_MS + 1000));
+
+    const health = await (await fetch(sup.url("/health"))).json();
+    expect(health.thinking).toBe(false);
+    const armed = sup.output.join("").match(/SIGUSR2: evaluate\(\) will throw/g) ?? [];
+    expect(armed, "should have armed once, not twice").toHaveLength(1);
+
+    await sup.stop();
+  }, 40000);
+});
+
 describe("shutting down", () => {
   it("exits on SIGTERM even with a browser still attached", async () => {
     /* systemd sends SIGTERM and waits. A supervisor that lingers because a
