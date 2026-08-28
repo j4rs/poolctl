@@ -10,10 +10,32 @@ import { C, FONT_UI } from "../theme";
  * that `aria-pressed` does not move while armed: nothing has happened yet,
  * and a toggle that reads as switched before it has switched is the same lie
  * as one that moves because you touched it.
+ *
+ * The height is fixed at two lines' worth whether or not there is a second
+ * line. Sizing to content made the control ~18 px shorter whenever it had
+ * nothing to say, so a reason arriving or a confirmation arming resized the
+ * button under the thumb — and these sit in a stretch row, so one growing
+ * dragged its neighbour with it and shifted everything below. A control that
+ * moves while you are aiming at it is the same class of problem as one that
+ * reads as switched before it is.
+ *
+ * Reserved rather than always-rendered so a lone label still sits in the
+ * middle of its box: an empty second line would hold the space but push the
+ * label off centre.
  */
+
+/*
+ * Two lines: 14+14 padding, 2 border, 15.6 label (13 x 1.2), 4 gap, 13.65
+ * second line (10.5 x 1.3). Both line heights are set explicitly below so
+ * this arithmetic stays true; `minHeight` rather than `height` so a reason
+ * that wraps on a narrow phone can still take the room it needs.
+ */
+const TWO_LINES = 63.25;
+
 export default function Toggle({ label, on, disabled, reason, armed, confirmLabel, onClick }) {
   const showReason = Boolean(disabled && reason);
   const prompt = armed && !disabled ? (confirmLabel ?? "Tap again to confirm") : null;
+  const second = prompt ?? (showReason ? reason : null);
   return (
     <button
       onClick={onClick}
@@ -31,6 +53,7 @@ export default function Toggle({ label, on, disabled, reason, armed, confirmLabe
         alignItems: "center",
         justifyContent: "center",
         gap: 4,
+        minHeight: TWO_LINES,
         padding: "14px 8px",
         borderRadius: 10,
         border: `1px solid ${prompt ? C.heat : on ? C.water : C.line}`,
@@ -44,15 +67,15 @@ export default function Toggle({ label, on, disabled, reason, armed, confirmLabe
         transition: "all 160ms ease",
       }}
     >
-      <span>{label}</span>
-      {showReason && (
-        <span style={{ fontSize: 10.5, fontWeight: 400, color: C.faint, lineHeight: 1.3 }}>
-          {reason}
-        </span>
-      )}
-      {prompt && (
-        <span style={{ fontSize: 10.5, fontWeight: 400, color: C.heat, lineHeight: 1.3 }}>
-          {prompt}
+      <span style={{ lineHeight: 1.2 }}>{label}</span>
+      {/* `aria-hidden`: the reason and the prompt are already in the
+          accessible name, and reading them twice is worse than not at all. */}
+      {second && (
+        <span aria-hidden="true" style={{
+          fontSize: 10.5, fontWeight: 400, lineHeight: 1.3,
+          color: prompt ? C.heat : C.faint,
+        }}>
+          {second}
         </span>
       )}
     </button>

@@ -175,6 +175,31 @@ describe("Toggle", () => {
     expect(b.getAttribute("aria-label")).toMatch(/^Blower/);
   });
 
+  /* jsdom has no layout, so the rendered height cannot be asserted here.
+     What can be pinned is the reservation that produces it: the same floor
+     in every state, so nothing a state change adds can resize the button.
+     Measured in a browser before and after — 44 px quiet against 61.6 px
+     with a second line, now 63.25 px throughout. */
+  it("reserves the same height in every state, so the button never resizes", () => {
+    const floor = (el) => el.querySelector("button").style.minHeight;
+    const { container: quiet } = render(<Toggle label="Light" onClick={vi.fn()} />);
+    const { container: reasoned } = render(
+      <Toggle label="Blower" disabled reason="Available in spa mode" onClick={vi.fn()} />);
+    const { container: armed } = render(
+      <Toggle label="Blower" armed confirmLabel="Tap again to start it" onClick={vi.fn()} />);
+    expect(floor(quiet)).toBeTruthy();
+    expect(floor(reasoned)).toBe(floor(quiet));
+    expect(floor(armed)).toBe(floor(quiet));
+  });
+
+  it("does not repeat the reason to a screen reader", () => {
+    /* It is already in the accessible name. Reading it twice is worse than
+       not reading it at all. */
+    render(<Toggle label="Blower" disabled reason="Available in spa mode" onClick={vi.fn()} />);
+    const second = screen.getByRole("button").querySelectorAll("span")[1];
+    expect(second.getAttribute("aria-hidden")).toBe("true");
+  });
+
   it("does not fire while disabled", () => {
     const onClick = vi.fn();
     render(<Toggle label="Blower" disabled reason="nope" onClick={onClick} />);
