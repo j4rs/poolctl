@@ -139,7 +139,8 @@ client surfaces every one.
 | njsPC dies or wedges | supervisor's calls fail; readings go null | supervisor keeps running and reports. It does not restart itself: `evaluate()` still completes, and a restart would not fix njsPC |
 | REM dies | njsPC relay ops fail | nothing — the supervisor drives the relays itself, and njsPC's valves are configured with no device binding |
 | Pi loses power | — | **nothing** — the HDR-60-5 feeds the HAT upstream of the Pi, so the expander stays powered and latched |
-| HAT loses power | — | relays de-energise: valves to pool, bypass to flow, heater open, blower off |
+| HAT loses 5 V, mains still up | — | relays de-energise and the valves **move**: the N.C. line goes live and drives them to pool / bypass to flow. Heater contacts open, blower off |
+| Mains lost entirely | — | relays de-energise but **nothing moves** — no 24 VAC to drive an actuator, so each valve stays where it was, held by gearing. Harmless: no pump, no heater, no call. Corrected at the next boot, which de-energises to `0x00` before serving anything |
 | Client loses network | client's own staleness timer | nothing happens to equipment — the entire point of ADR-7 |
 | Valve position drifts | nothing; there is no feedback | re-driven to pool on every boot |
 | Valve de-energises mid-hold | nothing yet | open question — REM `latch` semantics against a PE24GVA SPDT selector |
