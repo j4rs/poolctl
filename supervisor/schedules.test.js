@@ -2,7 +2,8 @@
 import { describe, it, expect } from "vitest";
 import {
   daysToMask, maskToDays, toClock, toMinutes, toUiSchedule,
-  isRealSchedule, whyNotSchedulable, scheduleConfig, REPEATS, HEAT_NO_CHANGE,
+  isRealSchedule, whyNotSchedulable, scheduleConfig, REPEATS,
+  HEAT_NO_CHANGE_FALLBACK, noChangeHeatSource,
 } from "./schedules.js";
 
 /**
@@ -196,7 +197,7 @@ describe("writing a schedule back", () => {
     expect(scheduleConfig(ui)).toEqual({
       id: 3, circuit: 6, startTime: 480, endTime: 1080, scheduleDays: 127,
       scheduleType: REPEATS, startTimeType: 0, endTimeType: 0,
-      disabled: false, heatSource: HEAT_NO_CHANGE, changeHeatSetpoint: false,
+      disabled: false, heatSource: HEAT_NO_CHANGE_FALLBACK, changeHeatSetpoint: false,
     });
   });
 
@@ -214,7 +215,7 @@ describe("writing a schedule back", () => {
     /* njsPC inherits heatSource from the stored schedule when absent, so an
        edit succeeds and a create fails with "Invalid heat source:
        undefined". Live bug, found on the first create. */
-    expect(scheduleConfig({ ...ui, id: undefined }).heatSource).toBe(HEAT_NO_CHANGE);
+    expect(scheduleConfig({ ...ui, id: undefined }).heatSource).toBe(HEAT_NO_CHANGE_FALLBACK);
   });
 
   it("never lets a schedule touch the heater", () => {
@@ -223,10 +224,35 @@ describe("writing a schedule back", () => {
        ADR-4. Sent explicitly rather than trusting njsPC's default, which is
        guarded by a `typeof` around a comparison and never actually runs. */
     expect(scheduleConfig(ui).changeHeatSetpoint).toBe(false);
-    /* 32 is njsPC's "No Change". */
-    expect(scheduleConfig(ui).heatSource).toBe(HEAT_NO_CHANGE);
+    expect(scheduleConfig(ui).heatSource).toBe(HEAT_NO_CHANGE_FALLBACK);
     expect(scheduleConfig(ui)).not.toHaveProperty("heatSetpoint");
   });
+
+  it("takes the no-change value njsPC actually offers, not a constant", () => {
+    /* The live 400. NixieBoard's constructor map has nochange at 32, but
+       updateHeaterServices() rebuilds it and puts nochange at 0 — so a rig
+       with a heat pump rejects 32 outright. */
+    const live = [
+      { val: 1, name: "off", desc: "Off" },
+      { val: 9, name: "heatpump", desc: "Heat Pump" },
+      { val: 0, name: "nochange", desc: "No Change" },
+    ];
+    expect(noChangeHeatSource(live)).toBe(0);
+    expect(scheduleConfig(ui, { heatSource: noChangeHeatSource(live) }).heatSource).toBe(0);
+  });
+
+  it("reads the keyed shape too, because njsPC serialises value maps both ways", () => {
+    expect(noChangeHeatSource({ 1: { name: "off" }, 32: { name: "nochange" } })).toBe(32);
+  });
+
+  it("falls back rather than refusing when njsPC offers nothing usable", () => {
+    /* A save that fails because an options lookup failed would be a worse
+       bug than the one this replaces. */
+    for (const junk of [undefined, null, [], {}, [{ val: 1, name: "off" }]]) {
+      expect(noChangeHeatSource(junk)).toBe(HEAT_NO_CHANGE_FALLBACK);
+    }
+  });
+
 
   it("carries the enabled toggle across as njsPC's inverse", () => {
     expect(scheduleConfig({ ...ui, enabled: false }).disabled).toBe(true);

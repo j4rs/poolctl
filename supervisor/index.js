@@ -23,7 +23,7 @@ import {
 } from "./binding.js";
 import { checkCommissioning } from "./commissioning.js";
 import { access } from "node:fs/promises";
-import { scheduleConfig, whyNotSchedulable } from "./schedules.js";
+import { scheduleConfig, whyNotSchedulable, noChangeHeatSource } from "./schedules.js";
 import { byteFor, describe as describeRelays } from "./relays.js";
 import { createHat, available as hatAvailable } from "./hat.js";
 import { createWatchdog, evaluationHealth } from "./watchdog.js";
@@ -552,6 +552,33 @@ async function unbind(id) {
  * is refused explicitly rather than silently ignored — a control that appears
  * to work and does nothing is worse than one that says no.
  */
+/**
+ * njsPC's value for "leave the heater alone", read from njsPC rather than
+ * assumed.
+ *
+ * It is not a constant: `NixieBoard`'s constructor says 32, and
+ * `updateHeaterServices()` rebuilds the map from the installed heater types
+ * and puts `nochange` at 0. Sending the wrong one is a 400 at save time —
+ * "Invalid heat source: 32" — which is how this was found.
+ *
+ * Cached after the first success, because it only changes when heaters are
+ * added or removed, and a failed lookup must not stop somebody saving a
+ * schedule: falling back to the documented default is better than refusing.
+ */
+let heatSourceCache = null;
+
+async function heatSourceOpts() {
+  if (heatSourceCache !== null) return { heatSource: heatSourceCache };
+  try {
+    const opts = await njs.get("/config/options/schedules");
+    heatSourceCache = noChangeHeatSource(opts?.heatSources);
+  } catch (err) {
+    console.warn(`could not read njsPC heat sources (${err.message}); using the default`);
+    return {};
+  }
+  return { heatSource: heatSourceCache };
+}
+
 const intents = {
   /**
    * Pump speed.
@@ -794,7 +821,7 @@ const intents = {
   async saveSchedule({ schedule }) {
     const why = whyNotSchedulable(schedule);
     if (why) throw refuse(why);
-    await njs.setScheduleConfig(scheduleConfig(schedule));
+    await njs.setScheduleConfig(scheduleConfig(schedule, await heatSourceOpts()));
   },
 
   async deleteSchedule({ id }) {
@@ -813,7 +840,8 @@ const intents = {
   async setScheduleEnabled({ id, on }) {
     const current = (ui?.schedules ?? []).find((s) => s.id === Number(id));
     if (!current) throw refuse(`no schedule '${id}'`);
-    await njs.setScheduleConfig(scheduleConfig({ ...current, enabled: Boolean(on) }));
+    await njs.setScheduleConfig(
+      scheduleConfig({ ...current, enabled: Boolean(on) }, await heatSourceOpts()));
   },
 
   async setTarget({ body, degrees, delta }) {

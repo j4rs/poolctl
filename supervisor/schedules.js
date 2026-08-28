@@ -37,8 +37,36 @@ export const REPEATS = 128;
  * The value we want is the one that changes nothing. A schedule can
  * otherwise carry a setpoint and impose it when it fires, which would put a
  * second authority on the heater and walk straight through ADR-4.
+ *
+ * **The number is not a constant, and assuming it was cost a live 400.**
+ * `NixieBoard`'s constructor builds the map with `32 = nochange`, which is
+ * where 32 came from and it was true when it was written. But
+ * `updateHeaterServices()` rebuilds that map from the installed heater types
+ * and merges `[0, nochange]` at the end — so on a running system with a heat
+ * pump the valid set is `{0 nochange, 1 off, 9 heatpump}` and 32 is rejected
+ * with "Invalid heat source: 32".
+ *
+ * So resolve it by *name* from njsPC's own options, and treat 32 only as the
+ * last-resort default for a board that has never rebuilt its map.
  */
-export const HEAT_NO_CHANGE = 32;
+export const HEAT_NO_CHANGE_FALLBACK = 32;
+
+/**
+ * Pick the "no change" value out of njsPC's `heatSources` options.
+ *
+ * Tolerates the two shapes njsPC serialises value maps in — a bare array of
+ * `{val,name}` and an object keyed by value — because the state and config
+ * routes have disagreed on exactly this before.
+ */
+export function noChangeHeatSource(heatSources) {
+  const entries = Array.isArray(heatSources)
+    ? heatSources
+    : Object.entries(heatSources ?? {}).map(([val, v]) => ({ val: Number(val), ...v }));
+  const found = entries.find((e) => e && e.name === "nochange");
+  return found && Number.isFinite(Number(found.val))
+    ? Number(found.val)
+    : HEAT_NO_CHANGE_FALLBACK;
+}
 
 /**
  * Bit position for a `Date#getDay` index, per `NixieBoard`'s scheduleDays
@@ -172,7 +200,7 @@ export function whyNotSchedulable(s) {
  * always truthy and the fallback never runs. Saying it outright costs one
  * line and does not depend on that being fixed.
  */
-export function scheduleConfig(s) {
+export function scheduleConfig(s, { heatSource = HEAT_NO_CHANGE_FALLBACK } = {}) {
   return {
     /* 0 asks njsPC for the next free slot. */
     id: s.id == null || String(s.id).startsWith("new-") ? 0 : s.id,
@@ -186,7 +214,7 @@ export function scheduleConfig(s) {
     disabled: s.enabled === false,
     /* Both halves of "do not touch the heater" — the source that changes
        nothing, and the flag that stops a setpoint being imposed. */
-    heatSource: HEAT_NO_CHANGE,
+    heatSource,
     changeHeatSetpoint: false,
   };
 }

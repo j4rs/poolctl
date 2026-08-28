@@ -252,6 +252,89 @@ each other.
 
 ---
 
+## Test 1b — which screw is which, and where each relay lives
+
+Measured 28 August 2026 with a Klein MM325 on continuity, card bare, driven
+one relay at a time over I2C from the Pi. Nothing was inferred from position
+or from the LEDs: each relay was latched on indefinitely, the block that
+changed was found by probing, and the block was then labelled on the card.
+
+Orientation for everything below: **board landscape, GPIO header along the
+top, terminal blocks down the left and right edges, screws running vertically
+in each block.**
+
+### Where the relays are
+
+```
+                          top
+      +--------------------------------------+
+  8 --|                                      |-- 1
+  7 --|            (header, DIP)             |-- 2
+  6 --|                                      |-- 3
+  5 --|                                      |-- 4
+      +--------------------------------------+
+```
+
+The right edge runs **1-2-3-4 top to bottom**; the left edge runs **5-6-7-8
+bottom to top**. The board is laid out with 180-degree rotational symmetry,
+which is the whole explanation for the "mirrored" connector groups — the same
+silkscreen printed in board coordinates reads reversed on the two halves when
+you look at both from the same side.
+
+### Which screw is which
+
+| group | blocks | top | middle | bottom |
+|---|---|---|---|---|
+| `RELAY 1-4` | right edge | **N.C.** | COM | **N.O.** |
+| `RELAY 5-8` | left edge | **N.O.** | COM | **N.C.** |
+
+COM is the middle screw on all eight. **The silkscreen is honest** — both
+groups read exactly as printed. That was the thing in doubt, and it is now
+measured rather than trusted.
+
+Raw readings, for anyone who wants to re-derive it. The pair that beeps:
+
+| relay | coil off | coil on |
+|---|---|---|
+| 1 | top-middle | bottom-middle |
+| 2 | top-middle | bottom-middle |
+| 3 | top-middle | bottom-middle |
+| 4 | top-middle | bottom-middle |
+| 5 | middle-bottom | top-middle |
+| 6 | middle-bottom | top-middle |
+| 7 | middle-bottom | top-middle |
+| 8 | middle-bottom | top-middle |
+
+*(REL1 was taken with the board portrait and mapped across; REL2-4 were
+measured directly in the landscape orientation and agree, so the group result
+does not rest on the rotation.)*
+
+### What to actually wire
+
+The fail-safe convention is that **de-energised is safe** — so anything whose
+safe state is *off* takes **N.O.**, and anything whose safe state is *a
+position* takes **N.C.** for that position. Combined with the table above:
+
+| channel | relay | safe state | use the screw |
+|---|---|---|---|
+| Intake valve | 1 | pool | **top** (N.C.) |
+| Return valve | 2 | pool | **top** (N.C.) |
+| Bypass valve | 3 | **flow through heater** (ADR-9) | **top** (N.C.) |
+| Pool heat | 4 | contact open | **bottom** (N.O.) |
+| Spa heat | 5 | contact open | **top** (N.O.) |
+| Blower | 6 | off | **top** (N.O.) |
+| Light | 7 | off | **top** (N.O.) |
+| Spare | 8 | — | — |
+
+**The heater pair straddles the group boundary and does not wire
+symmetrically.** Pool heat is the *bottom* screw and spa heat is the *top*
+one, despite being a matched pair doing the same job. This is the single
+easiest mistake available on this card, and it fails in the worst direction:
+wire them alike and one of them calls for heat whenever the supervisor thinks
+it is idle.
+
+Every one of these pairs with COM, the middle screw.
+
 ## Test 2 — clean shutdown
 
 ```bash
