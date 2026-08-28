@@ -1881,7 +1881,8 @@ temperature (read from source).
 - nodejs-poolController (njsPC) — https://github.com/tagyoureit/nodejs-poolController
 - relayEquipmentManager (REM) — https://github.com/rstrouse/relayEquipmentManager
 - dashPanel — https://github.com/rstrouse/nodejs-poolController-dashPanel
-- 8relay-rpi, Sequent's driver for the relay HAT — https://github.com/SequentMicrosystems/8relay-rpi
+- 8relind-rpi, whose remap table matches this card — https://github.com/SequentMicrosystems/8relind-rpi
+- 8relay-rpi, named by the product page but **wrong for this board** — https://github.com/SequentMicrosystems/8relay-rpi
 
 ### Reported upstream
 

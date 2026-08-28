@@ -84,13 +84,15 @@ I2C address, nothing more — so the mapping has to be established by eye, once,
 on this card:
 
 ```bash
-cd ~/8relay-rpi && make          # build only; see below on installing
-for n in 1 2 3 4 5 6 7 8; do
-  ./8relay 0 write $n on
-  printf "ch%d -> port 0x%s  " "$n" "$(i2cget -y 1 0x27 | sed 's/0x//')"
-  read -p "which REL LED is lit? " led; echo "  ch$n = REL$led"
-  ./8relay 0 write $n off
+# One bit at a time, straight to the card. No driver, and nothing to be wrong
+# about: whichever single LED lights is that bit's relay.
+for bit in 0 1 2 3 4 5 6 7; do
+  printf -v mask '0x%02x' $((1 << bit))
+  i2cset -y 1 0x27 0x01 $mask
+  read -p "bit $bit ($mask) — which REL number is lit? " rel
+  echo "  bit $bit = REL$rel"
 done
+i2cset -y 1 0x27 0x01 0x00
 ```
 
 Record the full table. `ch<n> = REL<n>` throughout means the driver matches the

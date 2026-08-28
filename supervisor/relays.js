@@ -10,11 +10,16 @@
  * and both cost an evening to find. See `docs/bench-relays.md`.
  *
  * **The bit order is not the relay order.** The expander's pins are routed to
- * whichever relay was nearest on the board, so channel N is not bit N-1. That
- * is normal and expected. What is not expected is that Sequent's own driver
- * carries the wrong table for this hardware revision: its channels 6, 7 and 8
- * close relays 7, 8 and 6. Reported upstream as 8relay-rpi#7. We do not use
- * that driver, and this module is why.
+ * whichever relay was nearest on the board, so relay N is not bit N-1. That is
+ * normal, and it is why every driver for these cards carries a remap table.
+ *
+ * The catch is which table. This board was bought as *Eight Relays* and its
+ * product page names `8relay-rpi`, but its routing is `8relind-rpi`'s — the
+ * *Industrial* card's driver — matching in all eight entries. Drive it with
+ * `8relay-rpi` and only channels 1 and 2 land where you asked; the rest reach
+ * relays 8, 7, 3, 4, 5 and 6. `8relay 0 write 8 on` is nominally the spare and
+ * closes REL6, the blower contactor. Raised upstream as 8relay-rpi#7, though
+ * this module means we do not depend on the answer.
  *
  * **Write the whole byte; never read-modify-write.** Both Sequent bindings
  * change one channel by reading the port back, flipping a bit and writing it
