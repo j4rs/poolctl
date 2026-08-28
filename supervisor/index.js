@@ -24,6 +24,9 @@ import {
 import { checkCommissioning } from "./commissioning.js";
 import { access } from "node:fs/promises";
 import { scheduleConfig, whyNotSchedulable } from "./schedules.js";
+import { byteFor, describe as describeRelays } from "./relays.js";
+import { createHat, available as hatAvailable } from "./hat.js";
+import { createWatchdog, evaluationHealth } from "./watchdog.js";
 
 /**
  * poolctl supervisor — v0.
@@ -167,11 +170,47 @@ function publish() {
  * owner set. Correcting equipment on the strength of a snapshot is how a
  * supervisor makes a bad situation worse.
  */
+/* The watchdog asks these two questions and nothing else: did an evaluation
+   finish, and did it finish cleanly. See watchdog.js for why it deliberately
+   does not ask whether the invariants were satisfied. */
+let lastEvaluatedAt = null;
+let lastEvaluationError = null;
+
 function evaluate() {
-  const view = toUiState(njsRaw, own);
-  applyCutoff(view);
-  own.violations = checkInvariants(toUiState(njsRaw, own));
-  publish();
+  try {
+    const view = toUiState(njsRaw, own);
+    applyCutoff(view);
+    const settled = toUiState(njsRaw, own);
+    own.violations = checkInvariants(settled);
+    driveRelays(settled);
+    publish();
+    lastEvaluatedAt = Date.now();
+    lastEvaluationError = null;
+  } catch (err) {
+    /* Recorded rather than swallowed. The loop keeps running so a transient
+       does not take the process down, but the watchdog stops pinging, so a
+       persistent one ends in a restart instead of a supervisor that looks
+       alive and has stopped thinking. */
+    lastEvaluationError = err.message;
+    console.error(`evaluate() threw: ${err.stack || err.message}`);
+  }
+}
+
+/**
+ * The card follows the state; it is never commanded directly.
+ *
+ * `set` writes only when the byte changes, so this is free on the heartbeat
+ * and costs one process spawn on an actual valve move. Failures are reported
+ * by `hat` once and do not throw here — a card that has gone away must not
+ * stop the supervisor evaluating, because everything else it does still works
+ * and the Water screen is how anyone finds out.
+ */
+function driveRelays(view) {
+  if (!hat) return;
+  const byte = byteFor(view);
+  hat.set(byte).then((r) => {
+    if (r.written) console.log(`relays -> ${describeRelays(byte)}`);
+  }).catch(() => {});
 }
 
 /**
@@ -988,11 +1027,63 @@ njs.start();
 /* The heartbeat evaluates rather than merely republishing: njsPC only speaks
    when something changes, and "nothing changed" is exactly the condition a
    stuck heat call presents. */
+/**
+ * The relay card, and the two moments its state is asserted rather than
+ * followed.
+ *
+ * `RELAYS=off` disables all of it — for running the supervisor on a laptop, or
+ * on a Pi whose card is not to be touched. Absent a card, `hat` is null and
+ * every relay path is a no-op, which is what makes this safe to deploy before
+ * the panel exists.
+ */
+const RELAYS_ENABLED = process.env.RELAYS !== "off" && hatAvailable();
+const hat = RELAYS_ENABLED ? createHat({}) : null;
+if (!RELAYS_ENABLED) {
+  console.log(
+    process.env.RELAYS === "off"
+      ? "relays: disabled by RELAYS=off"
+      : "relays: no I2C bus, running without a card",
+  );
+}
+
+/**
+ * De-energise, unconditionally, whatever the shadow says.
+ *
+ * Used at start and at stop, and `force` rather than `set` in both places on
+ * purpose: at boot we have never written the card and cannot know what it is
+ * holding, and at shutdown the shadow is the last thing *we* wrote, which is
+ * not evidence about now. Assuming otherwise is how a valve gets left
+ * somewhere nobody expects.
+ *
+ * De-energised is safe for every channel — architecture.md: valves to pool,
+ * bypass to flow, heater open, blower off — which is the property that makes
+ * this the right thing to do without knowing anything else.
+ */
+async function deEnergise(why) {
+  if (!hat) return;
+  const r = await hat.force(0x00);
+  console.log(`relays -> 0x00 (all off) — ${why}${r.written ? "" : " [FAILED]"}`);
+}
+
 const heartbeat = setInterval(evaluate, HEARTBEAT_MS);
 const recheck = setInterval(reviewCommissioning, COMMISSIONING_MS);
 
-server.listen(PORT, () => {
+const watchdog = createWatchdog({
+  isHealthy: () => evaluationHealth({
+    lastEvaluatedAt, lastError: lastEvaluationError,
+    now: Date.now(),
+    /* Three heartbeats. One missed tick is scheduling; three is a wedge. */
+    staleAfterMs: HEARTBEAT_MS * 3,
+  }),
+});
+
+server.listen(PORT, async () => {
   console.log(`supervisor v0 on http://localhost:${PORT}  ->  njsPC at ${NJSPC_URL}`);
+  /* Before serving anything and before the first evaluation: whatever the card
+     was holding through a crash, a kill or a power cut is not ours to inherit.
+     This is the boot half of ADR-10 — every restart begins from de-energised. */
+  await deEnergise("boot");
+  watchdog.start();
   if (!authRequired()) {
     console.warn("WARNING: no password set. Anyone who can reach this port can");
     console.warn("         drive the equipment. Run: node supervisor/passwd.js");
@@ -1004,7 +1095,13 @@ for (const sig of ["SIGINT", "SIGTERM"]) {
     clearInterval(heartbeat);
     clearInterval(recheck);
     clearTimeout(reviewTimer);
+    watchdog.stop();
     njs.stop();
+    /* Before the store flush and before the sockets close, because this is the
+       only part of shutdown that moves equipment and the rest can wait. A
+       clean stop must not leave a coil energised: `systemctl stop`, a deploy
+       and a reboot all come through here. */
+    await deEnergise(sig);
     /* Flush synchronously enough to beat the exit: a debounced write in
        flight would otherwise be lost on every restart. */
     await store.flush();
