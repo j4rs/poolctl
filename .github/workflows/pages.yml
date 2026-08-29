@@ -68,6 +68,12 @@ jobs:
       # never been run on a clean checkout.
       - run: npm ci --prefix supervisor
 
+      # The supervisor serves dist/, and auth.integration.test.js asserts that
+      # it does — so the app has to be built before the suite runs, not only
+      # before the deploy. This is the second thing the first CI run found
+      # that a working copy had been quietly supplying.
+      - run: npm run build
+
       # The suite gates the deploy. A demo of a controller whose own tests are
       # failing is worse than no demo.
       - run: npm test

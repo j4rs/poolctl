@@ -403,8 +403,16 @@ const now = async () => (await (await fetch(sup.url("/state"))).json());
  * spawned test supervisor, and covered properly in `auth.integration.test.js`
  * rather than asserted around here.
  */
+/* Findings about njsPC's configuration, which is what these tests move.
+ *
+ * Two checks describe the *host* instead, and would otherwise make the suite
+ * depend on where it runs: `no-password` fires because the harness points
+ * AUTH_FILE at nothing, and `clock-utc` fires on any box set to UTC — which
+ * is every CI runner, and every developer in London for half the year. Both
+ * are correct findings; neither is about anything asserted here. */
+const HOST_FINDINGS = new Set(["no-password", "clock-utc", "clock-unsynced"]);
 const njspcFindings = (state) =>
-  (state.commissioning ?? []).filter((f) => f.id !== "no-password");
+  (state.commissioning ?? []).filter((f) => !HOST_FINDINGS.has(f.id));
 
 /** Wait until `check` holds of a published state frame. */
 const settles = (check, ms = 6000) =>
