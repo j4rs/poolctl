@@ -576,6 +576,7 @@ async function reviewCommissioning() {
       heaters: config.value?.heaters,
       valves: config.value?.valves,
       pumps: config.value?.pumps,
+      bodyCircuits: { pool: POOL_CIRCUIT, spa: SPA_CIRCUIT },
     });
     const changed = JSON.stringify(findings) !== JSON.stringify(own.commissioning);
     own.commissioning = findings;

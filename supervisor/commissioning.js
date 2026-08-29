@@ -1,4 +1,6 @@
-import { SPA_TIMEOUT_MIN, ASSUMED_VALVE_TRAVEL_SEC } from "../src/lib/sequences.js";
+import {
+  SPA_TIMEOUT_MIN, ASSUMED_VALVE_TRAVEL_SEC, HEATER_MIN_RPM,
+} from "../src/lib/sequences.js";
 import { DONT_STOP_MINUTES } from "./binding.js";
 
 /**
@@ -31,7 +33,7 @@ export const NJSPC_DEFAULT_EGG_TIMER = 720;
  */
 export function checkCommissioning({
   spaCircuit, options, njspcOnLan, passwordSet, rs485, clock, heaters,
-  valves, pumps,
+  valves, pumps, bodyCircuits,
 } = {}) {
   return [
     ...checkPassword(passwordSet),
@@ -39,6 +41,7 @@ export function checkCommissioning({
     ...checkSerialPort(rs485),
     ...checkValveBinding(valves),
     ...checkPump(pumps),
+    ...checkHeatFloor(pumps, bodyCircuits),
     ...checkHeater(heaters),
     ...checkClock(clock),
     ...checkSpaEggTimer(spaCircuit),
@@ -88,6 +91,66 @@ export function checkValveBinding(valves) {
 }
 
 const nonEmpty = (v) => typeof v === "string" && v.trim() !== "";
+
+/**
+ * Whether the pump can even reach the heater's flow floor.
+ *
+ * `heaterCall !== 'off' implies pumpRpm >= HEATER_MIN_RPM` is one of the
+ * invariants, and njsPC decides the speed: `setTargetSpeed` takes the highest
+ * among the circuits that are on. So if the circuit carrying a body runs
+ * slower than the floor, calling for heat on that body breaches the invariant
+ * every single time, by configuration rather than by fault.
+ *
+ * Which is exactly the shape of alarm this project has decided is worse than
+ * useless. Once the pump is on the bus a permanent `heat-below-floor` would
+ * sit on the Water screen for the whole of every heating run, and a monitor
+ * that always fires is one nobody reads.
+ *
+ * Said here, before the pump is attached, it is a question with two honest
+ * answers and no way yet to choose between them: either the circuit is too
+ * slow or `HEATER_MIN_RPM` is wrong. It is a **placeholder** — the PRD's
+ * instruction is to ramp the pump and find where the heat pump's flow fault
+ * clears — so this deliberately does not say which one to change.
+ *
+ * A note, not a warning. Nothing is unsafe: the Raypak will not fire into
+ * insufficient flow, it faults with `FLo`/`FL3`, and ADR-4 puts that
+ * protection in the heater's firmware on purpose.
+ */
+export function checkHeatFloor(pumps, bodyCircuits) {
+  if (!Array.isArray(pumps) || !bodyCircuits) return [];
+
+  const speeds = new Map();
+  for (const p of pumps) {
+    for (const pc of p?.circuits ?? []) {
+      const id = pc?.circuit?.id ?? pc?.circuit;
+      if (Number.isFinite(Number(id)) && Number.isFinite(Number(pc?.speed))) {
+        speeds.set(Number(id), Number(pc.speed));
+      }
+    }
+  }
+  if (speeds.size === 0) return [];
+
+  const slow = [];
+  for (const [label, id] of Object.entries(bodyCircuits)) {
+    const rpm = speeds.get(Number(id));
+    if (Number.isFinite(rpm) && rpm < HEATER_MIN_RPM) slow.push({ label, rpm });
+  }
+  if (slow.length === 0) return [];
+
+  const which = slow.map((s) => `${s.label} at ${s.rpm} rpm`).join(", ");
+  return [{
+    id: "heat-floor-unreachable",
+    severity: "note",
+    what: `Heating the ${slow.map((s) => s.label).join(" or ")} would run below the flow floor`,
+    detail:
+      `njsPC runs ${which}, and this repo believes the heater needs ` +
+      `${HEATER_MIN_RPM} rpm. A heat call on that body breaches the pump-floor ` +
+      `invariant by configuration, so the alarm would stand for the whole run. ` +
+      `One of the two numbers is wrong and neither is measured: ramp the pump ` +
+      `at commissioning, find where the heat pump's flow fault clears, and ` +
+      `correct whichever it turns out to be.`,
+  }];
+}
 
 /**
  * A pump has to exist before a program can bind to one.

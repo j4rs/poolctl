@@ -2,7 +2,7 @@
 import { describe, it, expect } from "vitest";
 import {
   checkCommissioning, checkExposure, checkSerialPort, checkClock, checkHeater,
-  checkValveBinding, checkPump,
+  checkValveBinding, checkPump, checkHeatFloor,
   NJSPC_DEFAULT_EGG_TIMER,
 } from "./commissioning.js";
 import { SPA_TIMEOUT_MIN } from "../src/lib/sequences.js";
@@ -372,5 +372,53 @@ describe("a pump to bind programs to", () => {
 
   it("says nothing when the configuration could not be read", () => {
     expect(checkPump(undefined)).toEqual([]);
+  });
+});
+
+describe("whether the pump can reach the heater's flow floor", () => {
+  /* HEATER_MIN_RPM is 1900 and a placeholder; these use explicit numbers
+     either side of it rather than importing it, so a future measurement
+     changing the constant does not quietly change what is being asserted. */
+  const bodies = { pool: 6, spa: 1 };
+  const pump = (circuits) => [{ id: 50, circuits }];
+
+  it("says nothing when every body circuit clears the floor", () => {
+    expect(checkHeatFloor(pump([
+      { circuit: 6, speed: 2400 }, { circuit: 1, speed: 2800 },
+    ]), bodies)).toEqual([]);
+  });
+
+  it("notes a body circuit configured below the floor", () => {
+    /* The live rig: pool at 1600 against a believed floor of 1900. Once the
+       pump is on the bus this would breach the pump-floor invariant on every
+       heat call, permanently, by configuration rather than by fault. */
+    const [f] = checkHeatFloor(pump([
+      { circuit: 6, speed: 1600 }, { circuit: 1, speed: 2800 },
+    ]), bodies);
+    expect(f.severity).toBe("note");
+    expect(f.id).toBe("heat-floor-unreachable");
+    expect(f.what).toMatch(/pool/);
+    expect(f.what).not.toMatch(/spa/);
+    expect(f.detail).toMatch(/1600/);
+  });
+
+  it("refuses to say which of the two numbers is wrong", () => {
+    /* Both are unmeasured. Naming a culprit would be inventing a measurement
+       the project has not taken. */
+    const [f] = checkHeatFloor(pump([{ circuit: 6, speed: 1600 }]), bodies);
+    expect(f.detail).toMatch(/One of the two numbers is wrong/);
+  });
+
+  it("reads njsPC's expanded circuit shape as well as the bare id", () => {
+    /* State expands enums into objects; config does not. Getting this wrong
+       is the bug that has already cost this project twice. */
+    expect(checkHeatFloor(pump([{ circuit: { id: 6 }, speed: 1600 }]), bodies))
+      .toHaveLength(1);
+  });
+
+  it("says nothing when the pump lists no speeds", () => {
+    expect(checkHeatFloor(pump([]), bodies)).toEqual([]);
+    expect(checkHeatFloor(undefined, bodies)).toEqual([]);
+    expect(checkHeatFloor(pump([{ circuit: 6, speed: 1600 }]), undefined)).toEqual([]);
   });
 });

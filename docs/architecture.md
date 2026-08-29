@@ -148,11 +148,37 @@ model, **13 of its 30 steps are things njsPC already does**, and the way to
 | `heat-pool`, `heat-spa` | supervisor | CH4/CH5, derived from our own call. **Implemented** |
 | `blower-off` | supervisor | CH6. **Implemented** |
 | `purge` | supervisor | **implemented.** Flow is held through the exchanger for `PURGE_MIN` after a call ends, before the bypass may isolate it. njsPC would not have done it: `NixieHeatpump.getCooldownTime()` returns 0, so `HeaterCooldownDelay` never fires for this heater type. Duration still unmeasured |
-| `pump-min` | supervisor | **not implemented.** `floorRpm` computes it and `setRpm` then refuses, so it has never reached equipment |
+| `pump-min` | supervisor | **not built, deliberately.** `floorRpm` computes it and `setRpm` refuses, so it has never reached equipment — and enforcing it now would encode an unmeasured threshold. See below |
 
-So the file's remaining claim on the supervisor is **the pump floor** — the
-purge landed on 29 August 2026. Everything else is either done or is njsPC
-configuration.
+So the file's remaining claim on the supervisor is **the pump floor**, and
+that one is waiting on a measurement rather than on code. The purge landed on
+29 August 2026; everything else is done or is njsPC configuration.
+
+### Why the pump floor is not built
+
+`HEATER_MIN_RPM` is **1900 and a placeholder**. njsPC runs the Pool circuit at
+**1600**, so a pool heat call already breaches the invariant by configuration —
+not by fault, and not occasionally, but on every call. The Spa circuit at 2800
+clears it.
+
+Enforcing the floor would mean raising the pump to a number nobody has
+measured, through a dedicated njsPC circuit turned on with manual priority —
+which is a commissioning decision, and one this process has deliberately never
+made for itself (`commissioning.js` checks and never corrects). If the real
+floor turns out to be under 1600 the whole mechanism is unnecessary; if it is
+over, the right fix may be the Pool circuit's speed rather than a second
+circuit. There is no way to choose without ramping the pump and watching for
+the heat pump's flow fault to clear.
+
+Meanwhile the Raypak refuses to fire into insufficient flow and reports
+`FLo`/`FL3`. ADR-4 puts that protection in the heater's firmware on purpose,
+which is what makes waiting for the measurement the safe option rather than
+the lazy one.
+
+What *is* built is the warning: `checkHeatFloor` raises a commissioning note
+comparing each body circuit's configured speed against the floor, so the
+contradiction is visible now instead of arriving as a permanent alarm the day
+the pump reaches the bus.
 
 ### How the purge is actually shaped
 
