@@ -55,8 +55,18 @@ jobs:
         with:
           node-version: 22
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            supervisor/package-lock.json
 
       - run: npm ci
+
+      # The supervisor is a separate package with its own dependencies, and
+      # index.test.js spawns it as a real process. Without this the spawn dies
+      # on socket.io-client and every integration suite fails at once — which
+      # is how the first run of this workflow discovered that the suite had
+      # never been run on a clean checkout.
+      - run: npm ci --prefix supervisor
 
       # The suite gates the deploy. A demo of a controller whose own tests are
       # failing is worse than no demo.

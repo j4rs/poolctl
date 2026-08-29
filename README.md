@@ -73,8 +73,12 @@ on a phone from the same network — worth doing, since this is a phone-first UI
 
 ## Tests
 
+The supervisor is a separate package, and the integration suites spawn it as a
+real process — so its dependencies have to be installed too, or every one of
+them fails at once on a fresh clone:
+
 ```bash
-npm test
+npm install && npm install --prefix supervisor && npm test
 ```
 
 Covers the client, the supervisor's pure logic, the njsPC translation layer,
