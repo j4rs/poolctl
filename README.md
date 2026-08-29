@@ -25,16 +25,22 @@ njsPC, or standalone on mock data with no hardware at all.
 
 ## Status
 
-The UI runs live against njsPC through the supervisor. The Raspberry Pi is
-up and thermally characterised. **No equipment is connected** — the relay HAT
-has not arrived, so njsPC runs with no serial port and no pump answers on the
-bus. That has still been enough to settle most of the design.
+The whole stack runs on the Pi: njsPC v10.0.1 on loopback, the supervisor on
+the LAN behind a password, both as systemd services verified across a reboot,
+with a watchdog that restarts a wedged supervisor. The relay HAT arrived on
+27 August and its channel map is measured rather than assumed — the card's
+routing does not match the driver its own product page names.
+
+**No equipment is connected to the bus**, so njsPC has no serial port and
+every reading is null. That has still been enough to settle most of the
+design, and null-everywhere is the state the tests are written against.
 
 Implemented in the supervisor: mode changes, heat targets with server-side
-clamping, blower and light, pool heat with the bypass interlock, pump
-run/stop, service mode, and manual programs bound to real njsPC circuits.
-Not yet: valve relay driving, scheduled preheat, and anything needing a water
-temperature.
+clamping, blower and light, pool heat with the bypass interlock, the purge
+that holds flow through the exchanger after a call ends, pump run/stop,
+service mode, manual programs bound to real njsPC circuits, and relay
+driving through the HAT. Not yet: valve travel modelling, scheduled preheat,
+and anything needing a real water temperature.
 
 ## Run
 
@@ -81,6 +87,14 @@ pointed at a dead one — reconnection, the heartbeat, ack correlation,
 persistence across a restart, and every refusal. That part takes about 18 s,
 and it is where both of this layer's shipped bugs lived.
 
+Above that sit the integration suites, which simulate the interfaces and
+script the physics: a PCA9554 relay card that lives in a JSON file and is
+invoked exactly as `i2cset`/`i2cget` are, and an njsPC that answers real HTTP
+with shapes captured from a real one. Neither the supervisor nor `hat.js`
+knows it is being faked. Those suites assert the **trace**, not the resting
+state — every fault they found had the right end position and the wrong route
+through it.
+
 ## Screens
 
 - **Water** — mode switching with a live water-path schematic, transition
@@ -120,6 +134,7 @@ supervisor/                runs on the Pi; plain JS, no build step
   index.js                 njsPC link, intents, WebSocket, serves dist/
   map.js                   njsPC state -> the shape the UI speaks
   interlocks.js            the rules njsPC lacks — pure, tested
+  invariants.js            the invariants, checked against what is true now
   commissioning.js         njsPC settings checked against what we believe
   binding.js               program -> njsPC circuit + pump speed
   schedules.js             njsPC schedules <-> the shape the UI speaks
@@ -127,6 +142,9 @@ supervisor/                runs on the Pi; plain JS, no build step
   store.js                 durable preferences
   auth.js                  password hashing and signed sessions
   passwd.js                CLI to set the password
+  hat.js                   the I2C relay card, driven through i2cget/i2cset
+  relays.js                the measured relay -> bit map, and byte naming
+  watchdog.js              systemd sd_notify, so a wedged process is restarted
 docs/architecture.md       system view, state ownership, failure modes
 docs/pi-bringup.md         flashed card -> running controller, in order
 docs/prds/poolctl-v1.md    full requirements, ADRs, and open questions
@@ -138,16 +156,22 @@ Tests sit beside what they cover as `*.test.js[x]` and never reach `dist/`.
 ## Wiring to real hardware
 
 `useSupervisor` already does this; `useController` remains so the app runs
-standalone. The original note follows, and still describes the contract:
-
-Replace `useController` with a hook that subscribes to njsPC over MQTT or its
-WebSocket, maps payloads into the same state shape, and posts intents.
-Nothing else changes.
+standalone on mock data. Both present the same surface, so a screen cannot
+tell which one it is talking to.
 
 The UI must never issue equipment primitives. It says `setMode('spa')`; the
-server decides what relays that means and enforces every interlock. See the
-invariants in [`src/lib/sequences.js`](src/lib/sequences.js) — that file is
-the spec the server sequencer has to mirror step for step.
+supervisor decides what that means and enforces every interlock. A phone
+loses signal mid-tap and the state machine has to hold regardless — see
+ADR-7.
+
+`src/lib/sequences.js` is **not** a program the server runs, and an earlier
+version of this file said it was. The supervisor imports named constants and
+the invariant list from it and nothing else; the step-by-step transition list
+is mock-only, because every duration in it is invented and a progress bar
+that looks measured while being a guess is worse than none. Live progress
+comes from njsPC's own `delays[]`, which has a real clock behind it. The
+attribution is in [`docs/architecture.md`](docs/architecture.md) under
+"Sequence ownership".
 
 ## Mock timings
 
