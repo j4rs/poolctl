@@ -88,3 +88,48 @@ export function checkInvariants(s) {
 
   return out;
 }
+
+/**
+ * The relay card disagreeing with what the supervisor commanded.
+ *
+ * Kept here with the other breaches, and pure, because it is a decision about
+ * what to show rather than an act of talking to hardware — `index.js` does
+ * the reading and the correcting.
+ *
+ * Two states, deliberately one concern. While the card disagrees it is a
+ * present-tense alarm. Once corrected it becomes a standing note that it
+ * happened at all: testing found that the alarm cleared on the next pass, so
+ * a self-healing fault showed for under five seconds and then vanished, which
+ * is indistinguishable from never having happened.
+ *
+ * @param drift  {expected, actual} while disagreeing, else null
+ * @param count  how many times it has drifted since boot
+ */
+export function driftBreaches(drift, count = 0) {
+  const hex = (b) => `0x${b.toString(16).padStart(2, "0")}`;
+
+  if (drift) {
+    return [{
+      id: "relay-drift",
+      severity: "alarm",
+      what: "The relay card is not holding what it was told",
+      detail: `The card reads ${hex(drift.actual)} where the supervisor `
+        + `commanded ${hex(drift.expected)}. Re-asserting it now. A latch that `
+        + `moves on its own is a hardware fault — check the card's power and `
+        + `the I2C wiring before trusting any position.`,
+    }];
+  }
+
+  if (!count) return [];
+  return [{
+    id: "relay-drift-history",
+    severity: "warn",
+    what: count === 1
+      ? "The relay card lost its state once and was corrected"
+      : `The relay card has lost its state ${count} times and been corrected`,
+    detail: "The positions are right now — the supervisor reads the card back "
+      + "every few seconds and re-asserts what it commanded. But the card "
+      + "should never need correcting, so this points at power or I2C wiring. "
+      + "Clears when the supervisor restarts.",
+  }];
+}

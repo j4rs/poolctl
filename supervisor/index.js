@@ -16,7 +16,7 @@ import { DEFAULT_PROGRAMS } from "../src/lib/programs.js";
 import {
   floorRpm, bypassFor, mayCallForHeat, mayToggleBlower, shouldStopHeat, refuse,
 } from "./interlocks.js";
-import { checkInvariants } from "./invariants.js";
+import { checkInvariants, driftBreaches } from "./invariants.js";
 import {
   circuitConfig, echoCircuitConfig, withPumpCircuit, withoutPumpCircuit,
   whyNotBindable, pumpLimits,
@@ -222,7 +222,7 @@ function evaluate() {
     const view = toUiState(njsRaw, own);
     applyCutoff(view);
     const settled = toUiState(njsRaw, own);
-    own.violations = checkInvariants(settled);
+    own.violations = [...checkInvariants(settled), ...driftBreaches(own.relayDrift, own.relayDrifts ?? 0)];
     publish();
     lastEvaluatedAt = Date.now();
     lastEvaluationError = null;
@@ -251,6 +251,68 @@ function driveRelays(view) {
   hat.set(byte).then((r) => {
     if (r.written) console.log(`relays -> ${describeRelays(byte)}`);
   }).catch(() => {});
+}
+
+/**
+ * Check the card against what we believe we wrote.
+ *
+ * `hat.set` compares the wanted byte against a *software shadow* of the last
+ * successful write, and skips the write when they match. That is the right
+ * default — re-writing a latch to its own value is a process spawn for
+ * nothing — but it has a failure mode with no floor: once the shadow and the
+ * card disagree, every subsequent `set` short-circuits on the wrong belief
+ * and the card is never corrected. It stays wrong until something else
+ * happens to change the byte.
+ *
+ * Observed for real on 28 August 2026: driving relays by hand with `i2cset`
+ * during the bench work left the supervisor certain of `0x40` while the card
+ * sat elsewhere, for the best part of an hour, silently.
+ *
+ * On the bench that was convenient. In the panel it is the exact thing this
+ * process exists to prevent — the supervisor confident about equipment that
+ * is doing something else. So read the card back and, unlike the invariants,
+ * **correct it**. Re-asserting our own decision is not reaching into
+ * equipment on the strength of a snapshot; it is making the card agree with
+ * a decision already taken, which is the one correction a supervisor is
+ * entitled to make.
+ *
+ * It still says so loudly. A drift is a fault even after it is corrected.
+ */
+async function verifyRelays() {
+  if (!hat) return;
+  const expected = hat.lastWritten;
+  if (expected == null) return;               /* nothing written yet */
+
+  const actual = await hat.read();
+  if (actual == null) return;                 /* read failed; hat says so once */
+
+  if (actual === expected) {
+    if (own.relayDrift) {
+      console.log("relay card: back in agreement");
+      own.relayDrift = null;
+    }
+    return;
+  }
+
+  /* Counted as well as reported, and the count outlives the correction.
+     Testing this found the hole: the drift cleared on the next pass, so the
+     Water screen showed an alarm for under five seconds and then nothing.
+     A latch that moved on its own is a fault whether or not we put it back
+     within a heartbeat, and the journal is not where anybody looks. The tally
+     is in memory, so a restart clears it — which is the right scope for
+     "something odd happened to this card since it last booted". */
+  own.relayDrifts = (own.relayDrifts ?? 0) + 1;
+  own.lastDriftAt = Date.now();
+
+  const first = !own.relayDrift;
+  own.relayDrift = { expected, actual, at: Date.now() };
+  if (first) {
+    console.error(
+      `relay card: drifted — card reads ${describeRelays(actual)}, ` +
+      `expected ${describeRelays(expected)}. Re-asserting.`,
+    );
+  }
+  await hat.force(expected).catch(() => {});
 }
 
 /**
@@ -1167,6 +1229,10 @@ async function deEnergise(why) {
 }
 
 const heartbeat = setInterval(evaluate, HEARTBEAT_MS);
+/* Its own interval rather than a line inside evaluate(): the read is async and
+   spawns a process, and evaluate() is deliberately synchronous so that a slow
+   or hanging I2C read can never be what stops the invariants being checked. */
+const relayCheck = setInterval(() => { verifyRelays().catch(() => {}); }, HEARTBEAT_MS);
 const recheck = setInterval(reviewCommissioning, COMMISSIONING_MS);
 
 /* One definition, two readers: the watchdog decides whether to ping on it and
@@ -1199,6 +1265,7 @@ server.listen(PORT, async () => {
 for (const sig of ["SIGINT", "SIGTERM"]) {
   process.on(sig, async () => {
     clearInterval(heartbeat);
+    clearInterval(relayCheck);
     clearInterval(recheck);
     clearTimeout(reviewTimer);
     watchdog.stop();

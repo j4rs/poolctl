@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect } from "vitest";
-import { checkInvariants } from "./invariants.js";
+import { checkInvariants, driftBreaches } from "./invariants.js";
 import { HEATER_MIN_RPM } from "../src/lib/sequences.js";
 
 /**
@@ -140,5 +140,48 @@ describe("reporting several at once", () => {
        describe equipment misbehaving now. */
     const v = checkInvariants({ ...ok, heaterCall: "pool", pumpRpm: 800 });
     expect(v.every((x) => x.severity === "alarm")).toBe(true);
+  });
+});
+
+/**
+ * The relay card not holding what it was told.
+ *
+ * This is the only fault in the system the supervisor both reports *and*
+ * corrects. Re-asserting our own decision is not reaching into equipment on
+ * the strength of a snapshot — it is making the card agree with a decision
+ * already taken — but the reporting still has to survive the correction.
+ */
+describe("relay drift", () => {
+  it("says nothing when the card has always agreed", () => {
+    expect(driftBreaches(null, 0)).toEqual([]);
+  });
+
+  it("alarms, with both bytes, while the card disagrees", () => {
+    const [v] = driftBreaches({ expected: 0x40, actual: 0x02 }, 1);
+    expect(v.severity).toBe("alarm");
+    expect(v.detail).toMatch(/0x02/);
+    expect(v.detail).toMatch(/0x40/);
+  });
+
+  it("keeps saying so after the correction, which is the point", () => {
+    /* Found by testing on the Pi: the alarm cleared on the next pass, so a
+       self-healing fault showed for under five seconds and then vanished —
+       indistinguishable from never having happened. */
+    const [v] = driftBreaches(null, 1);
+    expect(v).toBeTruthy();
+    expect(v.id).toBe("relay-drift-history");
+    expect(v.severity).toBe("warn");
+    expect(v.what).toMatch(/once/);
+  });
+
+  it("counts repeats, because twice is a different problem from once", () => {
+    expect(driftBreaches(null, 4)[0].what).toMatch(/4 times/);
+  });
+
+  it("prefers the live alarm over the history when both apply", () => {
+    /* A card that is wrong right now is not a footnote about the past. */
+    const out = driftBreaches({ expected: 0x00, actual: 0x80 }, 3);
+    expect(out).toHaveLength(1);
+    expect(out[0].id).toBe("relay-drift");
   });
 });

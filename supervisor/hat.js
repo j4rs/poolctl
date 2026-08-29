@@ -25,7 +25,18 @@ const run = promisify(execFile);
 export const BUS = 1;
 export const ADDRESS = "0x27";
 export const OUTPUT_REG = "0x01";
+/**
+ * The input port, read to check the card against what we believe we wrote.
+ *
+ * Register 0x01 is the output latch and would only echo our own write back;
+ * 0x00 is the actual pin level, which is strictly more informative at the
+ * same cost — it catches a latch that has drifted *and* a pin that is not
+ * following it. The two agree in normal operation: measured 27 August 2026
+ * with four channels energised, `0x00` = `0x63` and `0x01` = `0x63`.
+ */
+export const INPUT_REG = "0x00";
 const I2CSET = "/usr/sbin/i2cset";
+const I2CGET = "/usr/sbin/i2cget";
 const DEVICE = `/dev/i2c-${BUS}`;
 
 /**
@@ -48,15 +59,15 @@ export function available() {
  * or something is wrong that a retry will paper over. It is reported and the
  * shadow is left alone, so the next differing byte tries again naturally.
  */
-export function createHat({ dryRun = false, log = console } = {}) {
+export function createHat({ dryRun = false, log = console, exec = run } = {}) {
   let last = null;
   let failing = false;
 
   async function put(byte) {
     if (dryRun) { last = byte; return { written: true, dryRun: true }; }
     try {
-      await run(I2CSET, ["-y", String(BUS), ADDRESS, OUTPUT_REG,
-                         `0x${byte.toString(16).padStart(2, "0")}`]);
+      await exec(I2CSET, ["-y", String(BUS), ADDRESS, OUTPUT_REG,
+                          `0x${byte.toString(16).padStart(2, "0")}`]);
       last = byte;
       if (failing) { log.log("relay card: writes recovered"); failing = false; }
       return { written: true };
@@ -85,5 +96,34 @@ export function createHat({ dryRun = false, log = console } = {}) {
         card's real state is unknown and assuming it is the shadow is exactly
         the assumption that gets a valve left where nobody expects it. */
     async force(byte) { return put(byte); },
+
+    /**
+     * What the card actually holds, or null if it cannot be read.
+     *
+     * The shadow above is what we *believe*; this is the only way to find out
+     * whether that belief is true. Nothing else in this process ever looks at
+     * the card — `set` compares against the shadow, so once the two disagree
+     * they stay disagreeing forever, and every subsequent `set` short-circuits
+     * on a belief that is wrong.
+     */
+    async read() {
+      if (dryRun) return last;
+      try {
+        const { stdout } = await exec(I2CGET, ["-y", String(BUS), ADDRESS, INPUT_REG]);
+        const text = String(stdout ?? "").trim();
+        /* Matched before parsing, because `Number("")` is 0 and so is
+           `Number("\n")`. An empty answer would otherwise read as "every
+           relay is off" — a confident, wrong statement about the equipment,
+           and indistinguishable from a card that really is at 0x00. */
+        if (!/^(0x[0-9a-f]{1,2}|\d{1,3})$/i.test(text)) return null;
+        const byte = Number(text);
+        return Number.isInteger(byte) && byte >= 0 && byte <= 0xff ? byte : null;
+      } catch (err) {
+        /* Same discipline as a failed write: say it once. A card that has
+           gone away must not fill the journal on the heartbeat. */
+        if (!failing) { log.error(`relay card: read failed — ${err.message}`); failing = true; }
+        return null;
+      }
+    },
   };
 }
