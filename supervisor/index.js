@@ -56,13 +56,28 @@ const NJSPC_URL = process.env.NJSPC_URL || "http://localhost:4200";
  * not lengthen this without lengthening that. */
 const HEARTBEAT_MS = 5000;
 
+/**
+ * Durations a test may compress.
+ *
+ * Here rather than in `sequences.js`, which the browser bundle imports and
+ * where `process` does not exist. The knobs are the supervisor's, not the
+ * spec's — the spec keeps saying three minutes, and this says how long this
+ * process will wait for it.
+ *
+ * `HEARTBEAT_MS` is deliberately *not* one of them. The client restates it as
+ * its staleness threshold, and the pair is the only defence against the
+ * threshold-shorter-than-the-heartbeat bug that shipped once already; a test
+ * that moved one and not the other would quietly retire that guard.
+ */
+const PURGE_MS = Number(process.env.PURGE_MS) || PURGE_MIN * 60_000;
+
 /* How often the settings njsPC owns are re-read.
  *
  * Not on the state path: these change at commissioning and then effectively
  * never. But dashPanel can change them at any time, and a notice that
  * persists after the operator has just fixed the thing it names is worse
  * than no notice — so it cannot only be checked when the link comes up. */
-const COMMISSIONING_MS = 5 * 60 * 1000;
+const COMMISSIONING_MS = Number(process.env.COMMISSIONING_MS) || 5 * 60 * 1000;
 
 /* Shortest gap between checks prompted by njsPC saying something changed.
  *
@@ -378,7 +393,7 @@ function runPurge(view) {
   const call = view.heaterCall;
   if (lastHeatCall !== "off" && call === "off") {
     own.heatEndedAt = Date.now();
-    console.log(`heat call ended — holding flow for ${PURGE_MIN} min`);
+    console.log(`heat call ended — holding flow for ${Math.round(PURGE_MS / 1000)} s`);
   }
   lastHeatCall = call;
 
@@ -387,10 +402,10 @@ function runPurge(view) {
      the body by itself, and produced spa valves with the bypass still around
      the exchanger. So the loop owns the *clock* and the map owns the
      *position*, and the two meet here. */
-  const left = call === "off" ? purgeRemainingMs(own.heatEndedAt, Date.now()) : 0;
+  const left = call === "off" ? purgeRemainingMs(own.heatEndedAt, Date.now(), PURGE_MS) : 0;
   const was = own.purgeHolding;
   own.purgeHolding = left > 0;
-  own.purgeUntil = left > 0 ? own.heatEndedAt + PURGE_MIN * 60_000 : null;
+  own.purgeUntil = left > 0 ? own.heatEndedAt + PURGE_MS : null;
   if (was && !own.purgeHolding) console.log("purge elapsed — bypass around the heater");
 }
 

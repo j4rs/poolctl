@@ -79,27 +79,27 @@ describe("holding flow after a heat call", () => {
   const t0 = 1_700_000_000_000;
 
   it("holds for the full window after a call ends", () => {
-    expect(purgeRemainingMs(t0, t0, 3)).toBe(3 * MIN);
-    expect(purgeRemainingMs(t0, t0 + 1 * MIN, 3)).toBe(2 * MIN);
+    expect(purgeRemainingMs(t0, t0, 3 * MIN)).toBe(3 * MIN);
+    expect(purgeRemainingMs(t0, t0 + 1 * MIN, 3 * MIN)).toBe(2 * MIN);
   });
 
   it("is done once the window has passed, and does not go negative", () => {
-    expect(purgeRemainingMs(t0, t0 + 3 * MIN, 3)).toBe(0);
-    expect(purgeRemainingMs(t0, t0 + 90 * MIN, 3)).toBe(0);
+    expect(purgeRemainingMs(t0, t0 + 3 * MIN, 3 * MIN)).toBe(0);
+    expect(purgeRemainingMs(t0, t0 + 90 * MIN, 3 * MIN)).toBe(0);
   });
 
   it("holds nothing when no call has ever ended", () => {
     /* Distinct from "the purge finished". A supervisor that has never called
        for heat has no exchanger to empty. */
-    expect(purgeRemainingMs(null, t0, 3)).toBe(0);
-    expect(purgeRemainingMs(undefined, t0, 3)).toBe(0);
+    expect(purgeRemainingMs(null, t0, 3 * MIN)).toBe(0);
+    expect(purgeRemainingMs(undefined, t0, 3 * MIN)).toBe(0);
   });
 
   it("subsumes the skip-when-idle condition rather than needing it", () => {
     /* PURGE_MIN is below PURGE_SKIP_AFTER_MIN by design: a call that ended
        more than five minutes ago also ended more than three minutes ago. The
        old needsPurge() boolean asked a question this already answers. */
-    expect(purgeRemainingMs(t0, t0 + 5 * MIN, 3)).toBe(0);
+    expect(purgeRemainingMs(t0, t0 + 5 * MIN, 3 * MIN)).toBe(0);
   });
 });
 

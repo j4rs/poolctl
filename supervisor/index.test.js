@@ -570,6 +570,109 @@ describe("the relay card", () => {
   }, 30000);
 });
 
+describe("the purge, at speed", () => {
+  /**
+   * A three-minute rule asserted in three seconds.
+   *
+   * `PURGE_MS` is the supervisor's own knob, not the spec's — `sequences.js`
+   * goes on saying three minutes, and this says how long *this process* will
+   * wait for it. Without it the release could only ever be checked by
+   * watching a journal on the Pi, by hand, once; the hold was all a test
+   * could reach.
+   *
+   * njsPC is at a dead port throughout, which is fine here: the purge is
+   * driven by our own heat call and our own clock, and every boot starts one
+   * because we cannot know whether the heater was firing a second before the
+   * power went.
+   */
+  it("holds the bypass at boot, then releases it", async () => {
+    const sup = await start({ card: true, purgeMs: 2500 });
+    await sup.card.quiet();
+
+    /* The whole point of seeding `purgeHolding` true: no 0x40 flash before
+       the hold engages. Seeding only `heatEndedAt` left one, seen on the Pi. */
+    expect(await sup.card.trace()).toEqual(["0x00  (all off)"]);
+
+    await new Promise((r) => setTimeout(r, 3500));
+    await sup.card.quiet();
+    /* njsPC is unreachable, so mode reads pool and the released bypass goes
+       around the heater — REL3, the one coil held energised in normal pool
+       running. */
+    expect(await sup.card.trace()).toEqual(["0x00  (all off)", "0x40  REL3"]);
+    await sup.stop();
+  }, 30000);
+
+  it("reports how long it is holding for", async () => {
+    /* Not on the first frame: that is published when njsPC connects, before
+       the first evaluation, and `purgeUntil` is set by the evaluation. */
+    const sup = await start({ card: true, purgeMs: 60_000 });
+    const client = await connect(sup.port);
+    const held = await client.next(
+      (m) => m.type === "state" && m.state.purgeUntil != null, HEARTBEAT_MS * 3);
+    expect(held.state.purgeUntil).toBeGreaterThan(Date.now());
+    await sup.stop();
+  }, 30000);
+});
+
+describe("the watchdog, at speed", () => {
+  /**
+   * `WATCHDOG_USEC` is systemd's own variable, so compressing it needs no new
+   * knob — the supervisor already reads it and is inert when it is absent.
+   *
+   * What can be asserted here is the *withholding*, which is the decision
+   * this process makes. The kill that follows is systemd's, and there is no
+   * systemd in a test; on the Pi it was verified by watching a wedged
+   * supervisor be SIGABRTed at 51 s.
+   */
+  it("withholds, recovers, and withholds again for a new reason", async () => {
+    /* A 3 s window, so the watchdog ticks every second and the whole cycle
+       fits in one test.
+     *
+     * The order matters and writing this found it. The first tick happens
+     * before the first evaluation, so the watchdog withholds immediately for
+     * "no evaluation has completed yet" — and the say-once rule then hides
+     * anything that goes wrong afterwards. On the Pi that never shows,
+     * because the window is 60 s and the first tick is 20 s in, by which time
+     * an evaluation has long since landed. So wait for health before breaking
+     * anything, or the test asserts the boot condition and nothing else.
+     */
+    const sup = await start({ watchdogUsec: 3_000_000 });
+    const healthy = async () => {
+      for (let i = 0; i < 60; i++) {
+        const h = await (await fetch(sup.url("/health"))).json();
+        if (h.thinking) return;
+        await new Promise((r) => setTimeout(r, 250));
+      }
+      throw new Error("never became healthy");
+    };
+    await healthy();
+
+    sup.signal("SIGUSR2");
+    for (let i = 0; i < 40 && !/last evaluation threw/.test(sup.output.join("")); i++) {
+      await new Promise((r) => setTimeout(r, 250));
+    }
+
+    const log = sup.output.join("");
+    /* Withheld at boot for want of an evaluation, resumed when one landed,
+       and withheld again once they started throwing. Three states, and the
+       reason changes with them — a bare "unhealthy" would not explain the
+       kill that follows. */
+    expect(log).toMatch(/withholding the ping — no evaluation has completed yet/);
+    expect(log).toMatch(/healthy again, resuming/);
+    expect(log).toMatch(/withholding the ping — last evaluation threw/);
+    await sup.stop();
+  }, 30000);
+
+  it("is inert when systemd is not watching", async () => {
+    /* Running by hand, or in every other test in this file. */
+    const sup = await start();
+    const client = await connect(sup.port);
+    await client.state(HEARTBEAT_MS * 2);
+    expect(sup.output.join("")).not.toMatch(/watchdog:/);
+    await sup.stop();
+  }, 30000);
+});
+
 describe("shutting down", () => {
   it("exits on SIGTERM even with a browser still attached", async () => {
     /* systemd sends SIGTERM and waits. A supervisor that lingers because a

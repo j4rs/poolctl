@@ -50,9 +50,9 @@ export function bypassFor(mode, poolHeatDemand) {
  * still be running after our call ended, so this can only ever over-estimate
  * how long the exchanger stays hot.
  */
-export function purgeRemainingMs(heatEndedAt, now, purgeMin = PURGE_MIN) {
+export function purgeRemainingMs(heatEndedAt, now, purgeMs = PURGE_MIN * 60_000) {
   if (!heatEndedAt) return 0;
-  const left = heatEndedAt + purgeMin * 60_000 - now;
+  const left = heatEndedAt + purgeMs - now;
   return left > 0 ? left : 0;
 }
 

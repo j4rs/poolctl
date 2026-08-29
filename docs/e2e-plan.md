@@ -128,7 +128,7 @@ no suite, because it fails confidently.
 
 ---
 
-## Slice 3 — A compressed clock
+## Slice 3 — A compressed clock — **done, 29 August 2026**
 
 **What.** Env-overridable durations **in the supervisor** — `PURGE_MS`,
 `HEARTBEAT_MS`, `COMMISSIONING_MS`, spa revert. Not in `sequences.js`: the
@@ -141,6 +141,31 @@ watching a journal on the Pi, by hand, once.
 
 **Done when** the purge release, the spa auto-revert and the watchdog withhold
 are all asserted in a suite that still runs in under two minutes.
+
+**Shipped, with one item moved.** `PURGE_MS` and `COMMISSIONING_MS` are
+supervisor-side env knobs, set only when a test asks; production has neither
+and keeps the real numbers. `WATCHDOG_USEC` needed no knob — it is systemd's
+own variable and the supervisor already reads it.
+
+`HEARTBEAT_MS` is deliberately **not** overridable. The client restates it as
+its staleness threshold, and that pair is the only defence against the
+threshold-shorter-than-the-heartbeat bug that shipped once already; a test
+moving one and not the other would quietly retire the guard.
+
+**The spa auto-revert moved to slice 5.** It is njsPC's egg timer expiring,
+not our clock — so it is njsPC acting on its own, and belongs with the rest of
+that. Claiming it here would have meant testing our own fake's timer.
+
+Writing the watchdog test found an ordering nobody had noticed: with a short
+window the first tick lands *before* the first evaluation, so the watchdog
+withholds for "no evaluation has completed yet" and the say-once rule then
+hides whatever goes wrong next. Invisible on the Pi, where the window is 60 s
+and the first tick is 20 s in. The test now waits for health before breaking
+anything — and asserts all three states, since the reason changing is what
+makes the journal able to explain a kill.
+
+Suite is 652 tests in about 100 seconds. Verified by breaking it: making the
+purge never release fails the boot-hold trace.
 
 **Cost** small. **Independent**, but every other slice gets faster with it.
 
@@ -165,8 +190,8 @@ table, and adding a fifth is obvious.
 ## Slice 5 — njsPC acting on its own
 
 **What.** Script njsPC *initiating* — a schedule firing, an egg timer
-expiring, dashPanel writing a circuit, a body switching — and assert the
-supervisor reacts. Today the fake is only ever poked by the test in step with
+expiring (including the spa auto-revert, moved here from slice 3), dashPanel
+writing a circuit, a body switching — and assert the supervisor reacts. Today the fake is only ever poked by the test in step with
 the supervisor's own intents.
 
 **Why.** This is ADR-11's entire hazard, and it has already produced a real

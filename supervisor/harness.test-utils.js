@@ -116,7 +116,9 @@ async function fakeCard() {
 }
 
 /** Spawn a supervisor and wait until it answers /health. */
-export async function start({ stateFile, njspcUrl, authFile, card = false } = {}) {
+export async function start({
+  stateFile, njspcUrl, authFile, card = false, purgeMs, commissioningMs, watchdogUsec,
+} = {}) {
   const relays = card ? await fakeCard() : null;
   const port = await freePort();
   const proc = spawn(process.execPath, [ENTRY], {
@@ -135,6 +137,14 @@ export async function start({ stateFile, njspcUrl, authFile, card = false } = {}
       /* Absent unless a test asked for a card, so every existing test keeps
          the behaviour it was written against: no bus, no relay writes. */
       ...(relays ? relays.env : {}),
+      /* Compressed durations, so a three-minute rule can be asserted in three
+         seconds. Only set when a test asks: everything else keeps the real
+         numbers, and a test that quietly ran against a different purge than
+         the Pi does would be worse than no test. */
+      ...(purgeMs === undefined ? {} : { PURGE_MS: String(purgeMs) }),
+      ...(commissioningMs === undefined ? {} : { COMMISSIONING_MS: String(commissioningMs) }),
+      /* systemd normally sets this. Absent, the watchdog is inert. */
+      ...(watchdogUsec === undefined ? {} : { WATCHDOG_USEC: String(watchdogUsec) }),
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
