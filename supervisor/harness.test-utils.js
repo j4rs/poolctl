@@ -112,6 +112,30 @@ async function fakeCard() {
       s.byte = byte;
       await writeFile(state, JSON.stringify(s));
     },
+
+    /** The card has gone away, or come back. */
+    async setFailing(fail) {
+      const s = await load();
+      s.fail = Boolean(fail);
+      await writeFile(state, JSON.stringify(s));
+    },
+
+    /** Make reads slow, so a write can be made to land inside one. */
+    async setReadDelay(ms) {
+      const s = await load();
+      s.readDelayMs = ms;
+      await writeFile(state, JSON.stringify(s));
+    },
+
+    /** Resolve once a read is open, so a test can act during it. */
+    async whileReading({ timeout = 15000 } = {}) {
+      const deadline = Date.now() + timeout;
+      for (;;) {
+        if ((await load()).readingSince) return;
+        if (Date.now() > deadline) throw new Error("no read went in flight");
+        await new Promise((r) => setTimeout(r, 25));
+      }
+    },
   };
 }
 

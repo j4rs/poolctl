@@ -673,6 +673,102 @@ describe("the watchdog, at speed", () => {
   }, 30000);
 });
 
+describe("when the card misbehaves", () => {
+  /**
+   * Every recovery path here was written from reasoning and verified, if at
+   * all, by breaking something on the Pi over SSH. The drift corrector was
+   * found that way — and it was found only *after* it had shipped, undone a
+   * legitimate relay change, and reported a hardware fault that had not
+   * happened.
+   */
+  const logOf = (sup) => sup.output.join("");
+
+  it("notices a card holding something nobody asked for, and puts it back", async () => {
+    const sup = await start({ card: true, purgeMs: 500 });
+    /* Wait for the boot purge to release rather than guessing at it: the hold
+       expires on our clock but the valve moves on an evaluation, so a short
+       PURGE_MS still lands on the next heartbeat. 0x40 is settled pool. */
+    const settled = 0x40;
+    for (let i = 0; i < 40 && (await sup.card.byte()) !== settled; i++) {
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    expect(await sup.card.byte()).toBe(settled);
+
+    await sup.card.poke(0x02);        /* REL8 — the spare, which nothing sets */
+    /* Two passes: one to notice and re-assert, the next to confirm. Up to two
+       heartbeats, so poll rather than sleep on a guess. */
+    for (let i = 0; i < 60 && !/back in agreement/.test(logOf(sup)); i++) {
+      await new Promise((r) => setTimeout(r, 250));
+    }
+
+    expect(await sup.card.byte(), "the card should have been put back").toBe(settled);
+    expect(logOf(sup)).toMatch(/drifted — card reads 0x02  REL8/);
+    expect(logOf(sup)).toMatch(/back in agreement/);
+    await sup.stop();
+  }, 30000);
+
+  it("does not call a write landing inside a read a drift", async () => {
+    /* The bug this slice exists for. `verifyRelays` sampled what it expected
+       *before* spawning `i2cget`, so a write during the read produced a fresh
+       card against a stale expectation: reported as a hardware fault, counted
+       against the card, and re-asserted — undoing a change the supervisor had
+       just made on purpose.
+     *
+     * Deterministic rather than hopeful: the read announces itself, the test
+     * waits for one to be open, and only then changes the byte. */
+    const sup = await start({ card: true, purgeMs: 500 });
+    const client = await connect(sup.port);
+    await client.state(HEARTBEAT_MS * 2);
+    await new Promise((r) => setTimeout(r, 1500));
+    await sup.card.quiet();
+
+    await sup.card.setReadDelay(2500);
+    await sup.card.whileReading();
+    await client.intent("toggle", { key: "light" });
+    await new Promise((r) => setTimeout(r, 4000));
+
+    expect(logOf(sup), "a legitimate write is not a drift").not.toMatch(/drifted/);
+    await sup.card.setReadDelay(0);
+    await sup.stop();
+  }, 30000);
+
+  it("keeps supervising a card that has gone away, and says so once", async () => {
+    /* A dead card must not take the process with it. The invariants still
+       want checking and the phones still want state — what is lost is the
+       ability to move anything, and that is worth exactly one line. */
+    const sup = await start({ card: true });
+    const client = await connect(sup.port);
+    await client.state(HEARTBEAT_MS * 2);
+
+    await sup.card.setFailing(true);
+    await client.intent("toggle", { key: "light" });
+    await client.intent("toggle", { key: "light" });
+    await new Promise((r) => setTimeout(r, HEARTBEAT_MS + 1500));
+
+    const health = await (await fetch(sup.url("/health"))).json();
+    expect(health.ok, "the supervisor must survive its card").toBe(true);
+    expect(health.thinking, "and keep evaluating").toBe(true);
+    expect(logOf(sup).match(/relay card: (write|read) failed/g).length)
+      .toBeLessThanOrEqual(2);
+    await sup.card.setFailing(false);
+    await sup.stop();
+  }, 30000);
+
+  it("does not invent a drift out of a failed read", async () => {
+    /* A read that cannot be done tells us nothing about the card. Treating
+       "no answer" as "wrong answer" would raise a hardware fault every time
+       the bus was busy, and then re-assert on the strength of it. */
+    const sup = await start({ card: true, purgeMs: 500 });
+    await new Promise((r) => setTimeout(r, 1500));
+    await sup.card.setFailing(true);
+    await new Promise((r) => setTimeout(r, HEARTBEAT_MS + 2000));
+
+    expect(logOf(sup)).not.toMatch(/drifted/);
+    await sup.card.setFailing(false);
+    await sup.stop();
+  }, 30000);
+});
+
 describe("shutting down", () => {
   it("exits on SIGTERM even with a browser still attached", async () => {
     /* systemd sends SIGTERM and waits. A supervisor that lingers because a

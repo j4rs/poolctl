@@ -236,7 +236,7 @@ asking. Observe and react; never assert, and never remember.
 
 ---
 
-## Slice 6 — Faults
+## Slice 6 — Faults — **done, 29 August 2026**
 
 **What.** Card write fails, card read fails, njsPC drops mid-intent, the card
 drifts, two writes race. Some of this exists — `SIGUSR2` breaks `evaluate()`,
@@ -248,6 +248,23 @@ corrector's race was found that way and could have been found here.
 
 **Done when** the drift path is provable without an SSH session, including the
 case that broke it: a legitimate write landing during the read-back.
+
+**Shipped.** The fake card gained two fields settable while the supervisor
+runs: `fail`, and `readDelayMs` — which also records `readingSince`, so a test
+can wait for a read to be *open* and act inside it. That is what makes the
+race deterministic rather than hopeful.
+
+Four tests: a drift is noticed, corrected and confirmed on the following pass;
+a write landing inside a read is **not** a drift; a card that has gone away
+does not take the supervisor with it, and costs one log line rather than one
+per heartbeat; and a failed read never becomes an invented drift, because "no
+answer" is not "wrong answer".
+
+Verified by breaking it: reintroducing the stale sample — reading
+`hat.lastWritten` before the spawn instead of after — fails the race test.
+That is the bug that shipped this morning, undid a legitimate relay change and
+reported a hardware fault that never happened. It is now caught in nine
+seconds without an SSH session.
 
 **Cost** small-medium. **Depends on** 1.
 
@@ -289,6 +306,19 @@ environment, which is the least pleasant combination here.
 place only once the others are done.
 
 ---
+
+## A note on runtime
+
+660 tests, and the suite is now about **125 seconds** — four over the two
+minutes slice 3 set as the budget. Most of it is the integration files, which
+spawn real processes and wait on real heartbeats; the fault tests alone are
+~40 s because several of them must wait two full evaluation passes.
+
+Not yet worth fixing, but worth watching. The lever, when it is needed, is
+making `HEARTBEAT_MS` overridable — deliberately refused in slice 3 because
+the client restates it as its staleness threshold and moving one without the
+other retires a real guard. Doing it properly means moving both together and
+keeping the pair asserted.
 
 ## Order
 

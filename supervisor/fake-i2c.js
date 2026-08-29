@@ -31,8 +31,18 @@
  *   fake-i2c.js set -y 1 0x27 0x01 0x40
  *   fake-i2c.js get -y 1 0x27 0x00
  *
- * `FAKE_I2C_STATE` names the JSON file. `FAKE_I2C_FAIL`, if set, makes every
- * operation exit non-zero — the card having gone away, for slice 6.
+ * `FAKE_I2C_STATE` names the JSON file. Two fields in it make the card
+ * misbehave on demand, both settable while the supervisor is running:
+ *
+ *   `fail`         every operation exits non-zero — the card has gone away
+ *   `readDelayMs`  a read takes this long, and records that it is in flight
+ *
+ * The delay is not padding. The drift corrector's bug was a write landing
+ * *inside* a read: it sampled what it expected before spawning `i2cget`, so a
+ * fresh card came back against a stale expectation, got reported as a
+ * hardware fault, and was "corrected" to the byte the supervisor had just
+ * stopped wanting. Reproducing that needs a read that is reliably still open
+ * when something else writes, and `readingSince` is how a test knows one is.
  */
 import { readFileSync, writeFileSync } from "node:fs";
 
@@ -40,11 +50,6 @@ const STATE = process.env.FAKE_I2C_STATE;
 if (!STATE) {
   process.stderr.write("fake-i2c: FAKE_I2C_STATE is not set\n");
   process.exit(2);
-}
-
-if (process.env.FAKE_I2C_FAIL) {
-  process.stderr.write("Error: Read failed\n");
-  process.exit(1);
 }
 
 const read = () => {
@@ -63,6 +68,11 @@ const [, , register, value] = args;
 
 const state = read();
 
+if (state.fail) {
+  process.stderr.write("Error: Read failed\n");
+  process.exit(1);
+}
+
 if (tool === "set") {
   const byte = Number(value);
   if (!Number.isInteger(byte) || byte < 0 || byte > 0xff) {
@@ -76,11 +86,29 @@ if (tool === "set") {
 }
 
 if (tool === "get") {
-  /* Both registers answer with the latch: every pin is an output and nothing
-     external drives one, so the input port mirrors it. See the header. */
-  process.stdout.write(`0x${state.byte.toString(16).padStart(2, "0")}\n`);
-  process.exit(0);
+  const delay = Number(state.readDelayMs) || 0;
+  if (delay > 0) {
+    /* Announce the read, hold it open, then answer with the byte as it was
+       when the read *started* — which is what a real bus does, and what makes
+       a write landing mid-read visible as a stale answer. */
+    const sampled = state.byte;
+    state.readingSince = Date.now();
+    writeFileSync(STATE, JSON.stringify(state));
+    setTimeout(() => {
+      const now = read();
+      delete now.readingSince;
+      writeFileSync(STATE, JSON.stringify(now));
+      process.stdout.write(`0x${sampled.toString(16).padStart(2, "0")}\n`);
+      process.exit(0);
+    }, delay);
+  } else {
+    /* Both registers answer with the latch: every pin is an output and
+       nothing external drives one, so the input port mirrors it. */
+    process.stdout.write(`0x${state.byte.toString(16).padStart(2, "0")}\n`);
+    process.exit(0);
+  }
+} else if (tool !== "set") {
+  process.stderr.write(`fake-i2c: unknown tool ${tool}\n`);
+  process.exit(2);
 }
 
-process.stderr.write(`fake-i2c: unknown tool ${tool}\n`);
-process.exit(2);
