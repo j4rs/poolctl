@@ -782,8 +782,9 @@ const intents = {
     if (key === "blower" && !mayToggleBlower({ turningOn, mode: ui?.mode })) {
       throw refuse("the blower only starts in spa mode");
     }
-    /* No relay is assigned until the HAT is fitted, so this is supervisor
-       state for now. It becomes a circuit call at commissioning. */
+    /* Supervisor state, and from there straight onto the card: the light is
+       CH7 and the blower CH6 in `relays.js`. Neither is an njsPC circuit, so
+       this intent is the whole path. */
     own[key] = turningOn;
     publish();
   },

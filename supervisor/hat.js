@@ -35,9 +35,19 @@ export const OUTPUT_REG = "0x01";
  * with four channels energised, `0x00` = `0x63` and `0x01` = `0x63`.
  */
 export const INPUT_REG = "0x00";
-const I2CSET = "/usr/sbin/i2cset";
-const I2CGET = "/usr/sbin/i2cget";
-const DEVICE = `/dev/i2c-${BUS}`;
+/**
+ * Where i2c-tools live, and which bus node to look for.
+ *
+ * Overridable because distributions disagree — Debian puts these in
+ * `/usr/sbin`, others in `/usr/bin` — and because it is the seam the test
+ * harness uses to stand a fake card in front of the supervisor. No test
+ * awareness in here: these are two paths, and something else decides what
+ * they point at.
+ */
+const TOOL_DIR = process.env.I2C_TOOL_DIR || "/usr/sbin";
+const I2CSET = `${TOOL_DIR}/i2cset`;
+const I2CGET = `${TOOL_DIR}/i2cget`;
+const DEVICE = process.env.I2C_DEVICE || `/dev/i2c-${BUS}`;
 
 /**
  * Is there a card to talk to?

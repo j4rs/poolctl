@@ -499,6 +499,77 @@ describe("a supervisor that has stopped thinking", () => {
   }, 40000);
 });
 
+describe("the relay card", () => {
+  /**
+   * The only output that moves equipment, and until this slice no test had
+   * ever looked at one. `hat` was null in every run — `available()` looks for
+   * `/dev/i2c-1`, absent off the Pi — so `driveRelays()` returned immediately
+   * and the path from an intent to a byte went unexercised. Both of the bugs
+   * found on 29 August lived in that seam.
+   *
+   * The card is faked at the process boundary, so `hat.js` itself runs for
+   * real: argument building, output parsing, write serialisation. Only the
+   * two `i2c` binaries are ours.
+   */
+  it("de-energises everything before it serves anything", async () => {
+    /* Whatever the card was holding through a crash, a kill or a power cut is
+       not ours to inherit. This is the boot half of ADR-10, and it is a
+       `force` rather than a `set` precisely because the shadow is empty and
+       the card's real state is unknown. */
+    const sup = await start({ card: true });
+    await new Promise((r) => setTimeout(r, 1200));
+    expect(await sup.card.writes()).toEqual([0x00]);
+    await sup.stop();
+  }, 30000);
+
+  it("puts an intent on the card", async () => {
+    /* The light is the whole path in one intent: supervisor state, no njsPC
+       circuit, CH7. Bit 3 of the measured map, so 0x08 — a number that only
+       comes out right if relays.js, hat.js and the byte the card holds all
+       agree. */
+    const sup = await start({ card: true });
+    const client = await connect(sup.port);
+    await client.state(HEARTBEAT_MS * 2);
+
+    await client.intent("toggle", { key: "light" });
+    await new Promise((r) => setTimeout(r, 800));
+    expect(await sup.card.byte()).toBe(0x08);
+
+    await client.intent("toggle", { key: "light" });
+    await new Promise((r) => setTimeout(r, 800));
+    expect(await sup.card.byte()).toBe(0x00);
+    await sup.stop();
+  }, 30000);
+
+  it("de-energises on the way out, not just on the way in", async () => {
+    /* `systemctl stop`, a deploy and a reboot all come through SIGTERM. A
+       clean stop that left a coil energised would hand the next boot exactly
+       the state boot refuses to trust. */
+    const sup = await start({ card: true });
+    const client = await connect(sup.port);
+    await client.state(HEARTBEAT_MS * 2);
+    await client.intent("toggle", { key: "light" });
+    await new Promise((r) => setTimeout(r, 800));
+    expect(await sup.card.byte()).toBe(0x08);
+
+    await sup.term({ patience: 5000 });
+    expect(await sup.card.byte()).toBe(0x00);
+  }, 30000);
+
+  it("writes once for one change", async () => {
+    /* Concurrent publish() calls used to each pass the shadow check and all
+       write — three lines in the journal for one change. Serialised now, and
+       this is the assertion that would have caught it. */
+    const sup = await start({ card: true });
+    const client = await connect(sup.port);
+    await client.state(HEARTBEAT_MS * 2);
+    await client.intent("toggle", { key: "light" });
+    await new Promise((r) => setTimeout(r, HEARTBEAT_MS + 1000));
+    expect(await sup.card.writes()).toEqual([0x00, 0x08]);
+    await sup.stop();
+  }, 30000);
+});
+
 describe("shutting down", () => {
   it("exits on SIGTERM even with a browser still attached", async () => {
     /* systemd sends SIGTERM and waits. A supervisor that lingers because a

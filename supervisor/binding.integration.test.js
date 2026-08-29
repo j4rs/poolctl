@@ -239,7 +239,7 @@ let client;
 
 beforeEach(async () => {
   njspc = fakeNjspc();
-  sup = await start({ njspcUrl: await njspc.listen() });
+  sup = await start({ njspcUrl: await njspc.listen(), card: true });
   client = await connect(sup.port);
   /* Wait for real state, not merely for the link.
    *
@@ -688,8 +688,13 @@ describe("the evaluation loop", () => {
     await client.intent("setPoolHeat", { on: false });
     const after = await settles((s) => s.purgeUntil != null, 8000);
     expect(after.poolHeatDemand).toBe(false);
-    expect(after.valves.bypass, "the valve must not close on a hot exchanger")
-      .toBe("flow");
+
+    /* Asserted on the card rather than on `valves.bypass`. The state field is
+       what the supervisor believes; the byte is what the relays are doing,
+       and the two came apart once already — the first attempt at the purge
+       moved a field that drives nothing while every unit test passed. */
+    expect(await sup.card.byte(), "the valve must not close on a hot exchanger")
+      .toBe(0x00);
   });
 
   it("says how long the exchanger is being held open for", async () => {

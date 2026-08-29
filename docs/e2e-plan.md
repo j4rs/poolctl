@@ -34,7 +34,7 @@ water.
 
 ---
 
-## Slice 1 — The card exists in tests
+## Slice 1 — The card exists in tests — **done, 29 August 2026**
 
 **What.** `hat` is `null` in every test today: `hatAvailable()` looks for
 `/dev/i2c-1`, which is absent off the Pi, so `driveRelays()` returns
@@ -49,6 +49,26 @@ where `own.bypass` turned out to drive nothing while every unit test passed.
 
 **Done when** a test can assert the byte after an intent, and the purge test
 asserts `0x40 → 0x10` rather than reading `valves.bypass` out of the state.
+
+**Shipped.** `supervisor/fake-i2c.js` is a PCA9554 in a JSON file, invoked
+through wrappers the harness writes into a temp directory that `I2C_TOOL_DIR`
+points at. `hat.js` gained two configurable paths and no test awareness
+whatsoever — which is the part worth defending: faking at the *process*
+boundary leaves argument construction, output parsing and write serialisation
+all running for real, and those are exactly where its bugs have been.
+
+`start({ card: true })` returns a handle with `byte()`, `writes()` and
+`poke()` — the last for driving the card behind the supervisor's back, which
+slice 6 needs and which is how the drift bug was found by hand.
+
+The purge test now asserts the card rather than `valves.bypass`, which is the
+distinction that matters: the state field is what the supervisor believes, the
+byte is what the relays are doing, and the first attempt at the purge moved a
+field that drove nothing while every unit test passed.
+
+Verified by breaking it: moving `driveRelays()` back out of `publish()` — the
+tap-latency bug from 28 August — fails three of the four new tests. A test
+that cannot fail is worse than no test.
 
 **Cost** small. **Blocks** slices 2, 4, 5, 6.
 

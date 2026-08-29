@@ -6,7 +6,7 @@
  */
 import { spawn } from "node:child_process";
 import { createServer } from "node:net";
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, writeFile, chmod, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -28,8 +28,52 @@ export async function freePort() {
   return port;
 }
 
+const FAKE_I2C = fileURLToPath(new URL("./fake-i2c.js", import.meta.url));
+
+/**
+ * Stand a fake relay card in front of the supervisor.
+ *
+ * Faked at the *process boundary* rather than inside `hat.js`: the harness
+ * writes `i2cset` and `i2cget` wrappers into a directory and points
+ * `I2C_TOOL_DIR` at it, so the supervisor spawns them exactly as it spawns the
+ * real tools. `hat.js` runs for real — argument building, output parsing,
+ * write serialisation, the failure path — and none of it knows.
+ *
+ * `available()` also wants a bus node to exist, so an empty file stands in for
+ * `/dev/i2c-1`. It is only ever tested for existence.
+ */
+async function fakeCard() {
+  const dir = await mkdtemp(join(tmpdir(), "poolctl-i2c-"));
+  const state = join(dir, "card.json");
+  const device = join(dir, "i2c-fake");
+
+  await writeFile(state, JSON.stringify({ byte: 0x00, writes: [] }));
+  await writeFile(device, "");
+  for (const tool of ["set", "get"]) {
+    const path = join(dir, `i2c${tool}`);
+    await writeFile(path, `#!/bin/sh\nexec "${process.execPath}" "${FAKE_I2C}" ${tool} "$@"\n`);
+    await chmod(path, 0o755);
+  }
+
+  const load = async () => JSON.parse(await readFile(state, "utf8"));
+  return {
+    env: { I2C_TOOL_DIR: dir, I2C_DEVICE: device, FAKE_I2C_STATE: state },
+    /** What the card holds right now. */
+    async byte() { return (await load()).byte; },
+    /** Every write, in order — the foundation slice 2 builds traces on. */
+    async writes() { return (await load()).writes.map((w) => w.byte); },
+    /** Drive the card behind the supervisor's back, as a bench hand would. */
+    async poke(byte) {
+      const s = await load();
+      s.byte = byte;
+      await writeFile(state, JSON.stringify(s));
+    },
+  };
+}
+
 /** Spawn a supervisor and wait until it answers /health. */
-export async function start({ stateFile, njspcUrl, authFile } = {}) {
+export async function start({ stateFile, njspcUrl, authFile, card = false } = {}) {
+  const relays = card ? await fakeCard() : null;
   const port = await freePort();
   const proc = spawn(process.execPath, [ENTRY], {
     env: {
@@ -44,6 +88,9 @@ export async function start({ stateFile, njspcUrl, authFile } = {}) {
          reason auth has its own suite. */
       AUTH_FILE: authFile ?? join(tmpdir(), "poolctl-no-such-auth.json"),
       STATE_FILE: stateFile ?? join(await mkdtemp(join(tmpdir(), "poolctl-")), "state.json"),
+      /* Absent unless a test asked for a card, so every existing test keeps
+         the behaviour it was written against: no bus, no relay writes. */
+      ...(relays ? relays.env : {}),
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -67,6 +114,8 @@ export async function start({ stateFile, njspcUrl, authFile } = {}) {
   return {
     port,
     output,
+    /** The fake card, when one was asked for. */
+    card: relays,
     url: (path) => `http://127.0.0.1:${port}${path}`,
     /** Send a signal and carry on — the process is expected to survive it. */
     signal(sig) { proc.kill(sig); },
