@@ -6,7 +6,7 @@
  */
 import { spawn } from "node:child_process";
 import { createServer } from "node:net";
-import { mkdtemp, writeFile, chmod, readFile } from "node:fs/promises";
+import { mkdtemp, writeFile, chmod, readFile, rename } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -56,7 +56,26 @@ async function fakeCard() {
     await chmod(path, 0o755);
   }
 
-  const load = async () => JSON.parse(await readFile(state, "utf8"));
+  /* Retried, and the writer renames rather than truncating — between them a
+     reader can no longer catch the file mid-write. Belt and braces because a
+     torn read here fails a test somewhere else entirely, which is a miserable
+     thing to debug. */
+  const load = async () => {
+    for (let i = 0; ; i++) {
+      try { return JSON.parse(await readFile(state, "utf8")); }
+      catch (err) {
+        if (i >= 20) throw err;
+        await new Promise((r) => setTimeout(r, 20));
+      }
+    }
+  };
+
+  /* Same reason: never truncate a file the supervisor may be reading. */
+  const save = async (data) => {
+    const tmp = `${state}.harness.tmp`;
+    await writeFile(tmp, JSON.stringify(data));
+    await rename(tmp, state);
+  };
   return {
     env: { I2C_TOOL_DIR: dir, I2C_DEVICE: device, FAKE_I2C_STATE: state },
     /** What the card holds right now. */
@@ -104,27 +123,27 @@ async function fakeCard() {
     async reset() {
       const s = await load();
       s.writes = [];
-      await writeFile(state, JSON.stringify(s));
+      await save(s);
     },
     /** Drive the card behind the supervisor's back, as a bench hand would. */
     async poke(byte) {
       const s = await load();
       s.byte = byte;
-      await writeFile(state, JSON.stringify(s));
+      await save(s);
     },
 
     /** The card has gone away, or come back. */
     async setFailing(fail) {
       const s = await load();
       s.fail = Boolean(fail);
-      await writeFile(state, JSON.stringify(s));
+      await save(s);
     },
 
     /** Make reads slow, so a write can be made to land inside one. */
     async setReadDelay(ms) {
       const s = await load();
       s.readDelayMs = ms;
-      await writeFile(state, JSON.stringify(s));
+      await save(s);
     },
 
     /** Resolve once a read is open, so a test can act during it. */

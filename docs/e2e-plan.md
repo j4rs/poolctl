@@ -171,7 +171,7 @@ purge never release fails the boot-hold trace.
 
 ---
 
-## Slice 4 — Scenarios as tables
+## Slice 4 — Scenarios as tables — **done, 29 August 2026**
 
 **What.** A thin helper for `given state → these intents → expect this trace`.
 A table, not a DSL; the moment it needs its own documentation it has failed.
@@ -182,6 +182,34 @@ reviewable as a specification by someone who will not read the test harness.
 
 **Done when** the four `SEQUENCES` paths and the boot resync are each one
 table, and adding a fifth is obvious.
+
+**Shipped.** Seven rows, each `given` a starting position, `from` a stated
+resting byte, `when` something happens, expect exactly `card`. The runner
+waits for the card to reach the stated start before resetting the log, and
+waits for the last expected byte before asserting — so a row cannot pass by
+inheriting whatever the previous one left. Adding a row is three lines.
+
+**It found the purge's remaining hole.** Releasing pool heat traced
+`["0x40  REL3", "0x00  (all off)"]`: the intent published with the demand
+cleared while `purgeHolding` was still false, so `map.js` derived `around` and
+**the card isolated the exchanger for up to a whole heartbeat** before the
+evaluation caught up. The same hole as the boot flash, on the path the purge
+was actually written for — and invisible to every state assertion, because the
+end position was right and only the route through it wrong. `publish()` now
+runs the purge bookkeeping before the byte is computed.
+
+Two things about the instrument, both worth knowing:
+
+- **The fake card's state file was not written atomically.** A plain
+  `writeFileSync` truncates first, so the harness reading during that window
+  got `SyntaxError: Unexpected end of JSON input` — surfacing as a *different*
+  test failing on each run. Writes now go beside the file and rename.
+- **Compressing this suite's purge to 300 ms broke two assertions that caught
+  the hold at an instant.** Both moved rather than vanished: the release is
+  now a trace, `["0x00", "0x40"]`, which asserts the hold *and* the let-go and
+  is strictly stronger than a non-null `purgeUntil` read at one moment.
+
+662 tests, about 115 seconds, stable across three consecutive runs.
 
 **Cost** medium. **Depends on** 1, 2, 3.
 

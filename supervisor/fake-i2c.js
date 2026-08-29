@@ -44,13 +44,26 @@
  * stopped wanting. Reproducing that needs a read that is reliably still open
  * when something else writes, and `readingSince` is how a test knows one is.
  */
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync, renameSync } from "node:fs";
 
 const STATE = process.env.FAKE_I2C_STATE;
 if (!STATE) {
   process.stderr.write("fake-i2c: FAKE_I2C_STATE is not set\n");
   process.exit(2);
 }
+
+/**
+ * Atomic, because the harness reads this file while the supervisor is writing
+ * it. A plain `writeFileSync` truncates first, so a reader landing in that
+ * window gets an empty file and a `SyntaxError` — which surfaced as tests
+ * failing in different places on each run, the worst kind of flake to chase.
+ * Write beside it and rename; rename is atomic on POSIX.
+ */
+const save = (data) => {
+  const tmp = `${STATE}.${process.pid}.tmp`;
+  writeFileSync(tmp, JSON.stringify(data));
+  renameSync(tmp, STATE);
+};
 
 const read = () => {
   try {
@@ -81,7 +94,7 @@ if (tool === "set") {
   }
   state.byte = byte;
   state.writes.push({ at: Date.now(), byte, register });
-  writeFileSync(STATE, JSON.stringify(state));
+  save(state);
   process.exit(0);
 }
 
@@ -93,11 +106,11 @@ if (tool === "get") {
        a write landing mid-read visible as a stale answer. */
     const sampled = state.byte;
     state.readingSince = Date.now();
-    writeFileSync(STATE, JSON.stringify(state));
+    save(state);
     setTimeout(() => {
       const now = read();
       delete now.readingSince;
-      writeFileSync(STATE, JSON.stringify(now));
+      save(now);
       process.stdout.write(`0x${sampled.toString(16).padStart(2, "0")}\n`);
       process.exit(0);
     }, delay);

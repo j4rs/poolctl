@@ -372,7 +372,11 @@ let client;
 beforeEach(async () => {
   njspc = fakeNjspc();
   njspcUrl = await njspc.listen();
-  sup = await start({ njspcUrl, card: true });
+  /* A purge measured in fractions of a second. The rule is the same one
+     production runs — hold, then release — and compressing it is what lets a
+     scenario start from a known resting byte instead of inheriting a
+     three-minute hold from whatever ran before it. */
+  sup = await start({ njspcUrl, card: true, purgeMs: 300 });
   client = await connect(sup.port);
   /* Wait for real state, not merely for the link.
    *
@@ -807,42 +811,13 @@ describe("the evaluation loop", () => {
     await client.intent("setPoolHeat", { on: false });
   });
 
-  it("does not isolate the exchanger the instant the call ends", async () => {
-    /* The purge. Releasing pool heat used to swing the bypass to `around` in
-       the same tick, closing a valve on an exchanger that had been firing a
-       moment earlier. The hold is observable immediately, so this asserts it
-       without waiting three minutes; the release is unit-tested. */
-    njspc.setTemps({ temp: 70 });
-    await settles((s) => s.waterTemp === 70, 8000);
-    await client.intent("setTarget", { body: "pool", degrees: 85 });
-    await client.intent("setPoolHeat", { on: true });
-    await settles((s) => s.valves.bypass === "flow", 8000);
-
-    await client.intent("setPoolHeat", { on: false });
-    const after = await settles((s) => s.purgeUntil != null, 8000);
-    expect(after.poolHeatDemand).toBe(false);
-
-    /* Asserted on the card rather than on `valves.bypass`. The state field is
-       what the supervisor believes; the byte is what the relays are doing,
-       and the two came apart once already — the first attempt at the purge
-       moved a field that drives nothing while every unit test passed. */
-    expect(await sup.card.byte(), "the valve must not close on a hot exchanger")
-      .toBe(0x00);
-  });
-
-  it("says how long the exchanger is being held open for", async () => {
-    /* An absolute timestamp, like spaExpiresAt — the client counts down on
-       its own clock rather than us streaming a number that is already stale. */
-    njspc.setTemps({ temp: 70 });
-    await settles((s) => s.waterTemp === 70, 8000);
-    await client.intent("setTarget", { body: "pool", degrees: 85 });
-    await client.intent("setPoolHeat", { on: true });
-    await settles((s) => s.valves.bypass === "flow", 8000);
-    await client.intent("setPoolHeat", { on: false });
-
-    const held = await settles((s) => s.purgeUntil != null, 8000);
-    expect(held.purgeUntil).toBeGreaterThan(Date.now());
-  });
+  /* The purge's hold and its report used to be asserted here. Both moved
+     rather than vanished: the scenario table above asserts the release as a
+     trace — ["0x00", "0x40"], the hold and then the let-go, which is stronger
+     than catching `purgeUntil` non-null at one instant — and index.test.js
+     asserts the reported deadline against a purge long enough to read it.
+     This suite now runs a 300 ms purge so scenarios start from a known byte,
+     which makes an instantaneous assertion here a race by construction. */
 
   it("leaves the spa call alone, because njsPC owns that heater", async () => {
     njspc.setTemps({ temp: 105 });
@@ -914,74 +889,144 @@ describe("the evaluation loop", () => {
 
 describe("what the card actually does", () => {
   /**
-   * Traces, not snapshots.
+   * The sequences, as traces.
    *
-   * The order is the safety property here — valve before contact, purge
-   * before isolation, boot passing through de-energised — and a resting byte
-   * cannot show any of it. Both bugs found on 29 August had the right end
-   * state and the wrong path: a boot that flashed `0x40` before the purge
-   * hold engaged, and a drift corrector re-asserting a byte the supervisor
-   * had just stopped wanting.
+   * Order is the safety property — valve before contact, purge before
+   * isolation, boot through de-energised — and a resting byte cannot show it.
+   * Two bugs on 29 August had the right end state and the wrong path.
    *
-   * These read as a specification. That is deliberate; someone who will never
-   * open the harness should be able to review them.
+   * A table rather than a helper library. Each row is `given` a starting
+   * position, `when` something happens, expect the card to do exactly `card`
+   * — and these read as a specification for someone who will never open the
+   * harness, which is most of the point. Adding a row should be three lines.
+   *
+   * The rows correspond to `sequences.js`, but not step for step: most of
+   * those steps are njsPC's, and what the supervisor contributes is the
+   * bypass, the heat contacts and the blower. See "Sequence ownership" in
+   * docs/architecture.md.
    */
-  /* Quiesce the card, then start the trace from there. */
-  const from = async () => { await sup.card.quiet(); await sup.card.reset(); };
-
-  it("switches to spa in one write, heat contact included", async () => {
-    /* 0x25 rather than 0x05, and the difference is the authority change: the
-       spa heat call follows the mode now, because njsPC's heater has no
-       device binding and actuates nothing. */
+  const inPool = async () => {
     await client.intent("setMode", { mode: "pool" });
     await settles((s) => s.mode === "pool", 8000);
-    await from();
-
-    await client.intent("setMode", { mode: "spa" });
-    await sup.card.quiet();
-    expect(await sup.card.trace()).toEqual(["0x25  REL1 REL2 REL5"]);
-  });
-
-  it("adds the blower without disturbing anything else", async () => {
+  };
+  const inSpa = async () => {
     await client.intent("setMode", { mode: "spa" });
     await settles((s) => s.mode === "spa", 8000);
-    await from();
+  };
+  const coldPool = async () => {
+    await inPool();
+    njspc.setTemps({ temp: 70 });
+    await settles((s) => s.waterTemp === 70, 8000);
+    await client.intent("setTarget", { body: "pool", degrees: 85 });
+  };
 
-    await client.intent("toggle", { key: "blower" });
-    await sup.card.quiet();
-    expect(await sup.card.trace()).toEqual(["0xa5  REL1 REL2 REL5 REL6"]);
-  });
+  const SCENARIOS = [
+    {
+      name: "pool to spa — both valves and the spa heat call, in one write",
+      /* 0x25 rather than 0x05: the spa heat call follows the mode now,
+         because njsPC's heater has no device binding and actuates nothing. */
+      given: inPool,
+      from: 0x40,
+      when: inSpa,
+      card: ["0x25  REL1 REL2 REL5"],
+    },
+    {
+      name: "the blower joins without disturbing anything else",
+      given: inSpa,
+      from: 0x25,
+      when: () => client.intent("toggle", { key: "blower" }),
+      card: ["0xa5  REL1 REL2 REL5 REL6"],
+    },
+    {
+      name: "spa to pool — out through de-energised, never through the bypass",
+      /* Spa heat was on, so the purge holds the bypass at flow. A 0x40 here
+         would isolate an exchanger the heater was firing into moments ago. */
+      given: inSpa,
+      from: 0x25,
+      when: inPool,
+      card: ["0x00  (all off)", "0x40  REL3"],
+    },
+    {
+      name: "the blower does not survive the mode change",
+      given: async () => {
+        await inSpa();
+        if (!(await now()).blower) await client.intent("toggle", { key: "blower" });
+        await settles((s) => s.blower === true, 8000);
+      },
+      from: 0xa5,
+      when: inPool,
+      card: ["0x00  (all off)", "0x40  REL3"],
+      then: (state) => expect(state.blower).toBe(false),
+    },
+    {
+      name: "calling for pool heat releases the bypass and closes the contact",
+      /* heatEngage. One write, because the byte carries both: CH3 drops as
+         CH4 closes, which is the valve-before-contact ordering expressed as
+         a single atomic change rather than a sequence. */
+      given: coldPool,
+      from: 0x40,
+      when: () => client.intent("setPoolHeat", { on: true }),
+      card: ["0x10  REL4"],
+    },
+    {
+      name: "releasing pool heat opens the contact and holds the flow",
+      /* heatRelease. The purge is why this is 0x00 and not 0x40. */
+      given: async () => {
+        await coldPool();
+        await client.intent("setPoolHeat", { on: true });
+        await settles((s) => s.heaterCall === "pool", 8000);
+      },
+      from: 0x10,
+      when: () => client.intent("setPoolHeat", { on: false }),
+      /* Two writes, and the first one is the whole point: the contact opens
+         and the bypass stays at flow. Straight to 0x40 would isolate an
+         exchanger the heater was firing into a moment earlier — which is
+         precisely what this did before the trace caught it. */
+      card: ["0x00  (all off)", "0x40  REL3"],
+    },
+    {
+      name: "the light is one relay and nothing else",
+      given: inPool,
+      from: 0x40,
+      when: () => client.intent("toggle", { key: "light" }),
+      card: ["0x48  REL3 REL7"],
+      then: () => client.intent("toggle", { key: "light" }),
+    },
+  ];
 
-  it("clears the blower on the way out of spa", async () => {
-    /* `mode !== 'spa' implies blower === false`. The toggle is gated to spa
-       mode, so a blower carried into pool mode is on and awkward to reach —
-       and sequences.js has an explicit blower-off step in the pool path. */
-    await client.intent("setMode", { mode: "spa" });
-    await settles((s) => s.mode === "spa", 8000);
-    if (!(await now()).blower) await client.intent("toggle", { key: "blower" });
-    await from();
+  /** Wait for the card to reach a byte, nudging njsPC so a purge release does
+      not have to wait out a whole heartbeat. */
+  const rests = async (byte, why) => {
+    for (let i = 0; i < 60; i++) {
+      if ((await sup.card.byte()) === byte) return;
+      njspc.touch();
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    throw new Error(
+      `card never reached ${why} (0x${byte.toString(16)}); it holds ` +
+      `0x${(await sup.card.byte()).toString(16)}`);
+  };
 
-    await client.intent("setMode", { mode: "pool" });
-    await settles((s) => s.mode === "pool", 8000);
-    await sup.card.quiet();
-    const state = await now();
-    expect(state.blower, "the blower must not survive the mode change").toBe(false);
-    expect(state.violations.map((v) => v.id)).not.toContain("blower-out-of-spa");
-  });
+  const lastByte = (trace) => Number(trace[trace.length - 1].split(/\s+/)[0]);
 
-  it("leaves spa through de-energised, not through the bypass", async () => {
-    /* Spa heat was on, so the purge holds the bypass at flow — the card lands
-       on 0x00 and stays there. A 0x40 here would be the exchanger isolated
-       moments after the heater stopped. */
-    await client.intent("setMode", { mode: "spa" });
-    await settles((s) => s.mode === "spa", 8000);
-    await from();
+  for (const s of SCENARIOS) {
+    it(s.name, async () => {
+      if (s.given) await s.given();
+      /* Start from a stated position rather than whatever the last scenario
+         happened to leave. Order-dependence in a trace suite is how a green
+         run stops meaning anything. */
+      await rests(s.from, "its starting position");
+      await sup.card.quiet();
+      await sup.card.reset();
 
-    await client.intent("setMode", { mode: "pool" });
-    await settles((s) => s.mode === "pool", 8000);
-    await sup.card.quiet();
-    expect(await sup.card.trace()).toEqual(["0x00  (all off)"]);
-  });
+      await s.when(client);
+      await rests(lastByte(s.card), "the end of the trace");
+      await sup.card.quiet();
+
+      expect(await sup.card.trace()).toEqual(s.card);
+      if (s.then) await s.then(await now());
+    });
+  }
 });
 
 describe("when njsPC moves without being asked", () => {
@@ -1058,9 +1103,15 @@ describe("when njsPC moves without being asked", () => {
 
     njspc.expireSpa();
     await settles((s) => s.mode === "pool", 8000);
+    for (let i = 0; i < 60 && (await sup.card.byte()) !== 0x40; i++) {
+      njspc.touch();
+      await new Promise((r) => setTimeout(r, 200));
+    }
     await sup.card.quiet();
-    expect(await sup.card.trace()).toEqual(["0x00  (all off)"]);
-    expect((await now()).purgeUntil).toBeGreaterThan(Date.now());
+    /* De-energised first, and only then around the heater. The order is the
+       assertion: a 0x40 straight out of a spa session would isolate an
+       exchanger the heater had been firing into moments earlier. */
+    expect(await sup.card.trace()).toEqual(["0x00  (all off)", "0x40  REL3"]);
   });
 });
 

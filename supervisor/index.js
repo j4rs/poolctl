@@ -174,6 +174,14 @@ const njs = new NjsPC({
 const heatCall = () => ui?.heaterCall ?? "off";
 
 function publish() {
+  /* Before the byte is computed, not after. An intent that ends a heat call
+     publishes straight away, and the purge is a *stored* flag — so until the
+     next evaluation caught up, `map.js` derived `around` and the card
+     isolated an exchanger the heater had been firing into moments earlier.
+     Up to a whole heartbeat of it. Same hole as the boot flash, on the path
+     the purge was actually written for; found by a trace, not by the state,
+     because the end position was right and only the route through it wrong. */
+  runPurge(toUiState(njsRaw, own));
   ui = toUiState(njsRaw, own);
   /* Drive the card from the very view being broadcast, so the relays and the
      screen cannot disagree. Doing this in `evaluate()` instead left every
