@@ -674,6 +674,38 @@ describe("the evaluation loop", () => {
     await client.intent("setPoolHeat", { on: false });
   });
 
+  it("does not isolate the exchanger the instant the call ends", async () => {
+    /* The purge. Releasing pool heat used to swing the bypass to `around` in
+       the same tick, closing a valve on an exchanger that had been firing a
+       moment earlier. The hold is observable immediately, so this asserts it
+       without waiting three minutes; the release is unit-tested. */
+    njspc.setTemps({ temp: 70 });
+    await settles((s) => s.waterTemp === 70, 8000);
+    await client.intent("setTarget", { body: "pool", degrees: 85 });
+    await client.intent("setPoolHeat", { on: true });
+    await settles((s) => s.valves.bypass === "flow", 8000);
+
+    await client.intent("setPoolHeat", { on: false });
+    const after = await settles((s) => s.purgeUntil != null, 8000);
+    expect(after.poolHeatDemand).toBe(false);
+    expect(after.valves.bypass, "the valve must not close on a hot exchanger")
+      .toBe("flow");
+  });
+
+  it("says how long the exchanger is being held open for", async () => {
+    /* An absolute timestamp, like spaExpiresAt — the client counts down on
+       its own clock rather than us streaming a number that is already stale. */
+    njspc.setTemps({ temp: 70 });
+    await settles((s) => s.waterTemp === 70, 8000);
+    await client.intent("setTarget", { body: "pool", degrees: 85 });
+    await client.intent("setPoolHeat", { on: true });
+    await settles((s) => s.valves.bypass === "flow", 8000);
+    await client.intent("setPoolHeat", { on: false });
+
+    const held = await settles((s) => s.purgeUntil != null, 8000);
+    expect(held.purgeUntil).toBeGreaterThan(Date.now());
+  });
+
   it("leaves the spa call alone, because njsPC owns that heater", async () => {
     njspc.setTemps({ temp: 105 });
     await settles((s) => s.waterTemp === 105, 8000);

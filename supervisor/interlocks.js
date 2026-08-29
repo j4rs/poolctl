@@ -1,4 +1,4 @@
-import { HEATER_MIN_RPM, HEATER_CAP, TARGET_MIN } from "../src/lib/sequences.js";
+import { HEATER_MIN_RPM, HEATER_CAP, TARGET_MIN, PURGE_MIN } from "../src/lib/sequences.js";
 
 /**
  * The rules njsPC has no concept of.
@@ -36,6 +36,44 @@ export function bypassFor(mode, poolHeatDemand) {
 }
 
 /**
+ * How much longer flow must be held through the exchanger, in ms.
+ *
+ * The invariant is *"bypass may only move when heaterCall === 'off' and purge
+ * has elapsed"*. The first half was already enforced — `bypassFor` returns
+ * flow whenever heat is called. This is the second half, and nothing kept it:
+ * releasing pool heat swung the bypass to `around` in the same tick, which
+ * strands whatever heat is left in the exchanger behind a closed valve.
+ *
+ * The compressor is unobservable — the 3-wire interface reports nothing — so
+ * the end of *our* call stands in for the end of the compressor's run. That
+ * is a safe substitution in the direction that matters: the compressor cannot
+ * still be running after our call ended, so this can only ever over-estimate
+ * how long the exchanger stays hot.
+ */
+export function purgeRemainingMs(heatEndedAt, now, purgeMin = PURGE_MIN) {
+  if (!heatEndedAt) return 0;
+  const left = heatEndedAt + purgeMin * 60_000 - now;
+  return left > 0 ? left : 0;
+}
+
+/**
+ * The bypass position, given whether the purge is still holding.
+ *
+ * A boolean rather than a clock, because the clock lives in the evaluation
+ * loop and the position lives in `map.js` — which *derives* the bypass rather
+ * than storing one. A stored position went stale the first time njsPC changed
+ * the body by itself, leaving spa valves with the exchanger still bypassed.
+ *
+ * Only ever holds a move *toward* the heater's side. Moving to `flow` is
+ * never delayed — that direction is the safe one, and a heat call that had to
+ * wait three minutes for a valve it already needs would be a bug wearing an
+ * interlock's clothes.
+ */
+export function bypassHeld(want, holding) {
+  return want === "around" && holding ? "flow" : want;
+}
+
+/**
  * Invariants 2 and 3, which are converses and both required.
  *
  * The valve is binary, so a heat call with the bypass around means zero flow
@@ -69,14 +107,6 @@ export function shouldStopHeat({ waterTemp, target }) {
   return waterTemp >= target;
 }
 
-/**
- * The purge is conditional on the compressor actually having run. njsPC's
- * HeaterCooldownDelay is unconditional, so this is the part it lacks.
- */
-export function needsPurge({ compressorIdleMin, skipAfterMin = 5 }) {
-  if (typeof compressorIdleMin !== "number") return true;
-  return compressorIdleMin < skipAfterMin;
-}
 
 /** Convenience for callers reporting a refusal with its reason. */
 export function refuse(reason) {

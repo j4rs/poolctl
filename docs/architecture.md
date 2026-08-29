@@ -147,11 +147,41 @@ model, **13 of its 30 steps are things njsPC already does**, and the way to
 | `bypass-*` | supervisor | njsPC has no bypass concept (ADR-9). **Implemented** |
 | `heat-pool`, `heat-spa` | supervisor | CH4/CH5, derived from our own call. **Implemented** |
 | `blower-off` | supervisor | CH6. **Implemented** |
-| `purge` | supervisor | **not implemented.** njsPC's `HeaterCooldownDelay` would cover it, but `NixieHeatpump.getCooldownTime()` returns 0, so it never fires for this heater type. Duration also unmeasured |
+| `purge` | supervisor | **implemented.** Flow is held through the exchanger for `PURGE_MIN` after a call ends, before the bypass may isolate it. njsPC would not have done it: `NixieHeatpump.getCooldownTime()` returns 0, so `HeaterCooldownDelay` never fires for this heater type. Duration still unmeasured |
 | `pump-min` | supervisor | **not implemented.** `floorRpm` computes it and `setRpm` then refuses, so it has never reached equipment |
 
-So the file's remaining claim on the supervisor is **two things: the purge and
-the pump floor.** Everything else is either done or is njsPC configuration.
+So the file's remaining claim on the supervisor is **the pump floor** — the
+purge landed on 29 August 2026. Everything else is either done or is njsPC
+configuration.
+
+### How the purge is actually shaped
+
+Not as a step in a sequence. The loop owns the *clock* and `map.js` owns the
+*position*, and they meet at one boolean:
+
+- `runPurge()` watches `heaterCall` for a non-off → off transition, stamps
+  `heatEndedAt`, and sets `purgeHolding` for `PURGE_MIN` afterwards.
+- `map.js` derives the bypass as it always did, then `bypassHeld()` turns a
+  wanted `around` into `flow` while the hold stands.
+
+The split is not decoration. `map.js` derives the bypass rather than storing
+one, because a stored position went stale the first time njsPC changed the
+body by itself — spa valves with the exchanger still bypassed, a heat call at
+zero flow. The first attempt at the purge mutated `own.bypass`, which drives
+nothing; every unit test passed and the end-to-end test caught it.
+
+Two consequences worth keeping:
+
+- **Intents never move the bypass toward `around`.** They set mode and heat
+  demand; the position follows. An intent that isolated the exchanger would be
+  racing the loop that decides whether it may.
+- **Every boot begins holding.** `heatEndedAt` and `purgeHolding` are seeded
+  at startup, because we cannot know whether the heater was firing a second
+  before the power went. Three minutes of needless flow costs nothing;
+  isolating a hot exchanger is the hazard. Seeding only `heatEndedAt` was not
+  enough — the first publish happens when njsPC connects, before the first
+  evaluation, and the bypass went to `around` for one heartbeat first.
+  Observed on the Pi as `0x40` then `0x00`.
 
 ### The spec is not executable, and saying it was is the bug
 

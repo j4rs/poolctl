@@ -45,6 +45,27 @@ export const SPA_TIMEOUT_MIN = 120;
 export const PURGE_SKIP_AFTER_MIN = 5;
 
 /**
+ * How long flow is held through the exchanger after a heat call ends, before
+ * the bypass may isolate it. **UNMEASURED** — the Raypak manual's ~5 min
+ * figure is the anti-short-cycle delay, which is a different thing, and its
+ * real post-compressor requirement is unconfirmed.
+ *
+ * Erring long is close to free here, which was not true of the design this
+ * number was first written for. In `SEQUENCES` the purge blocks a whole
+ * transition, so three minutes is three minutes of somebody waiting. As the
+ * supervisor actually implements it, njsPC switches the body immediately and
+ * all this delays is our own bypass relay — the water simply keeps going
+ * through the heater a while longer, which nobody sees and nothing waits on.
+ * So if the measurement comes back higher, raise it without hesitating.
+ *
+ * Note it is deliberately below `PURGE_SKIP_AFTER_MIN`. That makes the
+ * skip-when-idle condition redundant rather than wrong: a call that ended
+ * more than five minutes ago also ended more than three minutes ago, so the
+ * hold has already expired and there is nothing to skip.
+ */
+export const PURGE_MIN = 3;
+
+/**
  * Intermatic duty cycle: 1 min ON max, 8 min OFF min. An actuator may not be
  * re-driven inside this window. Nothing enforces it yet — a user toggling
  * spa -> pool -> spa would violate it with three normal transitions.

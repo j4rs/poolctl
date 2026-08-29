@@ -117,3 +117,39 @@ describe("dry run", () => {
     expect(await hat.read()).toBe(0x40);
   });
 });
+
+describe("concurrent writes", () => {
+  it("does not let two callers race the same change onto the card", async () => {
+    /* `set` compares against the shadow, awaits a spawn, and updates the
+       shadow only on success — so two publish() calls in one tick both passed
+       the guard and both wrote. Observed on the Pi as three "relays -> 0x40"
+       lines for one change. */
+    let inFlight = 0, overlapped = false;
+    const exec = async () => {
+      if (++inFlight > 1) overlapped = true;
+      await new Promise((r) => setTimeout(r, 5));
+      inFlight--;
+      return { stdout: "" };
+    };
+    const hat = createHat({ exec, log: quiet });
+    const results = await Promise.all([hat.set(0x40), hat.set(0x40), hat.set(0x40)]);
+    expect(overlapped, "writes overlapped on the bus").toBe(false);
+    expect(results.filter((r) => r.written)).toHaveLength(1);
+  });
+
+  it("still writes a genuine second change after the first lands", async () => {
+    const seen = [];
+    const exec = async (_cmd, args) => { seen.push(args[args.length - 1]); return { stdout: "" }; };
+    const hat = createHat({ exec, log: quiet });
+    await Promise.all([hat.set(0x40), hat.set(0x10)]);
+    expect(seen).toEqual(["0x40", "0x10"]);
+  });
+
+  it("keeps a force ordered against the sets around it", async () => {
+    const seen = [];
+    const exec = async (_cmd, args) => { seen.push(args[args.length - 1]); return { stdout: "" }; };
+    const hat = createHat({ exec, log: quiet });
+    await Promise.all([hat.set(0x40), hat.force(0x00), hat.set(0x40)]);
+    expect(seen).toEqual(["0x40", "0x00", "0x40"]);
+  });
+});

@@ -13,8 +13,10 @@ import {
   sessionCookie, clearedCookie, COOKIE,
 } from "./auth.js";
 import { DEFAULT_PROGRAMS } from "../src/lib/programs.js";
+import { PURGE_MIN } from "../src/lib/sequences.js";
 import {
-  floorRpm, bypassFor, mayCallForHeat, mayToggleBlower, shouldStopHeat, refuse,
+  floorRpm, bypassFor, purgeRemainingMs,
+  mayCallForHeat, mayToggleBlower, shouldStopHeat, refuse,
 } from "./interlocks.js";
 import { checkInvariants, driftBreaches } from "./invariants.js";
 import {
@@ -107,6 +109,16 @@ const own = {
   blower: false,
   light: false,
   target: null,
+  /* Seeded to boot time on purpose, so every restart begins with a full purge
+     hold. We cannot know whether the heater was running a second before the
+     power went, and three minutes of flow through an exchanger that did not
+     need it costs nothing — isolating one that did is the whole hazard.
+     `purgeHolding` starts true for the same reason and is not redundant: the
+     first publish happens when njsPC connects, which is before the first
+     evaluation, so leaving it false let the bypass go to `around` for one
+     heartbeat before the hold engaged. Observed on the Pi — 0x40 then 0x00. */
+  heatEndedAt: Date.now(),
+  purgeHolding: true,
   activeSequence: null,
   step: null,
   stepIndex: 0,
@@ -221,6 +233,9 @@ function evaluate() {
     if (injectedFault) throw new Error(injectedFault);
     const view = toUiState(njsRaw, own);
     applyCutoff(view);
+    /* After the cutoff, because the cutoff is one of the things that ends a
+       call — reading the pre-cutoff view would start the purge a tick late. */
+    runPurge(toUiState(njsRaw, own));
     const settled = toUiState(njsRaw, own);
     own.violations = [...checkInvariants(settled), ...driftBreaches(own.relayDrift, own.relayDrifts ?? 0)];
     publish();
@@ -280,11 +295,21 @@ function driveRelays(view) {
  */
 async function verifyRelays() {
   if (!hat) return;
-  const expected = hat.lastWritten;
-  if (expected == null) return;               /* nothing written yet */
+  const before = hat.lastWritten;
+  if (before == null) return;                 /* nothing written yet */
 
   const actual = await hat.read();
   if (actual == null) return;                 /* read failed; hat says so once */
+
+  /* Sampled again, because the read is a process spawn and a write can land
+     inside it. It did: the purge released the bypass mid-read, so a fresh
+     card was compared against a stale expectation, reported as a hardware
+     fault, and "corrected" back to the byte the supervisor had just stopped
+     wanting. The corrector fought the controller. If anything moved during
+     the read, this pass knows nothing — say so by doing nothing, and look
+     again on the next heartbeat. */
+  const expected = hat.lastWritten;
+  if (expected !== before) return;
 
   if (actual === expected) {
     if (own.relayDrift) {
@@ -329,6 +354,46 @@ async function verifyRelays() {
  * only move after a purge has elapsed and the purge duration is unmeasured.
  * Ending the call is the safe half and the half that matters.
  */
+/**
+ * Hold flow through the exchanger after a heat call, then let the valve go.
+ *
+ * The second half of *"bypass may only move when heaterCall === 'off' and
+ * purge has elapsed"*. Nothing kept it before: releasing pool heat swung the
+ * bypass to `around` in the same tick, closing a valve on an exchanger that
+ * had been firing a moment earlier.
+ *
+ * This is the second thing `evaluate()` acts on rather than merely reports,
+ * and it earns that the same way the cutoff does — it is a promise the
+ * invariants already made, on a clock, that no intent can keep on its own.
+ * Note what it does *not* do: it never moves a valve toward the heater, only
+ * delays moving one away. The dangerous direction is the only one it touches.
+ *
+ * `applyCutoff` used to leave the bypass alone forever for want of this, so
+ * a call ended by reaching its target left the exchanger plumbed in until
+ * somebody changed mode. That now resolves itself three minutes later.
+ */
+let lastHeatCall = "off";
+
+function runPurge(view) {
+  const call = view.heaterCall;
+  if (lastHeatCall !== "off" && call === "off") {
+    own.heatEndedAt = Date.now();
+    console.log(`heat call ended — holding flow for ${PURGE_MIN} min`);
+  }
+  lastHeatCall = call;
+
+  /* A flag, not a valve position. `map.js` derives the bypass rather than
+     latching one — a stored position went stale the first time njsPC changed
+     the body by itself, and produced spa valves with the bypass still around
+     the exchanger. So the loop owns the *clock* and the map owns the
+     *position*, and the two meet here. */
+  const left = call === "off" ? purgeRemainingMs(own.heatEndedAt, Date.now()) : 0;
+  const was = own.purgeHolding;
+  own.purgeHolding = left > 0;
+  own.purgeUntil = left > 0 ? own.heatEndedAt + PURGE_MIN * 60_000 : null;
+  if (was && !own.purgeHolding) console.log("purge elapsed — bypass around the heater");
+}
+
 function applyCutoff(view) {
   if (!own.poolHeatDemand || view.mode === "spa") return;
   if (!shouldStopHeat({ waterTemp: view.waterTemp, target: own.targets.pool })) return;
@@ -686,7 +751,9 @@ const intents = {
        purge has elapsed and that duration is unmeasured; a pure derivation
        would silently override that. Mode changes are the one transition
        where ADR-9 says it must follow. */
-    own.bypass = bypassFor(mode, mode === "pool" && own.poolHeatDemand);
+    /* Nothing about the bypass here. It is derived in `map.js` from the mode
+       and the heat demand, both of which have just been set — see the note
+       there for why a stored position was wrong. */
 
     /* Spa owns the heater (ADR-4), so a pool call cannot survive the switch. */
     if (mode === "spa") own.poolHeatDemand = false;
@@ -731,12 +798,16 @@ const intents = {
     if (want) {
       const bypass = bypassFor("pool", true);
       if (!mayCallForHeat(bypass)) throw refuse("bypass is not in flow position");
-      /* Ordering matters and is not negotiable: valve first, contact second. */
-      own.bypass = bypass;
+      /* Ordering still matters — valve first, contact second — but both now
+         fall out of one flag: `map.js` derives the bypass from the demand, so
+         setting it is the valve move and the call in the right order. */
       own.poolHeatDemand = true;
     } else {
       own.poolHeatDemand = false;
-      own.bypass = bypassFor("pool", false);
+      /* And deliberately nothing about the bypass, however much it looks like
+         the obvious pair to the line above. The exchanger is still hot.
+         `runPurge()` holds the valve open and releases it when the purge has
+         run, which is the only place that decision is made. */
     }
     publish();
   },

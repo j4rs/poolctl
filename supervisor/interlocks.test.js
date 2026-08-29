@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
-  floorRpm, bypassFor, mayCallForHeat, mayToggleBlower, shouldStopHeat, needsPurge,
+  floorRpm, bypassFor, mayCallForHeat, mayToggleBlower, shouldStopHeat,
+  purgeRemainingMs, bypassHeld,
 } from "./interlocks.js";
 import { HEATER_MIN_RPM } from "../src/lib/sequences.js";
 
@@ -65,14 +66,57 @@ describe("targets as cutoffs", () => {
   });
 });
 
-describe("conditional purge", () => {
-  it("purges when the compressor has just run", () =>
-    expect(needsPurge({ compressorIdleMin: 0 })).toBe(true));
-  it("skips it once the compressor has been idle", () =>
-    expect(needsPurge({ compressorIdleMin: 30 })).toBe(false));
-  it("purges when it cannot tell", () => {
-    /* Unknown means purge: the cost is three minutes, the risk is pushing
-       hot water through a stopped exchanger. */
-    expect(needsPurge({ compressorIdleMin: null })).toBe(true);
+/**
+ * The purge.
+ *
+ * The half of "bypass may only move when heaterCall === 'off' and purge has
+ * elapsed" that nothing kept: releasing pool heat used to swing the bypass to
+ * `around` in the same tick, closing a valve on an exchanger that had been
+ * firing a moment earlier.
+ */
+describe("holding flow after a heat call", () => {
+  const MIN = 60_000;
+  const t0 = 1_700_000_000_000;
+
+  it("holds for the full window after a call ends", () => {
+    expect(purgeRemainingMs(t0, t0, 3)).toBe(3 * MIN);
+    expect(purgeRemainingMs(t0, t0 + 1 * MIN, 3)).toBe(2 * MIN);
+  });
+
+  it("is done once the window has passed, and does not go negative", () => {
+    expect(purgeRemainingMs(t0, t0 + 3 * MIN, 3)).toBe(0);
+    expect(purgeRemainingMs(t0, t0 + 90 * MIN, 3)).toBe(0);
+  });
+
+  it("holds nothing when no call has ever ended", () => {
+    /* Distinct from "the purge finished". A supervisor that has never called
+       for heat has no exchanger to empty. */
+    expect(purgeRemainingMs(null, t0, 3)).toBe(0);
+    expect(purgeRemainingMs(undefined, t0, 3)).toBe(0);
+  });
+
+  it("subsumes the skip-when-idle condition rather than needing it", () => {
+    /* PURGE_MIN is below PURGE_SKIP_AFTER_MIN by design: a call that ended
+       more than five minutes ago also ended more than three minutes ago. The
+       old needsPurge() boolean asked a question this already answers. */
+    expect(purgeRemainingMs(t0, t0 + 5 * MIN, 3)).toBe(0);
   });
 });
+
+describe("the bypass position the purge permits", () => {
+  it("delays isolating the exchanger while the purge holds", () => {
+    expect(bypassHeld("around", true)).toBe("flow");
+  });
+
+  it("permits it once the purge is done", () => {
+    expect(bypassHeld("around", false)).toBe("around");
+  });
+
+  it("never delays a move toward the heater", () => {
+    /* The direction that matters. A heat call waiting three minutes for a
+       valve it already needs would be a bug wearing an interlock's clothes. */
+    expect(bypassHeld("flow", true)).toBe("flow");
+    expect(bypassHeld("flow", false)).toBe("flow");
+  });
+});
+

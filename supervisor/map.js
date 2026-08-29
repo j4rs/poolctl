@@ -12,7 +12,7 @@
 
 import { pumpLimits } from "./binding.js";
 import { toUiSchedule, isRealSchedule } from "./schedules.js";
-import { bypassFor } from "./interlocks.js";
+import { bypassFor, bypassHeld } from "./interlocks.js";
 
 /** njsPC's shared-equipment model fixes these circuit ids. */
 const SPA_CIRCUIT = 1;
@@ -100,7 +100,10 @@ export function toUiState(njs, own) {
          The supervisor observes and reacts (ADR-11); its bypass policy has to
          be a function of what is true, not a memory of what it last asked
          for. */
-      bypass: bypassFor(mode, mode === "pool" && Boolean(own.poolHeatDemand)),
+      bypass: bypassHeld(
+        bypassFor(mode, mode === "pool" && Boolean(own.poolHeatDemand)),
+        Boolean(own.purgeHolding),
+      ),
     },
 
     /* No `?? 0`. A pump we cannot hear from is not a pump at rest, and
@@ -138,6 +141,11 @@ export function toUiState(njs, own) {
     /* Cutoffs are ours; njsPC believes it owns setpoints. */
     targets: own.targets,
     poolHeatDemand: own.poolHeatDemand ?? false,
+    /* When the bypass may isolate the exchanger, or null when nothing is
+       being held. An absolute timestamp, like `spaExpiresAt` — the client
+       counts down against its own clock rather than us streaming a number
+       that is stale the moment it is sent. */
+    purgeUntil: own.purgeUntil ?? null,
     preheat: own.preheat ?? null,
 
     /* njsPC's own egg timer is the spa auto-revert (ADR-11 / commissioning). */

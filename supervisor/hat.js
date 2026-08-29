@@ -62,6 +62,19 @@ export function available() {
 export function createHat({ dryRun = false, log = console, exec = run } = {}) {
   let last = null;
   let failing = false;
+  /* Writes are serialised through one chain. `set` compares against `last`,
+     awaits a process spawn, and only then updates it — so two `publish()`
+     calls in the same tick both passed the guard and both wrote. Harmless
+     electrically, since they wrote the same byte, but it made the journal
+     claim three changes where there was one, and any log that overstates what
+     touched the relays is worse than no log. */
+  let chain = Promise.resolve();
+
+  const serial = (fn) => {
+    const next = chain.then(fn, fn);
+    chain = next.then(() => {}, () => {});
+    return next;
+  };
 
   async function put(byte) {
     if (dryRun) { last = byte; return { written: true, dryRun: true }; }
@@ -88,14 +101,16 @@ export function createHat({ dryRun = false, log = console, exec = run } = {}) {
     /** Write only on change. Re-writing a latch to its current value is a
         no-op electrically, but it is also a spawn, and there is no reason. */
     async set(byte) {
-      if (byte === last) return { written: false, unchanged: true };
-      return put(byte);
+      return serial(() => {
+        if (byte === last) return { written: false, unchanged: true };
+        return put(byte);
+      });
     },
 
     /** Write regardless of the shadow. For boot and for shutdown, where the
         card's real state is unknown and assuming it is the shadow is exactly
         the assumption that gets a valve left where nobody expects it. */
-    async force(byte) { return put(byte); },
+    async force(byte) { return serial(() => put(byte)); },
 
     /**
      * What the card actually holds, or null if it cannot be read.
