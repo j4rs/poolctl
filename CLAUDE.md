@@ -7,7 +7,7 @@ nodejs-poolController.
 the supervisor on the LAN behind a password, both systemd services verified
 across a reboot. Deployed with `scripts/deploy.sh`; see `docs/pi-bringup.md`.
 No equipment is attached, so njsPC has no serial port and every reading is
-null; that waits on the bus being attached. 521 tests; `npm test`.
+null; that waits on the bus being attached. 626 tests; `npm test`.
 
 **The relay HAT arrived 27 August 2026** — a **V 7.1** card, not the V6.0 every
 product photograph in this repo shows. Its silkscreen closed the one blocking
@@ -60,7 +60,7 @@ numeric readouts — this is telemetry, not marketing).
 ```
 src/
   theme.js               design tokens
-  lib/sequences.js       transition spec + invariants — the server mirrors this
+  lib/sequences.js       site facts, constants, invariants; mock-only steps
   lib/pump.js            rpm/watts/schedule maths
   lib/programs.js        manual pump programs — name, speed, required expiry
   lib/rs485.js           Pentair frame decoders — unverified against a real bus
@@ -158,8 +158,16 @@ valve is still moving at 100%. Worse, gating an interlock on that clock would
 make "purge has elapsed" a fiction. Revisit when travel is measured; the
 honest fix then is to raise njsPC's `valveDelayTime`, not to dead-reckon here.
 
-**`src/lib/sequences.js` is the executable spec.** The server implements the
-  same steps in the same order. If they disagree, one of them is a bug.
+**`src/lib/sequences.js` is not a program the server runs**, and saying it was
+  is a leftover from the design ADR-10 replaced. The supervisor imports
+  *constants* from it and nothing else — `SEQUENCES`, `stepsFor` and
+  `isSkipped` have no server-side caller, and `activeSequence`/`stepIndex`
+  stream as a permanent null and 0. What the file really holds is the site's
+  plumbing facts, the named constants, the invariant list, and a mock-only
+  step list for the transition display. Re-read against njsPC's model, **13 of
+  its 30 steps are njsPC configuration** and only two — the purge and the pump
+  floor — are supervisor work still outstanding. The full attribution is in
+  `docs/architecture.md`, "Sequence ownership".
 - **Every number needs a source.** Two figures in the PRD turned out to be
   invented outright — a pool-heating duration and the exchanger pressure drop
   that justifies automating the bypass. If a number cannot say where it came

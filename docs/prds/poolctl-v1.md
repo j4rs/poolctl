@@ -1923,6 +1923,22 @@ temperature (read from source).
 - [ ] Verify the decoders in `src/lib/rs485.js` against the real bus. They
       are transcribed from public reverse-engineering and unconfirmed on this
       equipment; the iChlor 30 is the least well covered of the lot
+- [ ] **Other pools, other hardware.** Owner's thought, 29 August 2026: parked
+      deliberately, not scoped. Everything here is built for one site — a
+      shared-body pool/spa with a spill, three PE24GVA actuators, one Raypak
+      heat pump on 3-wire, an IntelliFlo VSF and an iChlor 30 — and a good
+      deal of it is site fact rather than product: `sequences.js` names which
+      diverter is 180° and which is 90°, `relays.js` hardcodes a channel per
+      device, and ADR-9's bypass policy assumes a bypass exists at all.
+
+      Worth noting *now* only so the boundary stays visible: njsPC already
+      does the generalising over equipment, which is most of the hard part,
+      and what this repo adds is the interlocks njsPC lacks. The portable
+      core is the invariants and the relay layer; the site-specific part is
+      the channel map and the sequences. If this is ever pointed at a second
+      pool, the question is whether those two can be separated cleanly, not
+      whether the interlocks are right.
+
 - [ ] Home Assistant / MQTT bridge
 - [ ] Salt trend history and threshold alerts (Path A)
 - [ ] Winter pool-heating mode: the target and the on/off exist; the

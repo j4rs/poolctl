@@ -131,6 +131,62 @@ client surfaces every one.
 
 ---
 
+## Sequence ownership — what is configuration, not code
+
+`src/lib/sequences.js` was written before anyone had read njsPC's source, when
+the plan was a sequencer that owned everything. Re-read against njsPC's actual
+model, **13 of its 30 steps are things njsPC already does**, and the way to
+"implement" them is to configure njsPC correctly rather than to write code.
+
+| Step | Owner | How |
+|---|---|---|
+| `intake-*`, `returns-*` | **njsPC** | the `nxps` shared-body model diverts both valves when the Spa circuit switches. We never command a body valve |
+| `pump-low` | **njsPC** | `pumpDelay` + `valveDelayTime` hold the pump *off* across a valve move. Not a speed — see below |
+| `pump-spa`, `pump-pool`, `pump-restore` | **njsPC** | speed lives in `pump.circuits`; `setTargetSpeed` takes the max of the circuits that are on |
+| `heater-off` (in `spa`/`pool`) | — | subsumed. The relay byte is written atomically, so there is no off-then-on to sequence |
+| `bypass-*` | supervisor | njsPC has no bypass concept (ADR-9). **Implemented** |
+| `heat-pool`, `heat-spa` | supervisor | CH4/CH5, derived from our own call. **Implemented** |
+| `blower-off` | supervisor | CH6. **Implemented** |
+| `purge` | supervisor | **not implemented.** njsPC's `HeaterCooldownDelay` would cover it, but `NixieHeatpump.getCooldownTime()` returns 0, so it never fires for this heater type. Duration also unmeasured |
+| `pump-min` | supervisor | **not implemented.** `floorRpm` computes it and `setRpm` then refuses, so it has never reached equipment |
+
+So the file's remaining claim on the supervisor is **two things: the purge and
+the pump floor.** Everything else is either done or is njsPC configuration.
+
+### The spec is not executable, and saying it was is the bug
+
+The header says the server "MUST implement the same steps in the same order",
+and this was repeated in CLAUDE.md. **It does not, and it never has.** The
+supervisor imports only constants from that file — `HEATER_MIN_RPM`,
+`HEATER_CAP`, `TARGET_MIN`, `SPA_TIMEOUT_MIN`, `ASSUMED_VALVE_TRAVEL_SEC` —
+and never touches `SEQUENCES`, `stepsFor` or `isSkipped`. `own.activeSequence`
+and `own.stepIndex` are initialised and then never assigned by anything, so
+both stream to the UI as a permanent `null` and `0`.
+
+That is not a gap to close. The supervisor writes one byte computed from
+current state and lets njsPC drive its own timers, which is what ADR-10
+concluded after reading the source. The mistake was leaving a claim in place
+that described the design that ADR-10 replaced.
+
+**What `sequences.js` actually is:** the site's plumbing facts, the named
+constants, the invariant list, and a mock-only step list that drives the
+transition display. That is worth keeping. What it is not is a program the
+server mirrors.
+
+### Two steps that now contradict the file's own header
+
+- **`pump-low` is labelled "Pump to 1000 rpm".** The header above it says
+  valve moves happen at *zero* flow, and njsPC holds the pump off rather than
+  slowing it. `VALVE_RPM` survives only for moves with no pump restart, which
+  is no step in any sequence here.
+- **`boot` lists `bypass-around` last**, which is the settled pool state — but
+  the supervisor's actual boot is `deEnergise()` to `0x00` first, which puts
+  the bypass to *flow*, and only then computes the byte for the mode. The end
+  state agrees; the path does not, and the path is the part that matters for a
+  valve with no position feedback.
+
+---
+
 ## Failure modes
 
 | Failure | Detected by | Response |
