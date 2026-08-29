@@ -187,7 +187,7 @@ table, and adding a fifth is obvious.
 
 ---
 
-## Slice 5 — njsPC acting on its own
+## Slice 5 — njsPC acting on its own — **done, 29 August 2026**
 
 **What.** Script njsPC *initiating* — a schedule firing, an egg timer
 expiring (including the spa auto-revert, moved here from slice 3), dashPanel
@@ -203,6 +203,34 @@ body without asking.
 
 **Done when** a test switches the body behind the supervisor's back and
 asserts the byte follows, not the stale intent.
+
+**Shipped, and it found two more of the same bug.**
+
+The fake gained `switchBody()` and `expireSpa()`, both routed through the same
+`setCircuitState()` the supervisor's own writes use — deliberately, because if
+the driven path and the self-initiated path diverged, the fake would behave
+one way when pushed and another when it moved by itself. That asymmetry is
+what these tests exist to look for; hiding it inside the instrument would be
+the worst possible place for it.
+
+Two rules turned out to live in `setMode` and nowhere else:
+
+- **A pool heat call outlived the body it was made for.** ADR-4 gives the
+  heater to spa mode, and `setMode` cleared the call for exactly that reason —
+  but a schedule or an egg timer takes the body without going near the intent.
+  The call sat suppressed for the session and came back when the spa reverted.
+- **The blower outlived the spa session.** Same shape: cleared on the way out
+  through `setMode`, not cleared when njsPC's egg timer did the reverting, and
+  the toggle is gated to spa mode.
+
+Both are now derived in `map.js` against the observed body, so the bad pairing
+is unreachable rather than tidied up afterwards, with `followBody()` clearing
+the stored flags so neither resurrects on the way back. Same fix as the bypass
+before them.
+
+**That is three for three.** Every rule this project has enforced at intent
+time has been wrong in the same way, because njsPC takes the body without
+asking. Observe and react; never assert, and never remember.
 
 **Cost** medium. **Depends on** 1, 2. **Highest value after the spine.**
 

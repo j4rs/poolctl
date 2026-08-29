@@ -52,6 +52,31 @@ function fakeNjspc() {
      single fact that decides the body, the valve mode and both diverters. */
   const spaOn = () => Boolean(circuits.find((c) => c.id === 1)?.isOn);
 
+  /**
+   * One place a circuit changes, whoever asked.
+   *
+   * Deliberately shared between the supervisor's route and the helpers that
+   * let a test act *as* njsPC. If the two diverged, the fake would behave one
+   * way when driven and another when it moved on its own — which is precisely
+   * the asymmetry these tests exist to look for, and it would be hidden
+   * inside the instrument.
+   */
+  const setCircuitState = (id, on) => {
+    const c = circuits.find((x) => x.id === id);
+    if (!c) return null;
+    c.isOn = on;
+    c.endTime = on && c.eggTimer
+      ? new Date(Date.now() + c.eggTimer * 60000).toISOString()
+      : undefined;
+    /* Shared bodies are exclusive: njsPC turns the other one off rather than
+       running both. */
+    if (on && (id === 1 || id === 6)) {
+      const other = circuits.find((x) => x.id === (id === 1 ? 6 : 1));
+      if (other) { other.isOn = false; other.endTime = undefined; }
+    }
+    return c;
+  };
+
   const stateAll = () => ({
     circuits,
     /* njsPC's panel mode — what `toggleServiceMode` flips and what the
@@ -171,21 +196,8 @@ function fakeNjspc() {
       return { mode: { val: panelMode === "service" ? 1 : 0, name: panelMode } };
     },
     "PUT /state/circuit/setState": (body) => {
-      const c = circuits.find((x) => x.id === Number(body.id));
+      const c = setCircuitState(Number(body.id), Boolean(body.state));
       if (!c) throw Object.assign(new Error("circuit not found"), { status: 404 });
-      c.isOn = Boolean(body.state);
-      c.endTime = c.isOn && c.eggTimer
-        ? new Date(Date.now() + c.eggTimer * 60000).toISOString()
-        : undefined;
-      /* Shared bodies are exclusive: njsPC turns the other one off rather
-         than running both. The fake did not, so a switch back to pool left
-         the spa circuit on, `valveMode` stayed spa, and the supervisor was
-         being told the body never changed. Nothing noticed until a trace
-         asked what the card did about it. */
-      if (c.isOn && (c.id === 1 || c.id === 6)) {
-        const other = circuits.find((x) => x.id === (c.id === 1 ? 6 : 1));
-        if (other) { other.isOn = false; other.endTime = undefined; }
-      }
       return c;
     },
   };
@@ -233,6 +245,28 @@ function fakeNjspc() {
        refetches when it hears. A test that reaches in and edits state has to
        say so, or it is waiting on the 15 s poll and calling that a race. */
     touch: () => io.emit("circuit", {}),
+
+    /**
+     * njsPC changing something by itself.
+     *
+     * A schedule firing, an egg timer expiring, dashPanel writing a circuit —
+     * from the supervisor's side these are indistinguishable, and all of them
+     * arrive as "the body is different now and nobody asked us". ADR-11 is
+     * entirely about this, and it has already produced a real bug: the card
+     * came out 0x65, spa valves with the exchanger still bypassed, because
+     * the bypass was remembered from the last *intent* rather than derived
+     * from what was true.
+     */
+    switchBody: (mode) => {
+      setCircuitState(mode === "spa" ? 1 : 6, true);
+      io.emit("circuit", {});
+    },
+    /** The Spa circuit's egg timer running out — njsPC's spa auto-revert. */
+    expireSpa: () => {
+      setCircuitState(1, false);
+      setCircuitState(6, true);
+      io.emit("circuit", {});
+    },
     setTemps: (patch) => {
       temps = { ...temps, ...patch };
       io.emit("body", {});
@@ -871,6 +905,86 @@ describe("what the card actually does", () => {
     await settles((s) => s.mode === "pool", 8000);
     await sup.card.quiet();
     expect(await sup.card.trace()).toEqual(["0x00  (all off)"]);
+  });
+});
+
+describe("when njsPC moves without being asked", () => {
+  /**
+   * ADR-11's hazard, and the one the supervisor is least able to argue with.
+   * njsPC owns the bodies and drives them from its own timers — a schedule
+   * firing, an egg timer expiring, somebody in dashPanel. From here all three
+   * look the same: the body is different now and nobody asked us.
+   *
+   * The rule that follows is *observe and react*, never assert. Anything the
+   * supervisor decides at intent time is a memory, and a memory is wrong the
+   * moment njsPC moves on its own. That is not hypothetical — the card once
+   * came out `0x65`, spa valves with the exchanger still bypassed, because
+   * the bypass was remembered from the last intent instead of derived.
+   */
+  const from = async () => { await sup.card.quiet(); await sup.card.reset(); };
+
+  it("follows the body onto the card with nobody having tapped anything", async () => {
+    njspc.switchBody("pool");
+    await settles((s) => s.mode === "pool", 8000);
+    await from();
+
+    njspc.switchBody("spa");
+    await settles((s) => s.mode === "spa", 8000);
+    await sup.card.quiet();
+    /* The 0x65 test. Spa valves and the spa heat contact, and crucially the
+       bypass at flow — REL3 absent — because it is derived from what is true
+       rather than remembered from an intent that never happened. */
+    expect(await sup.card.trace()).toEqual(["0x25  REL1 REL2 REL5"]);
+  });
+
+  it("drops a pool heat call when njsPC takes the body", async () => {
+    /* Spa owns the heater (ADR-4), and `setMode` clears the pool call for
+       exactly that reason — but njsPC switching the body never goes through
+       `setMode`. If the call only dies in the intent, it survives here and
+       comes back the moment the spa reverts. */
+    njspc.switchBody("pool");
+    await settles((s) => s.mode === "pool", 8000);
+    njspc.setTemps({ temp: 70 });
+    await settles((s) => s.waterTemp === 70, 8000);
+    await client.intent("setTarget", { body: "pool", degrees: 85 });
+    await client.intent("setPoolHeat", { on: true });
+    await settles((s) => s.heaterCall === "pool", 8000);
+
+    njspc.switchBody("spa");
+    await settles((s) => s.mode === "spa", 8000);
+    expect((await now()).poolHeatDemand,
+      "a pool call must not outlive the body it was made for").toBe(false);
+  });
+
+  it("clears the blower when the spa reverts on its own", async () => {
+    /* The egg timer expiring is the ordinary end of a spa session — ADR-11
+       accepts that njsPC owns it. `setMode` clears the blower on the way out
+       of spa; this path does not call `setMode`. */
+    njspc.switchBody("spa");
+    await settles((s) => s.mode === "spa", 8000);
+    if (!(await now()).blower) await client.intent("toggle", { key: "blower" });
+    await settles((s) => s.blower === true, 8000);
+
+    njspc.expireSpa();
+    await settles((s) => s.mode === "pool", 8000);
+    await sup.card.quiet();
+    expect((await now()).blower,
+      "the blower must not outlive the spa session").toBe(false);
+  });
+
+  it("holds the exchanger open when njsPC ends a spa session", async () => {
+    /* Spa mode calls for spa heat, so a revert ends a heat call — and the
+       purge applies whoever ended it. A 0x40 straight after would isolate an
+       exchanger the heater was firing into moments earlier. */
+    njspc.switchBody("spa");
+    await settles((s) => s.mode === "spa", 8000);
+    await from();
+
+    njspc.expireSpa();
+    await settles((s) => s.mode === "pool", 8000);
+    await sup.card.quiet();
+    expect(await sup.card.trace()).toEqual(["0x00  (all off)"]);
+    expect((await now()).purgeUntil).toBeGreaterThan(Date.now());
   });
 });
 

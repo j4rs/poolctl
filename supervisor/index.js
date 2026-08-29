@@ -250,6 +250,7 @@ function evaluate() {
     applyCutoff(view);
     /* After the cutoff, because the cutoff is one of the things that ends a
        call — reading the pre-cutoff view would start the purge a tick late. */
+    followBody(toUiState(njsRaw, own));
     runPurge(toUiState(njsRaw, own));
     const settled = toUiState(njsRaw, own);
     own.violations = [...checkInvariants(settled), ...driftBreaches(own.relayDrift, own.relayDrifts ?? 0)];
@@ -388,6 +389,22 @@ async function verifyRelays() {
  * somebody changed mode. That now resolves itself three minutes later.
  */
 let lastHeatCall = "off";
+
+/**
+ * Forget what the body has contradicted.
+ *
+ * `map.js` derives `poolHeatDemand` and `blower` against the mode, so neither
+ * can reach the card while the body says otherwise. This clears the stored
+ * flags underneath, which is a different job: without it a pool call
+ * suppressed for the duration of a spa session would come back to life when
+ * the spa reverted, and a blower would restart on the next spa switch. Nobody
+ * asked for either, and "it resumed what you had before" is not a thing a
+ * pool controller should do unprompted.
+ */
+function followBody(view) {
+  if (view.mode === "spa") own.poolHeatDemand = false;
+  else own.blower = false;
+}
 
 function runPurge(view) {
   const call = view.heaterCall;
@@ -758,17 +775,12 @@ const intents = {
        for why a stored position was wrong, and for the 0x07 that stored
        position produced on the first spa switch after the card went in. */
 
-    /* Spa owns the heater (ADR-4), so a pool call cannot survive the switch. */
-    if (mode === "spa") own.poolHeatDemand = false;
-
-    /* And the blower cannot survive the switch the other way. `sequences.js`
-       has an explicit blower-off step in the pool path and the invariants say
-       `mode !== 'spa' implies blower === false`, but nothing enforced it —
-       leaving spa with the blower running carried it into pool mode, where
-       the toggle is gated and the invariant it breaks is reported rather than
-       corrected. Found by a trace assertion, not by the invariant that was
-       already watching for it. */
-    if (mode !== "spa") own.blower = false;
+    /* Nothing here about the pool call or the blower either, though both
+       used to be. They are consequences of which body is running, and njsPC
+       takes the body without asking — a schedule, an egg timer, dashPanel. A
+       rule enforced in the intent is enforced only when the intent is what
+       moved, which was true of all three of these and wrong in the same way
+       each time. `map.js` derives them and `followBody()` clears them. */
     publish();
   },
   /**

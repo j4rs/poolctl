@@ -140,7 +140,13 @@ export function toUiState(njs, own) {
 
     /* Cutoffs are ours; njsPC believes it owns setpoints. */
     targets: own.targets,
-    poolHeatDemand: own.poolHeatDemand ?? false,
+    /* Derived against the body, not reported raw. A pool call belongs to the
+       pool: ADR-4 gives the heater to spa mode outright, and `setMode` used
+       to clear this — which worked right up until njsPC took the body by
+       itself, through a schedule or an egg timer, and never went near the
+       intent. Deriving makes the bad pairing unreachable rather than merely
+       cleaned up afterwards, the same argument as the bypass above. */
+    poolHeatDemand: mode === "pool" && Boolean(own.poolHeatDemand),
     /* When the bypass may isolate the exchanger, or null when nothing is
        being held. An absolute timestamp, like `spaExpiresAt` — the client
        counts down against its own clock rather than us streaming a number
@@ -234,7 +240,11 @@ export function toUiState(njs, own) {
 
     /* Still supervisor-owned rather than njsPC-derived. The relay assignment
        now exists (`relays.js`), but nothing writes it from the live path yet. */
-    blower: own.blower ?? false,
+    /* Same treatment, same reason: `mode !== 'spa' implies blower === false`
+       is an invariant, and it was enforced only in the intent. njsPC's spa
+       egg timer expiring left the blower turning in pool mode, where its
+       toggle is gated. */
+    blower: mode === "spa" && Boolean(own.blower),
     light: own.light ?? false,
 
     saltPpm: chlor.saltLevel ?? null,
