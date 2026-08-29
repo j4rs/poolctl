@@ -8,12 +8,26 @@ import { spawn } from "node:child_process";
 import { createServer } from "node:net";
 import { mkdtemp, writeFile, chmod, readFile, rename } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocket } from "ws";
 import { describe as describeByte } from "./relays.js";
 
-const ENTRY = fileURLToPath(new URL("./index.js", import.meta.url));
+/**
+ * Resolve a sibling file, from either test environment.
+ *
+ * Under `@vitest-environment node` this module's `import.meta.url` is a
+ * `file:` URL and `fileURLToPath` is exact. Under jsdom, vite serves modules
+ * over http and it throws — which is what stopped the client integration test
+ * importing this harness at all. Vitest runs from the repo root, so the
+ * fallback is unambiguous.
+ */
+const here = (name) => {
+  try { return fileURLToPath(new URL(name, import.meta.url)); }
+  catch { return resolve(process.cwd(), "supervisor", name.replace(/^\.\//, "")); }
+};
+
+const ENTRY = here("./index.js");
 
 /* Restated from index.js. `src/lib/useSupervisor.test.jsx` restates the
    client's tolerance against the same number; if either drifts, the pair
@@ -29,7 +43,7 @@ export async function freePort() {
   return port;
 }
 
-const FAKE_I2C = fileURLToPath(new URL("./fake-i2c.js", import.meta.url));
+const FAKE_I2C = here("./fake-i2c.js");
 
 /**
  * Stand a fake relay card in front of the supervisor.

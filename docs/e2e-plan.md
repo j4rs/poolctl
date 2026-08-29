@@ -358,7 +358,7 @@ fails the check.
 
 ---
 
-## Slice 8 — The client against a real supervisor
+## Slice 8 — The client against a real supervisor — **done, 29 August 2026**
 
 **What.** Drive `useSupervisor` against a spawned supervisor rather than the
 `FakeSocket` it stubs today.
@@ -373,6 +373,32 @@ environment, which is the least pleasant combination here.
 **Independent**, and honestly the weakest of the eight. The shared
 `src/lib` types make the contract mostly self-enforcing, so this earns its
 place only once the others are done.
+
+**Shipped, and it was the weakest — that estimate held.** Four tests, no bugs
+found. The value is the field-contract check: a hand-written list of
+everything the screens destructure, asserted against a live frame. Dropping
+`purgeUntil` from the map fails it with *"the supervisor no longer sends:
+purgeUntil"*, which is the failure mode this was built for — a field renamed
+on the server and rendering as a blank on somebody's phone.
+
+Two shims, named rather than hidden. In production the client is *served by*
+the supervisor, so `location.host` is the supervisor and relative `/auth/*`
+fetches reach it; jsdom fixes its URL before a test knows which port was free.
+So the socket uses the `VITE_SUPERVISOR` override — a real code path, used in
+development — and `fetch` resolves relative paths against the supervisor's
+origin, which is what a browser does when the page came from there. **The
+`location.host` derivation itself stays untested.**
+
+The harness needed one change to be importable at all: `fileURLToPath` throws
+under jsdom, because vite serves modules over http rather than from disk. It
+now falls back to a path relative to the repo root.
+
+One assertion changed on contact with reality. `state.connected` is an AND of
+three things — socket up, state fresh, *and the supervisor able to reach
+njsPC* — so with njsPC at a dead port the honest answer is `false` with
+`offlineReason: "Controller cannot reach njsPC"`. That is a better assertion
+than the one I set out to write: a single boolean would be ADR-7 in miniature,
+a phone showing OFFLINE while the equipment is fine.
 
 ---
 
@@ -399,3 +425,34 @@ keeping the pair asserted.
 The honest summary is that slices 1, 2 and 5 pay for the whole exercise; 3 is
 an enabler; 4 is leverage; 6 and 7 are cheap insurance; and 8 is the one to
 drop if the appetite runs out.
+
+---
+
+## All eight, done — 29 August 2026
+
+666 tests, about 115 seconds. What the exercise actually caught, which is the
+only measure that matters:
+
+| Slice | Found |
+|---|---|
+| 2 | the blower surviving a mode change; the fake never diverting its valves; both bodies able to run at once |
+| 4 | the purge's last hole — an intent isolating the exchanger for a heartbeat before the hold engaged |
+| 5 | a pool heat call outliving the body it was made for; the blower outliving a spa session njsPC ended |
+| 6 | *(confirmed the drift race, already fixed)* |
+| 7 | nine fake-fidelity drifts, most from serving one `circuits` array as both state and config |
+| 1, 3, 8 | no bugs — enablers and a contract check |
+
+Five of eight found something. Three findings were the same bug wearing
+different clothes: **a rule enforced at intent time is enforced only when the
+intent is what moved**, and njsPC moves the body without asking. The bypass,
+the pool call and the blower were all written that way. That is now a smell to
+grep for rather than a lesson to relearn.
+
+The other pattern worth keeping: **every fault the traces found had the right
+end state and the wrong path.** Snapshot assertions saw nothing wrong in any
+of them.
+
+The estimate that held: slice 8 was called the weakest at planning time and
+found nothing. The estimate that did not: slice 7 was filed as cheap
+insurance, and turned up nine real drifts in an instrument the other seven
+slices depend on.
