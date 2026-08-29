@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { createServer } from "node:http";
+import { readFile } from "node:fs/promises";
 import { Server as SocketServer } from "socket.io";
 import { start, connect } from "./harness.test-utils.js";
 
@@ -39,8 +40,28 @@ function fakeNjspc() {
     { id: 1, circuit: 6, speed: 1600, units: 0 },
     { id: 2, circuit: 1, speed: 2800, units: 0 },
   ];
+  /**
+   * A pump's *type* has two shapes, and they are not the same object.
+   *
+   * On `/state/all` it carries the speed and flow ranges; on
+   * `/config/options/pumps` it carries `relays` and `hasBody` and no ranges
+   * at all. The fake served one fixture to both, which is the same
+   * state-versus-config conflation as the circuits above.
+   *
+   * This matters beyond tidiness: `binding.js` falls back to
+   * `type?.minSpeed`, and `pumpLimits()` reads the *state* pumps — so on real
+   * njsPC that fallback is live. A single fixture had me conclude, wrongly,
+   * that it was dead code.
+   */
+  const STATE_PUMP_TYPE = {
+    val: 4, name: "vsf", desc: "Intelliflo VSF",
+    minSpeed: 450, maxSpeed: 3450, minFlow: 15, maxFlow: 130,
+    maxCircuits: 8, hasAddress: true, addresses: [96],
+  };
   const TYPE = {
-    val: 4, name: "vsf", minSpeed: 450, maxSpeed: 3450, maxCircuits: 8,
+    val: 4, name: "vsf", desc: "Intelliflo VSF", maxCircuits: 8,
+    hasAddress: true, hasBody: false, maxRelays: 0,
+    relays: [{ id: 1, name: "Program 1" }], addresses: [],
   };
   const writes = [];
   let io;
@@ -77,8 +98,51 @@ function fakeNjspc() {
     return c;
   };
 
+  /**
+   * One record, two shapes.
+   *
+   * njsPC's state and config views of a circuit are genuinely different, and
+   * conflating them is the trap that has cost this project a live bug already
+   * — `Number({val:127})` is `NaN`, which read as *no days at all*. The fake
+   * served one array to both routes, which quietly taught the opposite. State
+   * expands enums into `{val,name,desc}`; config keeps the number, and carries
+   * `eggTimer` and `isActive` that state has no business knowing.
+   */
+  const CIRCUIT_TYPES = {
+    1: { val: 1, name: "spa", desc: "Spa", hasHeatSource: true, body: 2 },
+    6: { val: 12, name: "pool", desc: "Pool", hasHeatSource: true, body: 1 },
+  };
+  const typeOf = (c) => CIRCUIT_TYPES[c.id] ?? { val: 0, name: "generic", desc: "Generic" };
+
+  const stateCircuit = (c) => ({
+    id: c.id,
+    name: c.name,
+    type: typeOf(c),
+    isOn: Boolean(c.isOn),
+    showInFeatures: false,
+    freezeProtect: false,
+    startDelay: false,
+    stopDelay: false,
+    priority: "none",
+    manualPriorityActive: false,
+    action: { val: 0, name: "ready", desc: "Ready" },
+    equipmentType: "circuit",
+    ...(c.endTime ? { endTime: c.endTime } : {}),
+  });
+
+  const configCircuit = (c) => ({
+    id: c.id,
+    name: c.name,
+    type: typeOf(c).val,
+    showInFeatures: false,
+    freeze: false,
+    isActive: true,
+    eggTimer: c.eggTimer ?? 720,
+    master: 1,
+  });
+
   const stateAll = () => ({
-    circuits,
+    circuits: circuits.map(stateCircuit),
     /* njsPC's panel mode — what `toggleServiceMode` flips and what the
        supervisor reads back to decide whether a toggle is even needed. */
     mode: { val: panelMode === "service" ? 1 : 0, name: panelMode, desc: panelMode },
@@ -90,11 +154,14 @@ function fakeNjspc() {
     temps: { bodies: [{ id: 1, isOn: true, ...temps }] },
     pumps: [{
       id: 50, name: "IntelliFlo", isActive: true, minSpeed: 450, maxSpeed: 3450,
-      type: TYPE,
+      type: STATE_PUMP_TYPE,
       ...(pumpRpm === undefined ? {} : { rpm: pumpRpm }),
       circuits: pumpCircuits.map((pc) => ({
         ...pc,
-        circuit: { id: pc.circuit, isOn: Boolean(circuits.find((c) => c.id === pc.circuit)?.isOn) },
+        /* State expands the units enum too, the same as circuit types. */
+        units: { val: 0, name: "rpm", desc: "RPM" },
+        circuit: stateCircuit(
+          circuits.find((c) => c.id === pc.circuit) ?? { id: pc.circuit, name: "?" }),
       })),
     }],
     /* njsPC's `nxps` shared-body model diverts both valves when the body
@@ -123,11 +190,18 @@ function fakeNjspc() {
        missing pump found the contradiction. */
     "GET /config/all": () => ({
       pool: { options },
-      circuits,
-      pumps: [{ id: 50, name: "IntelliFlo", type: TYPE, isActive: true }],
+      circuits: circuits.map(configCircuit),
+      pumps: [{
+        id: 50, name: "IntelliFlo", type: TYPE.val, isActive: true,
+        minSpeed: 450, maxSpeed: 3450, address: 96, master: 1, portId: 0,
+      }],
+      /* No `connectionId` or `deviceBinding`: njsPC omits them on an unbound
+         valve rather than serving empty strings, and unbound is the state
+         this design requires. `checkValveBinding` is unit-tested against the
+         bound case. */
       valves: [
-        { id: 1, name: "Intake", connectionId: "", deviceBinding: "" },
-        { id: 2, name: "Return", connectionId: "", deviceBinding: "" },
+        { id: 1, name: "Intake", isIntake: true, isReturn: false, isActive: true },
+        { id: 2, name: "Return", isIntake: false, isReturn: true, isActive: true },
       ],
     }),
     "GET /config/options/pumps": () => ({
@@ -291,12 +365,14 @@ function fakeNjspc() {
 }
 
 let njspc;
+let njspcUrl;
 let sup;
 let client;
 
 beforeEach(async () => {
   njspc = fakeNjspc();
-  sup = await start({ njspcUrl: await njspc.listen(), card: true });
+  njspcUrl = await njspc.listen();
+  sup = await start({ njspcUrl, card: true });
   client = await connect(sup.port);
   /* Wait for real state, not merely for the link.
    *
@@ -985,6 +1061,95 @@ describe("when njsPC moves without being asked", () => {
     await sup.card.quiet();
     expect(await sup.card.trace()).toEqual(["0x00  (all off)"]);
     expect((await now()).purgeUntil).toBeGreaterThan(Date.now());
+  });
+});
+
+describe("the fake is still njsPC-shaped", () => {
+  /**
+   * A fake that drifts from what it imitates makes a suite *less* trustworthy
+   * than no suite, because it fails confidently. This one drifted three times
+   * in one sitting on 29 August: `/config/all` served `pumps: []` while every
+   * other route in the same fake served pump 50; `/state/all` served
+   * `valves: []`, so the valves never diverted and a trace showed the spa
+   * heat contact closing while they still read pool; and shared bodies were
+   * not exclusive, so a switch back to pool left both circuits on.
+   *
+   * `supervisor/njspc-shapes.json` is the shape of a real njsPC's answers,
+   * captured from the Pi over an SSH tunnel by `scripts/capture-njspc.mjs`.
+   * Shapes rather than values: values are this pool's configuration, would
+   * churn on every equipment change, and would drag credentials into the
+   * repository. Anything that looks like one is redacted at capture.
+   *
+   * The fake is deliberately a *subset* — insisting it serve all thirty-six
+   * top-level keys of `/state/all` would be noise nobody reads. So the rule
+   * is narrower and sharper: **whatever it does serve must have njsPC's
+   * shape**, and an array it serves empty where njsPC returns elements is
+   * drift. That is exactly the first two bugs above.
+   *
+   * The third it would not have caught: exclusivity is behaviour, not shape.
+   * Slice 5's tests cover that, and it is worth being clear which instrument
+   * catches which fault rather than implying this one catches everything.
+   */
+  /**
+   * Fields the capture could not see, because the Pi it came from has no
+   * equipment on the bus. Each needs a reason and a way to be retired: this
+   * list is a liability, not a convenience, and every entry is somewhere the
+   * check has been told to stop looking.
+   */
+  const ABSENT_FROM_AN_UNEQUIPPED_RIG = {
+    "/state/all.temps.bodies[0].temp":
+      "njsPC omits a body temperature it has no source for. The source is the "
+      + "iChlor's own probe (ADR-6), which is not on the bus yet. Recapture "
+      + "once it is, and delete this line.",
+  };
+
+  const compare = (real, fake, path = "") => {
+    const out = [];
+    const at = path || "(root)";
+    if (at in ABSENT_FROM_AN_UNEQUIPPED_RIG) return out;
+
+    if (Array.isArray(real)) {
+      if (!Array.isArray(fake)) return [`${at}: njsPC returns an array, the fake does not`];
+      if (real.length > 0 && fake.length === 0) {
+        return [`${at}: the fake serves an empty array where njsPC returns elements`];
+      }
+      if (real.length > 0 && fake.length > 0) out.push(...compare(real[0], fake[0], `${at}[0]`));
+      return out;
+    }
+
+    if (real !== null && typeof real === "object") {
+      if (fake === null || typeof fake !== "object" || Array.isArray(fake)) {
+        return [`${at}: njsPC returns an object, the fake returns ${typeof fake}`];
+      }
+      /* Driven by the fake's keys, not njsPC's: the subset is intentional,
+         inventing a field is not. */
+      for (const k of Object.keys(fake)) {
+        const here = `${at}.${k}`;
+        if (here in ABSENT_FROM_AN_UNEQUIPPED_RIG) continue;
+        if (!(k in real)) { out.push(`${here}: the fake invents this; njsPC has no such key`); continue; }
+        out.push(...compare(real[k], fake[k], here));
+      }
+      return out;
+    }
+
+    const fakeType = fake === null ? "null" : Array.isArray(fake) ? "array" : typeof fake;
+    if (real !== "redacted" && real !== "…" && real !== fakeType) {
+      out.push(`${at}: njsPC returns ${real}, the fake returns ${fakeType}`);
+    }
+    return out;
+  };
+
+  it("serves what njsPC serves, in the shape njsPC serves it", async () => {
+    const shapes = JSON.parse(
+      await readFile(new URL("./njspc-shapes.json", import.meta.url), "utf8"));
+
+    const complaints = [];
+    for (const [route, real] of Object.entries(shapes)) {
+      const res = await fetch(`${njspcUrl}${route}`);
+      if (!res.ok) continue;          /* a route the fake does not implement */
+      complaints.push(...compare(real, await res.json(), route));
+    }
+    expect(complaints, complaints.join("\n")).toEqual([]);
   });
 });
 

@@ -270,7 +270,7 @@ seconds without an SSH session.
 
 ---
 
-## Slice 7 — Keeping the fake njsPC honest
+## Slice 7 — Keeping the fake njsPC honest — **done, 29 August 2026**
 
 **What.** Compare the fake's route shapes against the real njsPC's, from a
 recorded capture or against the Pi directly.
@@ -284,6 +284,47 @@ confidently.
 
 **Done when** a shape mismatch fails a test, or at minimum prints a diff a
 person will notice.
+
+**Shipped.** `scripts/capture-njspc.mjs` records the *shape* of a real
+njsPC's answers — keys and types, arrays reduced to their first element — into
+`supervisor/njspc-shapes.json`, captured from the Pi over an SSH tunnel since
+njsPC is bound to loopback on purpose. Shapes rather than values: values are
+this pool's configuration, would churn on every equipment change, and would
+drag credentials into the repository. Anything matching `pass|secret|token|key`
+is redacted at capture; both `screenlogic.password` fields came through as
+`"redacted"`.
+
+The rule is narrower than parity, which would be unreadable noise: the fake
+serves a deliberate subset, so **whatever it does serve must have njsPC's
+shape**, it may not invent keys njsPC has no concept of, and an array it
+serves empty where njsPC returns elements is drift.
+
+**It found nine real faults on the first run.** The root of most was one
+thing: the fake served a single `circuits` array to both `/state/all` and
+`/config/all`, which is exactly njsPC's documented state-versus-config trap —
+the one that already cost a live bug when `Number({val:127})` came out `NaN`
+and read as *no days at all*. State expands enums into `{val,name,desc}`;
+config keeps the number and carries `eggTimer` and `isActive` that state has
+no business knowing. The fake now projects the shared record into both.
+
+The same conflation was in the pump: state's `type` carries the speed and flow
+ranges, the config-options `pumpTypes` carries `relays` and `hasBody` and no
+ranges at all. One fixture served both, and it led me to conclude — wrongly —
+that `binding.js`'s `type?.minSpeed` fallback was dead code. `pumpLimits()`
+reads the *state* pumps, where that field is present, so the fallback is live.
+
+**What it will not catch:** behaviour. Shared-body exclusivity, valve
+diversion, egg timers — none of that is shape, and slice 5's tests are what
+cover it. Worth being clear which instrument catches which fault rather than
+letting a green check imply more than it checks.
+
+One exception is carried, with a reason and a way to retire it:
+`temps.bodies[0].temp`, which njsPC omits on a body it has no source for. The
+source is the iChlor's probe (ADR-6), not on the bus yet. Recapture and delete
+the line when it is.
+
+Verified by breaking it: serving the config circuit shape from the state route
+fails the check.
 
 **Cost** small. **Independent.**
 

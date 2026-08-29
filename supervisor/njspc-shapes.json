@@ -1,0 +1,945 @@
+{
+  "/state/all": {
+    "appVersion": "string",
+    "appVersionState": {
+      "equipmentType": "string",
+      "gitLocalBranch": "string",
+      "gitLocalCommit": "string",
+      "githubRelease": "string",
+      "installed": "string",
+      "nextCheckTime": "string",
+      "status": {
+        "desc": "string",
+        "name": "string",
+        "val": "number"
+      }
+    },
+    "batteryVoltage": "number",
+    "chemControllers": [],
+    "chemDosers": [],
+    "chlorinators": [],
+    "circuitGroups": [],
+    "circuits": [
+      {
+        "action": {
+          "desc": "string",
+          "name": "string",
+          "val": "number"
+        },
+        "endTime": "string",
+        "equipmentType": "string",
+        "freezeProtect": "boolean",
+        "id": "number",
+        "isOn": "boolean",
+        "manualPriorityActive": "boolean",
+        "name": "string",
+        "priority": "string",
+        "showInFeatures": "boolean",
+        "startDelay": "boolean",
+        "stopDelay": "boolean",
+        "type": {
+          "body": "number",
+          "desc": "string",
+          "hasHeatSource": "boolean",
+          "name": "string",
+          "val": "number"
+        }
+      }
+    ],
+    "clockMode": {
+      "name": "string",
+      "val": "number"
+    },
+    "clockSource": {
+      "desc": "string",
+      "name": "string",
+      "val": "number"
+    },
+    "controllerType": "string",
+    "covers": [],
+    "delay": {},
+    "delays": [],
+    "equipment": {
+      "bootLoaderVersion": "string",
+      "controllerType": "string",
+      "dual": "boolean",
+      "equipmentType": "string",
+      "maxBodies": "number",
+      "maxCircuitGroups": "number",
+      "maxCircuits": "number",
+      "maxFeatures": "number",
+      "maxHeaters": "number",
+      "maxLightGroups": "number",
+      "maxPumps": "number",
+      "maxSchedules": "number",
+      "maxValves": "number",
+      "messages": [],
+      "model": "string",
+      "pluginAddress": "number",
+      "registration": {
+        "status": "number"
+      },
+      "shared": "boolean",
+      "single": "boolean",
+      "softwareVersion": "string"
+    },
+    "features": [],
+    "filters": [
+      {
+        "body": {
+          "desc": "string",
+          "name": "string",
+          "val": "number"
+        },
+        "equipmentType": "string",
+        "filterType": {
+          "desc": "string",
+          "name": "string",
+          "val": "number"
+        },
+        "id": "number",
+        "isOn": "boolean",
+        "name": "string"
+      }
+    ],
+    "freeze": "boolean",
+    "heaters": [
+      {
+        "bodyId": "number",
+        "endTime": "string",
+        "equipmentType": "string",
+        "id": "number",
+        "isOn": "boolean",
+        "name": "string",
+        "shutdownDelay": "boolean",
+        "startupDelay": "boolean",
+        "type": {
+          "desc": "string",
+          "hasAddress": "boolean",
+          "hasPreference": "boolean",
+          "name": "string",
+          "val": "number"
+        }
+      }
+    ],
+    "lightGroups": [],
+    "mode": {
+      "desc": "string",
+      "name": "string",
+      "val": "number"
+    },
+    "model": "string",
+    "nextSunrise": "string",
+    "nextSunset": "string",
+    "pumps": [
+      {
+        "address": "number",
+        "circuits": [
+          {
+            "circuit": {
+              "action": {
+                "desc": "…",
+                "name": "…",
+                "val": "…"
+              },
+              "endTime": "string",
+              "equipmentType": "string",
+              "freezeProtect": "boolean",
+              "id": "number",
+              "isOn": "boolean",
+              "manualPriorityActive": "boolean",
+              "name": "string",
+              "priority": "string",
+              "showInFeatures": "boolean",
+              "startDelay": "boolean",
+              "stopDelay": "boolean",
+              "type": {
+                "body": "…",
+                "desc": "…",
+                "hasHeatSource": "…",
+                "name": "…",
+                "val": "…"
+              }
+            },
+            "id": "number",
+            "master": "number",
+            "speed": "number",
+            "units": {
+              "desc": "string",
+              "name": "string",
+              "val": "number"
+            }
+          }
+        ],
+        "command": "number",
+        "equipmentType": "string",
+        "id": "number",
+        "isActive": "boolean",
+        "maxSpeed": "number",
+        "minSpeed": "number",
+        "name": "string",
+        "pumpOnDelay": "boolean",
+        "status": {
+          "desc": "string",
+          "name": "string",
+          "val": "number"
+        },
+        "type": {
+          "addresses": [
+            "number"
+          ],
+          "desc": "string",
+          "hasAddress": "boolean",
+          "maxCircuits": "number",
+          "maxFlow": "number",
+          "maxSpeed": "number",
+          "minFlow": "number",
+          "minSpeed": "number",
+          "name": "string",
+          "val": "number"
+        }
+      }
+    ],
+    "schedules": [
+      {
+        "circuit": {
+          "action": {
+            "desc": "string",
+            "name": "string",
+            "val": "number"
+          },
+          "equipmentType": "string",
+          "freezeProtect": "boolean",
+          "type": {
+            "desc": "string",
+            "name": "string",
+            "val": "number"
+          }
+        },
+        "clockMode": {
+          "name": "string",
+          "val": "number"
+        },
+        "display": {
+          "desc": "string",
+          "name": "string",
+          "val": "number"
+        },
+        "endTimeType": {
+          "desc": "string",
+          "name": "string",
+          "val": "number"
+        },
+        "equipmentType": "string",
+        "id": "number",
+        "isOn": "boolean",
+        "manualPriorityActive": "boolean",
+        "schedGroup": "number",
+        "scheduleTime": {
+          "calculated": "boolean",
+          "shouldBeOn": "boolean"
+        },
+        "startTimeType": {
+          "desc": "string",
+          "name": "string",
+          "val": "number"
+        },
+        "triggered": "boolean"
+      }
+    ],
+    "startTime": "string",
+    "status": {
+      "desc": "string",
+      "name": "string",
+      "percent": "number",
+      "val": "number"
+    },
+    "sunrise": "string",
+    "sunset": "string",
+    "systemUnits": {
+      "desc": "string",
+      "name": "string",
+      "val": "number"
+    },
+    "temps": {
+      "bodies": [
+        {
+          "circuit": "number",
+          "heatMode": {
+            "desc": "string",
+            "name": "string",
+            "val": "number"
+          },
+          "heatStatus": {
+            "desc": "string",
+            "name": "string",
+            "val": "number"
+          },
+          "heaterCooldownDelay": "boolean",
+          "heaterOptions": {
+            "gas": "number",
+            "heatpump": "number",
+            "hybrid": "number",
+            "jxi": "number",
+            "lxi": "number",
+            "mastertemp": "number",
+            "maxetherm": "number",
+            "solar": "number",
+            "total": "number",
+            "ultratemp": "number"
+          },
+          "id": "number",
+          "isCovered": "boolean",
+          "isOn": "boolean",
+          "name": "string",
+          "setPoint": "number",
+          "showInDashboard": "boolean",
+          "startDelay": "boolean",
+          "stopDelay": "boolean",
+          "type": {
+            "desc": "string",
+            "name": "string",
+            "val": "number"
+          }
+        }
+      ],
+      "equipmentType": "string",
+      "units": {
+        "desc": "string",
+        "name": "string",
+        "val": "number"
+      }
+    },
+    "time": "string",
+    "vacation": "boolean",
+    "valve": "number",
+    "valveMode": {
+      "desc": "string",
+      "name": "string",
+      "val": "number"
+    },
+    "valves": [
+      {
+        "circuit": {
+          "equipmentType": "string",
+          "id": "number",
+          "isActive": "boolean",
+          "isOn": "boolean",
+          "name": "string",
+          "type": {
+            "desc": "string",
+            "name": "string",
+            "val": "number"
+          }
+        },
+        "equipmentType": "string",
+        "id": "number",
+        "isActive": "boolean",
+        "isDiverted": "boolean",
+        "isIntake": "boolean",
+        "isReturn": "boolean",
+        "name": "string",
+        "pinId": "number",
+        "type": {
+          "desc": "string",
+          "name": "string",
+          "val": "number"
+        }
+      }
+    ],
+    "virtualCircuits": [
+      {
+        "equipmentType": "string",
+        "id": "number",
+        "isActive": "boolean",
+        "isOn": "boolean",
+        "name": "string",
+        "type": {
+          "desc": "string",
+          "name": "string",
+          "val": "number"
+        }
+      }
+    ]
+  },
+  "/config/all": {
+    "alerts": {
+      "chlorinatorNotifications": "number",
+      "circuitNotifications": "number",
+      "connectedGasNotifications": "number",
+      "hybridNotifications": "number",
+      "intellichemNotifications": "number",
+      "pumpNotifications": "number",
+      "raw": {},
+      "ultratempNotifications": "number"
+    },
+    "anslq25": {
+      "isActive": "boolean"
+    },
+    "appVersion": "string",
+    "bodies": [
+      {
+        "capacity": "number",
+        "capacityUnits": "number",
+        "circuit": "number",
+        "heatMode": "number",
+        "id": "number",
+        "isActive": "boolean",
+        "master": "number",
+        "name": "string",
+        "setPoint": "number",
+        "showInDashboard": "boolean",
+        "type": "number"
+      }
+    ],
+    "chemControllers": [],
+    "chemDosers": [],
+    "chlorinators": [],
+    "circuitGroups": [],
+    "circuits": [
+      {
+        "eggTimer": "number",
+        "freeze": "boolean",
+        "id": "number",
+        "isActive": "boolean",
+        "master": "number",
+        "name": "string",
+        "showInFeatures": "boolean",
+        "type": "number"
+      }
+    ],
+    "configVersion": {
+      "master": "number"
+    },
+    "controllerType": "string",
+    "covers": [],
+    "customNames": [],
+    "eggTimers": [],
+    "equipment": {
+      "bootloaderVersion": "string",
+      "dual": "boolean",
+      "equipmentIds": {
+        "circuitGroups": {
+          "end": "number",
+          "start": "number"
+        },
+        "circuits": {
+          "end": "number",
+          "start": "number"
+        },
+        "features": {
+          "end": "number",
+          "start": "number"
+        },
+        "invalidIds": [],
+        "virtualCircuits": {
+          "end": "number",
+          "start": "number"
+        }
+      },
+      "maxBodies": "number",
+      "maxChemControllers": "number",
+      "maxChemDosers": "number",
+      "maxChlorinators": "number",
+      "maxCircuitGroups": "number",
+      "maxCircuits": "number",
+      "maxCustomNames": "number",
+      "maxFeatures": "number",
+      "maxHeaters": "number",
+      "maxIntelliBrites": "number",
+      "maxLightGroups": "number",
+      "maxPumps": "number",
+      "maxSchedules": "number",
+      "maxValves": "number",
+      "model": "string",
+      "modules": [
+        {
+          "bodies": "number",
+          "desc": "string",
+          "id": "number",
+          "master": "number",
+          "name": "string",
+          "part": "string",
+          "type": "number",
+          "valves": "number"
+        }
+      ],
+      "shared": "boolean",
+      "single": "boolean",
+      "softwareVersion": "string",
+      "tempSensors": [
+        {
+          "calibration": "number",
+          "id": "string",
+          "isActive": "boolean",
+          "master": "number",
+          "name": "string"
+        }
+      ]
+    },
+    "features": [],
+    "filters": [
+      {
+        "body": "number",
+        "capacity": "number",
+        "capacityUnits": "number",
+        "cleanPressure": "number",
+        "dirtyPressure": "number",
+        "filterType": "number",
+        "id": "number",
+        "isActive": "boolean",
+        "master": "number",
+        "name": "string",
+        "pressureCircuitId": "number",
+        "pressureUnits": "number"
+      }
+    ],
+    "heaters": [
+      {
+        "body": "number",
+        "coolingEnabled": "boolean",
+        "heatingEnabled": "boolean",
+        "id": "number",
+        "isActive": "boolean",
+        "master": "number",
+        "minCycleTime": "number",
+        "name": "string",
+        "portId": "number",
+        "stopTempDelta": "number",
+        "type": "number"
+      }
+    ],
+    "lastUpdated": "string",
+    "lightGroups": [],
+    "pool": {
+      "location": {
+        "master": "number",
+        "timeZone": "number"
+      },
+      "master": "number",
+      "options": {
+        "adjustDST": "boolean",
+        "cleanerSolarDelay": "boolean",
+        "cleanerSolarDelayTime": "number",
+        "cleanerStartDelay": "boolean",
+        "cleanerStartDelayTime": "number",
+        "clockMode": "number",
+        "clockSource": "string",
+        "cooldownDelay": "boolean",
+        "freezeCycleTime": "number",
+        "freezeOverride": "number",
+        "freezeThreshold": "number",
+        "heaterStartDelay": "boolean",
+        "heaterStartDelayTime": "number",
+        "manualHeat": "boolean",
+        "manualPriority": "boolean",
+        "pumpDelay": "boolean",
+        "units": "number",
+        "vacation": {
+          "enabled": "boolean",
+          "useTimeframe": "boolean"
+        },
+        "valveDelay": "boolean",
+        "valveDelayTime": "number"
+      }
+    },
+    "pumps": [
+      {
+        "address": "number",
+        "circuits": [
+          {
+            "circuit": "number",
+            "id": "number",
+            "master": "number",
+            "speed": "number",
+            "units": "number"
+          }
+        ],
+        "id": "number",
+        "isActive": "boolean",
+        "master": "number",
+        "maxSpeed": "number",
+        "minSpeed": "number",
+        "name": "string",
+        "portId": "number",
+        "relays": [],
+        "type": "number"
+      }
+    ],
+    "remotes": [],
+    "schedules": [
+      {
+        "display": "number",
+        "endTimeOffset": "number",
+        "endTimeType": "number",
+        "id": "number",
+        "startTimeOffset": "number",
+        "startTimeType": "number"
+      }
+    ],
+    "security": {
+      "enabled": "boolean",
+      "enabledByte": "number",
+      "guestEnabled": "boolean"
+    },
+    "valves": [
+      {
+        "circuit": "number",
+        "id": "number",
+        "isActive": "boolean",
+        "isIntake": "boolean",
+        "isReturn": "boolean",
+        "master": "number",
+        "name": "string",
+        "type": "number"
+      }
+    ]
+  },
+  "/config/options/pumps": {
+    "bodies": [
+      {
+        "desc": "string",
+        "name": "string",
+        "val": "number"
+      }
+    ],
+    "circuitNames": [],
+    "circuits": [
+      {
+        "equipmentType": "string",
+        "hasHeatSource": "boolean",
+        "id": "number",
+        "name": "string",
+        "type": "number"
+      }
+    ],
+    "maxPumps": "number",
+    "models": {
+      "ds": [
+        {
+          "desc": "string",
+          "hiAmps": "number",
+          "hiWatts": "number",
+          "loAmps": "number",
+          "loWatts": "number",
+          "name": "string",
+          "pf": "number",
+          "val": "number",
+          "volts": "number"
+        }
+      ],
+      "ss": [
+        {
+          "amps": "number",
+          "desc": "string",
+          "name": "string",
+          "pf": "number",
+          "val": "number",
+          "volts": "number",
+          "watts": "number"
+        }
+      ],
+      "vf": [
+        {
+          "desc": "string",
+          "name": "string",
+          "val": "number"
+        }
+      ],
+      "vs": [
+        {
+          "desc": "string",
+          "name": "string",
+          "val": "number"
+        }
+      ],
+      "vsf": [
+        {
+          "desc": "string",
+          "name": "string",
+          "val": "number"
+        }
+      ],
+      "vssvrs": [
+        {
+          "desc": "string",
+          "name": "string",
+          "val": "number"
+        }
+      ]
+    },
+    "pumpTypes": [
+      {
+        "addresses": [],
+        "desc": "string",
+        "hasAddress": "boolean",
+        "hasBody": "boolean",
+        "maxCircuits": "number",
+        "maxRelays": "number",
+        "name": "string",
+        "relays": [
+          {
+            "id": "number",
+            "name": "string"
+          }
+        ],
+        "val": "number"
+      }
+    ],
+    "pumpUnits": [
+      {
+        "desc": "string",
+        "name": "string",
+        "val": "number"
+      }
+    ],
+    "pumps": [
+      {
+        "address": "number",
+        "circuits": [
+          {
+            "circuit": "number",
+            "id": "number",
+            "master": "number",
+            "speed": "number",
+            "units": "number"
+          }
+        ],
+        "id": "number",
+        "isActive": "boolean",
+        "master": "number",
+        "maxSpeed": "number",
+        "minSpeed": "number",
+        "name": "string",
+        "portId": "number",
+        "relays": [],
+        "type": "number"
+      }
+    ],
+    "rs485ports": [
+      {
+        "enabled": "boolean",
+        "inactivityRetry": "number",
+        "isOpen": "boolean",
+        "mock": "boolean",
+        "name": "string",
+        "netConnect": "boolean",
+        "netHost": "string",
+        "netPort": "number",
+        "netSettings": {
+          "allowHalfOpen": "boolean",
+          "keepAlive": "boolean",
+          "keepAliveInitialDelay": "number"
+        },
+        "ocpws": {
+          "alias": "string",
+          "host": "string",
+          "messageTimeoutMs": "number",
+          "port": "number",
+          "reconnectMs": "number"
+        },
+        "portId": "number",
+        "portSettings": {
+          "autoOpen": "boolean",
+          "baudRate": "number",
+          "dataBits": "number",
+          "flowControl": "boolean",
+          "lock": "boolean",
+          "parity": "string",
+          "rtscts": "boolean",
+          "stopBits": "number"
+        },
+        "rs485Port": "string",
+        "screenlogic": {
+          "connectionType": "string",
+          "password": "redacted",
+          "systemName": "string"
+        },
+        "type": "string"
+      }
+    ],
+    "servers": []
+  },
+  "/config/options/schedules": {
+    "bodies": [
+      {
+        "circuit": "number",
+        "heatSources": [
+          {
+            "desc": "string",
+            "name": "string",
+            "val": "number"
+          }
+        ],
+        "id": "number",
+        "name": "string"
+      }
+    ],
+    "circuits": [
+      {
+        "equipmentType": "string",
+        "hasHeatSource": "boolean",
+        "id": "number",
+        "name": "string",
+        "type": "number"
+      }
+    ],
+    "clockMode": "number",
+    "displayTypes": [
+      {
+        "desc": "string",
+        "name": "string",
+        "val": "number"
+      }
+    ],
+    "eggTimers": [],
+    "heatSources": [
+      {
+        "desc": "string",
+        "name": "string",
+        "val": "number"
+      }
+    ],
+    "maxSchedules": "number",
+    "scheduleDays": [
+      {
+        "bitval": "number",
+        "desc": "string",
+        "dow": "number",
+        "name": "string",
+        "val": "number"
+      }
+    ],
+    "scheduleTimeTypes": [
+      {
+        "desc": "string",
+        "name": "string",
+        "val": "number"
+      }
+    ],
+    "scheduleTypes": [
+      {
+        "days": "boolean",
+        "desc": "string",
+        "endTime": "boolean",
+        "heatSetpoint": "boolean",
+        "heatSource": "boolean",
+        "name": "string",
+        "startDate": "boolean",
+        "startTime": "boolean",
+        "val": "number"
+      }
+    ],
+    "schedules": [
+      {
+        "display": "number",
+        "endTimeOffset": "number",
+        "endTimeType": "number",
+        "id": "number",
+        "startTimeOffset": "number",
+        "startTimeType": "number"
+      }
+    ],
+    "tempUnits": {
+      "desc": "string",
+      "name": "string",
+      "val": "number"
+    }
+  },
+  "/config/options/heaters": {
+    "bodies": [
+      {
+        "desc": "string",
+        "name": "string",
+        "val": "number"
+      }
+    ],
+    "coolDownDelay": "boolean",
+    "equipmentMasters": [
+      {
+        "desc": "string",
+        "name": "string",
+        "val": "number"
+      }
+    ],
+    "heatModes": [
+      {
+        "desc": "string",
+        "name": "string",
+        "val": "number"
+      }
+    ],
+    "heaterTypes": [
+      {
+        "desc": "string",
+        "hasAddress": "boolean",
+        "name": "string",
+        "val": "number"
+      }
+    ],
+    "heaters": [
+      {
+        "body": "number",
+        "coolingEnabled": "boolean",
+        "heatingEnabled": "boolean",
+        "id": "number",
+        "isActive": "boolean",
+        "master": "number",
+        "minCycleTime": "number",
+        "name": "string",
+        "portId": "number",
+        "stopTempDelta": "number",
+        "type": "number"
+      }
+    ],
+    "maxHeaters": "number",
+    "rs485ports": [
+      {
+        "enabled": "boolean",
+        "inactivityRetry": "number",
+        "isOpen": "boolean",
+        "mock": "boolean",
+        "name": "string",
+        "netConnect": "boolean",
+        "netHost": "string",
+        "netPort": "number",
+        "netSettings": {
+          "allowHalfOpen": "boolean",
+          "keepAlive": "boolean",
+          "keepAliveInitialDelay": "number"
+        },
+        "ocpws": {
+          "alias": "string",
+          "host": "string",
+          "messageTimeoutMs": "number",
+          "port": "number",
+          "reconnectMs": "number"
+        },
+        "portId": "number",
+        "portSettings": {
+          "autoOpen": "boolean",
+          "baudRate": "number",
+          "dataBits": "number",
+          "flowControl": "boolean",
+          "lock": "boolean",
+          "parity": "string",
+          "rtscts": "boolean",
+          "stopBits": "number"
+        },
+        "rs485Port": "string",
+        "screenlogic": {
+          "connectionType": "string",
+          "password": "redacted",
+          "systemName": "string"
+        },
+        "type": "string"
+      }
+    ],
+    "servers": [],
+    "tempUnits": {
+      "desc": "string",
+      "name": "string",
+      "val": "number"
+    }
+  }
+}
