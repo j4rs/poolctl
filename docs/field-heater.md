@@ -15,7 +15,7 @@ Test 1b there if you want to re-derive it rather than trust it.
 - [ ] The card is labelled 1–8 in marker. If it is not, do Test 1b first.
       Nothing below is safe to follow from position alone.
 - [ ] `git log` on the Pi matches what you think is deployed —
-      `PI=j4rs@poolctl.local ./scripts/deploy.sh` if unsure.
+      `PI=<user>@poolctl.local ./scripts/deploy.sh` if unsure.
 - [ ] The end-to-end call works. **Done 28 August 2026**: tapping *Heat the
       pool* produced `relays -> 0x10  REL4`, with CH3 releasing at the same
       moment. If that ever stops being true, fix it here, not at the pad.
@@ -100,7 +100,7 @@ either beeps, it is on N.C. and must move.
 Panel first, heater second. Watch the journal:
 
 ```bash
-ssh j4rs@poolctl.local 'journalctl -u poolctl -f'
+ssh <user>@poolctl.local 'journalctl -u poolctl -f'
 ```
 
 Expect `relays -> 0x00 (all off) — boot`, then `relays -> 0x40  REL3` once
