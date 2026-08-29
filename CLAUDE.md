@@ -7,7 +7,15 @@ nodejs-poolController.
 the supervisor on the LAN behind a password, both systemd services verified
 across a reboot. Deployed with `scripts/deploy.sh`; see `docs/pi-bringup.md`.
 No equipment is attached, so njsPC has no serial port and every reading is
-null; that waits on the bus being attached. 626 tests; `npm test`.
+null; that waits on the bus being attached. 666 tests; `npm test`, ~115 s.
+
+**The integration suites are the ones that find things.** `docs/e2e-plan.md`
+records eight slices built 29 August and what each caught. Two habits came out
+of it and are worth keeping: **assert the trace, not the resting state** —
+every fault they found had the right end position and the wrong route through
+it — and **a rule enforced at intent time is enforced only when the intent is
+what moved.** njsPC takes the body without asking, so the bypass, the pool
+heat call and the blower were each wrong in that same way.
 
 **The relay HAT arrived 27 August 2026** — a **V 7.1** card, not the V6.0 every
 product photograph in this repo shows. Its silkscreen closed the one blocking
