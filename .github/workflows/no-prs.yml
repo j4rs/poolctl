@@ -1,0 +1,50 @@
+# Closes pull requests from outside the repository, politely.
+#
+# GitHub has no native switch for this: forks cannot be disabled on a public
+# repo, and pull requests cannot be turned off. So the position has to be
+# enforced rather than configured, and CONTRIBUTING.md states it in prose so
+# nobody only finds out after doing the work.
+#
+# `pull_request_target` rather than `pull_request` because a fork's
+# `GITHUB_TOKEN` is read-only and could not close anything. That trigger runs
+# in the base repository's context, which is only safe because this workflow
+# never checks out or executes the PR's code — it reads a number and writes a
+# comment. Do not add a checkout step here.
+name: no PRs yet
+
+on:
+  pull_request_target:
+    types: [opened, reopened]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  close:
+    # The owner can still open PRs against their own repo; only outside
+    # contributions are turned away.
+    if: github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.pull_request.number;
+            await github.rest.issues.createComment({
+              owner, repo, issue_number,
+              body: [
+                "Thanks for this — and sorry, this repository is not taking pull",
+                "requests yet. It is a DIY controller for one specific pool, still",
+                "being built, and no equipment has been on the bus yet; several of",
+                "its central numbers are still unmeasured placeholders. Merging your",
+                "work into that would not be fair to you.",
+                "",
+                "Issues are open and wanted, especially corrections to what this repo",
+                "claims about njsPC's behaviour — see [CONTRIBUTING.md](../blob/main/CONTRIBUTING.md).",
+                "",
+                "Closing automatically. Nothing personal, and the branch is yours to",
+                "keep."
+              ].join("\n")
+            });
+            await github.rest.pulls.update({ owner, repo, pull_number: issue_number, state: "closed" });
