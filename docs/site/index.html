@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="A DIY pool and spa controller replacing a Pentair IntelliConnect — and the record of what had to be measured rather than assumed.">
+<title>poolctl</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  /* Tokens lifted from src/theme.css, same as the panel plan, so the three
+     surfaces of this project look like one thing. Dark is the default here
+     for the reason it is there: this gets read at the pad. */
+  :root {
+    --ground: #0c1618;
+    --surface: #132325;
+    --surface-up: #1b2f32;
+    --line: #27454a;
+    --water: #4fbfb4;
+    --heat: #e08b4c;
+    --stone: #e6e2d7;
+    --muted: #7b9295;
+    --faint: #4e6669;
+    --alert: #d9705c;
+    --wash-water: rgba(79, 191, 180, 0.12);
+    --wash-heat: rgba(224, 139, 76, 0.13);
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --ground: #f2f5f4;
+      --surface: #ffffff;
+      --surface-up: #e7ecea;
+      --line: #c2d0cd;
+      --water: #0f7a70;
+      --heat: #a9530c;
+      --stone: #14201f;
+      --muted: #465957;
+      --faint: #677876;
+      --alert: #a8321f;
+      --wash-water: rgba(15, 122, 112, 0.10);
+      --wash-heat: rgba(169, 83, 12, 0.10);
+    }
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--stone);
+    font-family: 'Archivo', ui-sans-serif, -apple-system, system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+  }
+  .wrap { max-width: 62rem; margin: 0 auto; padding: 0 1.5rem; }
+  a { color: var(--water); }
+  a:focus-visible, button:focus-visible {
+    outline: 2px solid var(--water); outline-offset: 3px; border-radius: 2px;
+  }
+  code, .mono {
+    font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  code {
+    font-size: 0.86em; background: var(--surface-up);
+    padding: 0.1em 0.34em; border-radius: 3px;
+  }
+
+  /* ---- masthead ---- */
+  header.top { border-bottom: 1px solid var(--line); background: var(--surface); }
+  .top .wrap { padding-top: 3.5rem; padding-bottom: 3rem; }
+  h1 {
+    font-size: clamp(2.4rem, 7vw, 3.6rem); font-weight: 700;
+    letter-spacing: -0.02em; margin: 0; line-height: 1.05;
+  }
+  h1 .dot { color: var(--water); }
+  .lede {
+    margin: 1.1rem 0 0; max-width: 44ch;
+    font-size: clamp(1.05rem, 2.4vw, 1.22rem); color: var(--stone);
+    text-wrap: balance;
+  }
+  .sub { margin: 0.7rem 0 0; max-width: 56ch; color: var(--muted); }
+
+  /* Status as instrument readout, not prose. This is telemetry. */
+  .readout {
+    margin: 2rem 0 0; padding: 0; list-style: none;
+    display: grid; gap: 0.15rem 2.2rem;
+    grid-template-columns: repeat(auto-fit, minmax(9.5rem, max-content));
+    font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  }
+  .readout dt {
+    font-size: 0.62rem; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--faint);
+  }
+  .readout dd { margin: 0 0 0.9rem; font-size: 0.95rem; color: var(--stone); }
+  .readout dd.warn { color: var(--heat); }
+
+  /* ---- sections ---- */
+  section { padding: 3.5rem 0; border-bottom: 1px solid var(--line); }
+  h2 {
+    font-size: 0.72rem; font-weight: 600; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--muted);
+    margin: 0 0 1.6rem; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  }
+  h3 { font-size: 1.12rem; font-weight: 600; margin: 0 0 0.4rem; letter-spacing: -0.01em; }
+  p { margin: 0 0 1rem; max-width: 68ch; }
+  p:last-child { margin-bottom: 0; }
+
+  /* ---- destination cards ---- */
+  .cards { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); }
+  .card {
+    display: flex; flex-direction: column; gap: 0.5rem;
+    padding: 1.4rem; background: var(--surface);
+    border: 1px solid var(--line); border-radius: 10px;
+    text-decoration: none; color: inherit;
+    transition: border-color 120ms ease, transform 120ms ease;
+  }
+  .card:hover { border-color: var(--water); transform: translateY(-2px); }
+  @media (prefers-reduced-motion: reduce) { .card { transition: none; } .card:hover { transform: none; } }
+  .card .kicker {
+    font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+    font-size: 0.62rem; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--water);
+  }
+  .card p { font-size: 0.92rem; color: var(--muted); margin: 0; }
+
+  /* ---- the findings list: the actual argument of the project ---- */
+  .findings { display: grid; gap: 1.5rem; }
+  .finding {
+    display: grid; gap: 0.15rem 1.4rem; align-items: start;
+    grid-template-columns: 7.5rem 1fr;
+    padding-left: 1rem; border-left: 2px solid var(--line);
+  }
+  .finding .tag {
+    font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+    font-size: 0.62rem; letter-spacing: 0.13em; text-transform: uppercase;
+    color: var(--heat); padding-top: 0.3rem;
+  }
+  .finding p { margin: 0; font-size: 0.97rem; }
+  .finding .said { color: var(--muted); }
+  .finding .found { color: var(--stone); }
+  .finding .found strong { color: var(--heat); font-weight: 600; }
+  @media (max-width: 34rem) {
+    .finding { grid-template-columns: 1fr; }
+    .finding .tag { padding-top: 0; }
+  }
+
+  /* ---- status table ---- */
+  .scroll { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.94rem; min-width: 30rem; }
+  th, td { text-align: left; padding: 0.6rem 1rem 0.6rem 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th {
+    font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+    font-size: 0.62rem; letter-spacing: 0.13em; text-transform: uppercase;
+    color: var(--faint); font-weight: 500;
+  }
+  td.state { white-space: nowrap; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 0.82rem; }
+  .yes { color: var(--water); }
+  .no  { color: var(--muted); }
+
+  /* ---- safety ---- */
+  .safety {
+    background: var(--wash-heat); border: 1px solid var(--heat);
+    border-radius: 10px; padding: 1.4rem 1.6rem;
+  }
+  .safety h3 { color: var(--heat); }
+  .safety ul { margin: 0.6rem 0 0; padding-left: 1.1rem; }
+  .safety li { margin-bottom: 0.5rem; max-width: 68ch; }
+  .safety li:last-child { margin-bottom: 0; }
+
+  footer { padding: 2.5rem 0 4rem; color: var(--muted); font-size: 0.9rem; }
+  footer p { max-width: 68ch; }
+  .links { display: flex; flex-wrap: wrap; gap: 0.4rem 1.4rem; margin: 0 0 1.2rem; padding: 0; list-style: none; }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <h1>poolctl<span class="dot">.</span></h1>
+    <p class="lede">
+      A DIY pool and spa controller replacing a Pentair IntelliConnect — and
+      the record of everything that had to be measured rather than assumed.
+    </p>
+    <p class="sub">
+      Built on <a href="https://github.com/tagyoureit/nodejs-poolController">nodejs-poolController</a>
+      running on a Raspberry Pi, with a separate supervisor process holding the
+      interlocks that njsPC does not have. One specific pool, documented in
+      full: thirteen architecture decisions with their rejected alternatives,
+      the panel layout down to the cable runs, and the measurements that
+      contradicted the datasheets.
+    </p>
+
+    <dl class="readout">
+      <div><dt>Stack</dt><dd>on the Pi</dd></div>
+      <div><dt>njsPC</dt><dd>v10.0.1</dd></div>
+      <div><dt>Tests</dt><dd>666</dd></div>
+      <div><dt>Equipment on bus</dt><dd class="warn">none yet</dd></div>
+    </dl>
+  </div>
+</header>
+
+<main>
+  <section>
+    <div class="wrap">
+      <h2>Three ways in</h2>
+      <div class="cards">
+        <a class="card" href="app/">
+          <span class="kicker">Live in your browser</span>
+          <h3>Try the controller</h3>
+          <p>
+            The real interface, running on invented data with no backend.
+            Switch to spa, call for heat, edit a schedule. Every reading is
+            mock — it says so at the bottom of the screen.
+          </p>
+        </a>
+        <a class="card" href="panel/">
+          <span class="kicker">Drawings and parts</span>
+          <h3>The panel build</h3>
+          <p>
+            Every component photographed, where each sits on the backplate,
+            and what connects to what. The figures are generated from one
+            shared geometry so they cannot disagree.
+          </p>
+        </a>
+        <a class="card" href="https://github.com/j4rs/poolctl">
+          <span class="kicker">Source and documents</span>
+          <h3>The repository</h3>
+          <p>
+            Requirements, architecture, the bring-up procedure, and the
+            bench notes. MIT licensed. Issues are open; pull requests are
+            not, yet.
+          </p>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>Why the measurements are the point</h2>
+      <p style="margin-bottom:2rem;color:var(--muted);max-width:60ch">
+        A rule this project runs on: <strong style="color:var(--stone);font-weight:600">every
+        number needs a source.</strong> If a figure cannot say where it came
+        from, it is treated as fiction. That rule keeps earning its place.
+      </p>
+
+      <div class="findings">
+        <div class="finding">
+          <span class="tag">Relay card</span>
+          <div>
+            <p class="said">Its product page names the <code>8relay-rpi</code> driver.</p>
+            <p class="found">The routing is <code>8relind-rpi</code>'s. That driver's channels
+              close relays 1, 2, 8, 7, 3, 4, 5, 6 — so writing channel 8, the
+              nominal spare, <strong>starts the blower</strong>. Mapped by hand on the bench.</p>
+          </div>
+        </div>
+
+        <div class="finding">
+          <span class="tag">Watchdog</span>
+          <div>
+            <p class="said">The same page advertises a hardware watchdog.</p>
+            <p class="found">The I²C bus holds a single port expander at <code>0x27</code> and
+              nothing else — <strong>no microcontroller, no watchdog</strong>. It had to be
+              built in software instead. It buys recovery, not safety: the
+              expander latches, so a wedged Pi leaves every relay where it was.
+              Measured — relays held through all 51 s of a deliberate wedge.</p>
+          </div>
+        </div>
+
+        <div class="finding">
+          <span class="tag">Requirements</span>
+          <div>
+            <p class="said">Two figures sat in the requirements document justifying design decisions.</p>
+            <p class="found">Both were <strong>invented outright</strong> — a pool-heating
+              duration and the exchanger pressure drop that justified automating
+              a valve. Found by auditing every number for a citation.</p>
+          </div>
+        </div>
+
+        <div class="finding">
+          <span class="tag">Architecture</span>
+          <div>
+            <p class="said">Several decisions rested on what njsPC was assumed to do.</p>
+            <p class="found"><strong>Four were reversed</strong> once someone read its source.
+              It creates the bodies, circuits and valves unprompted, drives them
+              from its own timers, and cannot be made passive — so this project
+              supervises it rather than replacing it.</p>
+          </div>
+        </div>
+
+        <div class="finding">
+          <span class="tag">Test suites</span>
+          <div>
+            <p class="said">Unit tests passed on interlocks that were wrong in the same way three times.</p>
+            <p class="found">Integration suites — a relay card faked at the process boundary,
+              an njsPC answering real HTTP — found that the bypass, the pool heat
+              call and the blower were each enforced <strong>only when an intent
+              was what moved</strong>. njsPC takes the body without asking. Every
+              one had the right end state and the wrong route through it.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>Where it has got to</h2>
+      <div class="scroll">
+        <table>
+          <thead>
+            <tr><th scope="col">Part</th><th scope="col">State</th><th scope="col">Notes</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Supervisor and UI on the Pi</td><td class="state yes">running</td>
+                <td>Both systemd services, verified across a reboot, watchdog restarts a wedged process</td></tr>
+            <tr><td>Relay driving</td><td class="state yes">done</td>
+                <td>Channel map measured, not inherited; written to the expander directly</td></tr>
+            <tr><td>Interlocks</td><td class="state yes">done</td>
+                <td>Bypass policy, heat-conditional pump floor, purge, targets as cutoffs</td></tr>
+            <tr><td>Commissioning checks</td><td class="state yes">done</td>
+                <td>Ten checks comparing njsPC's settings against what this repo believes. It reports; it never corrects</td></tr>
+            <tr><td>Equipment on the bus</td><td class="state no">not yet</td>
+                <td>No serial port, so every reading is null — which is the state the tests are written against</td></tr>
+            <tr><td>Valve travel modelling</td><td class="state no">blocked</td>
+                <td>Needs a stopwatch on a real actuator. Until then njsPC's own delay clock is displayed, and said to be its</td></tr>
+            <tr><td>Scheduled preheat</td><td class="state no">blocked</td>
+                <td>Wants a real water temperature. Refuses with a reason rather than doing nothing</td></tr>
+            <tr><td>TLS</td><td class="state no">deferred</td>
+                <td>Deliberately. The reasoning is in the requirements document</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div class="safety">
+        <h3>⚠︎ Safety</h3>
+        <p style="margin-bottom:0">
+          This documents a system switching <strong>240 V pool equipment</strong> —
+          a heat pump, a variable-speed pump and a 1.5 HP blower — in a wet
+          environment.
+        </p>
+        <ul>
+          <li>The 240 V side, including NEC 680 equipotential bonding, is work
+            for a licensed electrician and in most places needs a permit and an
+            inspection. This is not a wiring guide.</li>
+          <li>The heater keeps its own thermostat and its own hard caps, in its
+            own firmware. That is deliberate, and it is why no software bug here
+            can produce a scalding spa.</li>
+          <li>Everything is specific to one site. Valve travels, relay wiring and
+            flow thresholds do not transfer. Survey your own system.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <ul class="links">
+      <li><a href="https://github.com/j4rs/poolctl">Repository</a></li>
+      <li><a href="https://github.com/j4rs/poolctl/blob/main/docs/prds/poolctl-v1.md">Requirements &amp; ADRs</a></li>
+      <li><a href="https://github.com/j4rs/poolctl/blob/main/docs/architecture.md">Architecture</a></li>
+      <li><a href="https://github.com/j4rs/poolctl/blob/main/docs/pi-bringup.md">Pi bring-up</a></li>
+      <li><a href="https://github.com/j4rs/poolctl/blob/main/docs/bench-relays.md">Bench notes</a></li>
+    </ul>
+    <p>
+      MIT licensed. njsPC and relayEquipmentManager are separate projects under
+      AGPL-3.0 and GPL-3.0 respectively; the supervisor is kept a separate
+      process deliberately, so those licences stay theirs. Provided as-is, with
+      no warranty.
+    </p>
+  </div>
+</footer>
+
+</body>
+</html>

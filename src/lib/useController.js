@@ -486,6 +486,11 @@ export function useController() {
     setPumpRunning, setPanelMode, startProgram, stopProgram, saveProgram, deleteProgram,
     bindProgram, saveSchedule, deleteSchedule, setScheduleEnabled,
     extendSpa, schedulePreheat, cancelPreheat, simulateOutage,
+    /* So the connection badge can say MOCK rather than LIVE. The transport
+       really is up — it is this file — but "LIVE" on a page of invented
+       readings claims something about equipment, and the demo build is
+       published where strangers see it. The live hook does not set this. */
+    mock: true,
     /* The mock never refuses anything, but App renders the same Toast either
        way rather than caring which hook it was handed. */
     problem: null, dismissProblem: () => {},

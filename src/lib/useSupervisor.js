@@ -54,7 +54,19 @@ function socketUrl() {
   return `${proto}//${location.host}`;
 }
 
-export function useSupervisor() {
+/**
+ * `enabled: false` builds the hook but never opens the socket.
+ *
+ * `App` calls both transports unconditionally, because React needs a stable
+ * hook order and the mock's timers are cheap. That was harmless while the
+ * only way to reach the mock was `vite dev` on a machine with no supervisor
+ * — the socket simply failed once. The demo build published to a static host
+ * is different: `socketUrl()` falls back to `location.host`, so the page
+ * would reconnect against the CDN serving it, forever, and 404 on
+ * `/auth/status` on every attempt. Idle has to be a real state, not an
+ * accident of nothing answering.
+ */
+export function useSupervisor({ enabled = true } = {}) {
   const [state, setState] = useState(null);
   const [link, setLink] = useState({ up: false, lastMessage: null, error: null });
 
@@ -103,6 +115,7 @@ export function useSupervisor() {
   }, []);
 
   useEffect(() => {
+    if (!enabled) return undefined;
     let closed = false;
 
     const connect = () => {
@@ -175,7 +188,7 @@ export function useSupervisor() {
       clearTimeout(retry.current);
       ws.current?.close();
     };
-  }, []);
+  }, [enabled]);
 
   /* Staleness needs its own clock. Deriving it only during render meant the
      offline state appeared whenever something else happened to re-render —

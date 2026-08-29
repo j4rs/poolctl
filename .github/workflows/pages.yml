@@ -1,19 +1,33 @@
-# Publishes docs/panel/ — and only docs/panel/ — to GitHub Pages.
+# Builds the public site: a landing page, the panel plan, and a live demo of
+# the controller itself.
 #
-# Scoped deliberately. Serving docs/ wholesale would put the PRD, the
-# bring-up guide and the architecture notes on the public internet while
-# the repo itself stayed private, which is a surprising asymmetry to
-# create by accident. Widen `path:` below if that is ever what you want.
+# The demo is why this is a build rather than a directory upload. A production
+# bundle normally assumes the supervisor is serving it, so on a static host it
+# would wait forever for a socket that cannot open. `VITE_MOCK=1` forces the
+# mock transport, and the app's own MOCK DATA badge then tells the truth about
+# what the numbers are.
+#
+# Two paths that must agree and are easy to break: `--base` has to match where
+# the bundle is served from, and it differs from the supervisor's own build,
+# which serves at the root. So it is set here and never in package.json.
 #
 # .nojekyll is written at build time rather than committed: Jekyll would
-# otherwise try to process the page and the three .py generators, and
-# nothing here wants a static-site generator's opinion.
-name: panel plan
+# otherwise try to process the page and the three .py generators, and nothing
+# here wants a static-site generator's opinion.
+name: site
 
 on:
   push:
     branches: [main]
-    paths: ['docs/panel/**', '.github/workflows/pages.yml']
+    paths:
+      - 'docs/site/**'
+      - 'docs/panel/**'
+      - 'src/**'
+      - 'index.html'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'vite.config.js'
+      - '.github/workflows/pages.yml'
   workflow_dispatch:
 
 permissions:
@@ -37,11 +51,30 @@ jobs:
       - name: Fail if the figures are stale against plate.py
         run: python3 docs/panel/check.py
 
-      - run: touch docs/panel/.nojekyll
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # The suite gates the deploy. A demo of a controller whose own tests are
+      # failing is worse than no demo.
+      - run: npm test
+
+      - name: Assemble the site
+        env:
+          VITE_MOCK: '1'
+        run: |
+          mkdir -p _site
+          cp docs/site/index.html _site/index.html
+          cp -r docs/panel _site/panel
+          npx vite build --base=/poolctl/app/ --outDir _site/app --emptyOutDir
+          touch _site/.nojekyll
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: docs/panel
+          path: _site
       - id: deploy
         uses: actions/deploy-pages@v4

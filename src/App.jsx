@@ -19,8 +19,18 @@ const TABS = [
 
 /* Live when a supervisor URL is configured, or when the page is served by the
    supervisor itself rather than the Vite dev server. Otherwise the mock, so
-   `npm run dev` still works standalone with no backend. */
-const LIVE = Boolean(import.meta.env?.VITE_SUPERVISOR) || !import.meta.env?.DEV;
+   `npm run dev` still works standalone with no backend.
+ *
+ * `VITE_MOCK` overrides both, and exists for one caller: the demo build
+ * published to GitHub Pages. A production build otherwise assumes a
+ * supervisor is serving it, so on a static host it would wait for a socket
+ * that can never open — a permanently "connecting" pool controller, which is
+ * a poor advertisement for one whose whole argument is that it tells you the
+ * truth about what it can reach. Every reading behind this flag is invented;
+ * see the banner the app renders when it is set. */
+const DEMO = import.meta.env?.VITE_MOCK === "1";
+const LIVE =
+  !DEMO && (Boolean(import.meta.env?.VITE_SUPERVISOR) || !import.meta.env?.DEV);
 
 const THEME_LABEL = { auto: "Auto", dark: "Night", light: "Day" };
 
@@ -75,7 +85,7 @@ export default function App() {
      and one of them simply idles. The mock's timers are cheap; the socket
      never opens without a supervisor to open it against. */
   const mock = useController();
-  const live = useSupervisor();
+  const live = useSupervisor({ enabled: !DEMO });
   const controller = LIVE ? live : mock;
   const { Screen } = TABS.find((t) => t.id === tab);
 

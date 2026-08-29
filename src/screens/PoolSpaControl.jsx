@@ -40,7 +40,7 @@ export default function PoolSpaControl({ controller, themeControl, onOpenHeat })
      minutes of uncancellable valve travel earns a hold, not a tap. */
   const confirm = useConfirm();
   const { state, setMode, toggle, extendSpa, schedulePreheat, cancelPreheat,
-    simulateOutage } = controller;
+    simulateOutage, mock } = controller;
   const {
     mode, target, activeSequence, stepIndex, steps, valves, pumpRpm, waterTemp,
     targets, setpoint, heaterCall, blower, light, saltPpm, cellOutput,
@@ -83,7 +83,9 @@ export default function PoolSpaControl({ controller, themeControl, onOpenHeat })
         {/* Tapping simulates a transport outage. Mock-only affordance, but
             the offline path it exposes is the real one. */}
         <button onClick={simulateOutage}
-          aria-label={connected ? "Connected. Tap to simulate an outage" : "Offline. Tap to reconnect"}
+          aria-label={connected
+            ? `${mock ? "Mock transport" : "Connected"}. Tap to simulate an outage`
+            : "Offline. Tap to reconnect"}
           style={{
             display: "flex", alignItems: "center", gap: 6, background: "transparent",
             border: "none", padding: 0, cursor: "pointer", textAlign: "right",
@@ -95,7 +97,7 @@ export default function PoolSpaControl({ controller, themeControl, onOpenHeat })
             background: connected ? C.water : C.alert,
           }} />
           <span>
-            {connected ? "LIVE" : "OFFLINE"}
+            {connected ? (mock ? "MOCK" : "LIVE") : "OFFLINE"}
             {stale && ago(lastSeen) && (
               <span style={{ display: "block", color: C.muted, letterSpacing: 0, fontSize: 9.5, marginTop: 2 }}>
                 last seen {ago(lastSeen)}
