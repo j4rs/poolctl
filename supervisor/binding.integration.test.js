@@ -77,7 +77,20 @@ function fakeNjspc() {
   const routes = {
     "GET /state/all": () => stateAll(),
     /* Where njsPC keeps the settings the commissioning check reads. */
-    "GET /config/all": () => ({ pool: { options }, circuits, pumps: [] }),
+    /* `pumps` and `valves` mirror what real njsPC returns here — measured on
+       the rig, 29 August 2026. They were `pumps: []` and absent respectively,
+       written as filler, which made this fixture claim there was no pump
+       while every other route served pump 50. The commissioning check for a
+       missing pump found the contradiction. */
+    "GET /config/all": () => ({
+      pool: { options },
+      circuits,
+      pumps: [{ id: 50, name: "IntelliFlo", type: TYPE, isActive: true }],
+      valves: [
+        { id: 1, name: "Intake", connectionId: "", deviceBinding: "" },
+        { id: 2, name: "Return", connectionId: "", deviceBinding: "" },
+      ],
+    }),
     "GET /config/options/pumps": () => ({
       pumpTypes: [TYPE],
       pumps: [{

@@ -1889,10 +1889,16 @@ temperature (read from source).
 - [x] Stand njsPC up on a laptop and test ADR-10's assumptions. Done — see
       the bench findings under ADR-10. `anslq25` was the wrong tool (it only
       mocks an EasyTouch OCP); Nixie with comms disabled is the way
-- [ ] Bench the pump through a body switch — the one safety question left
-      that needs no hardware. Configure a pump, switch bodies, watch the rpm.
-      Pass is "holds ~1000 rpm"; "stopped" means the supervisor cannot
-      delegate the switch to njsPC. Do this before designing the supervisor
+- [x] Bench the pump through a body switch. **Closed by reading rather than
+      by running it, and the answer changed the question.** The IntelliFlo
+      manual settles it: with priming enabled the pump runs 1800 RPM for 3 s
+      on every restart and *ignores automation commands while priming*, so a
+      1000 rpm floor through a restart is unenforceable by anybody. Disable
+      priming at the pump keypad during commissioning; a restart then costs
+      only ramp time, and njsPC's stop-move-start is gentler on the actuator
+      than turning under load. See "Valves move at zero flow, one at a time".
+      The instruction to do this "before designing the supervisor" is also
+      moot — the supervisor is built
 - [ ] Re-read `sequences.js` against njsPC's body/circuit model. Some steps
       are likely njsPC configuration rather than code; what survives that pass
       is the supervisor's actual scope

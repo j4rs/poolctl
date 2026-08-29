@@ -31,16 +31,90 @@ export const NJSPC_DEFAULT_EGG_TIMER = 720;
  */
 export function checkCommissioning({
   spaCircuit, options, njspcOnLan, passwordSet, rs485, clock, heaters,
+  valves, pumps,
 } = {}) {
   return [
     ...checkPassword(passwordSet),
     ...checkExposure(njspcOnLan),
     ...checkSerialPort(rs485),
+    ...checkValveBinding(valves),
+    ...checkPump(pumps),
     ...checkHeater(heaters),
     ...checkClock(clock),
     ...checkSpaEggTimer(spaCircuit),
     ...checkValveDelay(options),
   ];
+}
+
+/**
+ * njsPC's valves must have **no device binding**.
+ *
+ * This supervisor drives the relay card directly, from `relays.js` and
+ * `hat.js`. If a valve in njsPC is also bound to a device — REM, or anything
+ * else njsPC can reach — then two processes are driving the same actuator
+ * from different models of where it should be. The visible symptom is a valve
+ * that moves twice, or moves back; the invisible one is a position nobody can
+ * account for, on equipment with no feedback to recover from.
+ *
+ * A **warning**, not a note. Unlike most of this file, the bad state here is
+ * not merely wrong information — it is a second authority on a device, which
+ * is precisely what ADR-7 exists to forbid.
+ *
+ * It is also the kind of setting nobody sets on purpose: it arrives by
+ * clicking through a dashPanel form, and there is no screen anywhere that
+ * would otherwise mention it.
+ */
+export function checkValveBinding(valves) {
+  if (!Array.isArray(valves)) return [];
+
+  const bound = valves.filter(
+    (v) => v && (nonEmpty(v.connectionId) || nonEmpty(v.deviceBinding)),
+  );
+  if (bound.length === 0) return [];
+
+  const names = bound.map((v) => v.name || `valve ${v.id}`).join(", ");
+  return [{
+    id: "valve-bound-elsewhere",
+    severity: "warn",
+    what: bound.length === 1
+      ? `njsPC is driving the ${names} valve itself`
+      : `njsPC is driving these valves itself: ${names}`,
+    detail:
+      `This supervisor owns the relay card, so a valve with a device binding ` +
+      `has two things deciding where it should be. Clear the binding in ` +
+      `njsPC (dashPanel: the valve's connection and device), leaving the ` +
+      `valve defined but not bound.`,
+  }];
+}
+
+const nonEmpty = (v) => typeof v === "string" && v.trim() !== "";
+
+/**
+ * A pump has to exist before a program can bind to one.
+ *
+ * The speed lives on the pump, in `pump.circuits` — njsPC has no runtime
+ * pump-speed endpoint, because that is how pool controllers model a pump, and
+ * `binding.js` is built around it. With no pump configured there is nowhere
+ * for a program's rpm to live, so every bind fails and the programs sit
+ * unbindable with a reason nobody can act on from the app.
+ *
+ * A **note** rather than a warning: nothing is unsafe, and on a rig with no
+ * pump on the bus yet this is a true statement about an unfinished
+ * installation rather than a fault.
+ */
+export function checkPump(pumps) {
+  if (!Array.isArray(pumps)) return [];
+  if (pumps.some((p) => p && p.id != null)) return [];
+
+  return [{
+    id: "no-pump",
+    severity: "note",
+    what: "njsPC has no pump configured",
+    detail:
+      `A manual program's speed is stored on the pump, in its circuit list — ` +
+      `there is no runtime endpoint for pump speed. Until a pump exists, no ` +
+      `program can be bound and none of them will run.`,
+  }];
 }
 
 /**

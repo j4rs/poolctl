@@ -509,6 +509,8 @@ async function reviewCommissioning() {
       rs485: rs485.value,
       clock: clock.value,
       heaters: config.value?.heaters,
+      valves: config.value?.valves,
+      pumps: config.value?.pumps,
     });
     const changed = JSON.stringify(findings) !== JSON.stringify(own.commissioning);
     own.commissioning = findings;

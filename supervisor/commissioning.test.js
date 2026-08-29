@@ -2,6 +2,7 @@
 import { describe, it, expect } from "vitest";
 import {
   checkCommissioning, checkExposure, checkSerialPort, checkClock, checkHeater,
+  checkValveBinding, checkPump,
   NJSPC_DEFAULT_EGG_TIMER,
 } from "./commissioning.js";
 import { SPA_TIMEOUT_MIN } from "../src/lib/sequences.js";
@@ -286,5 +287,90 @@ describe("all the findings together", () => {
       spaCircuit: { id: 1, name: "Spa", eggTimer: 120, dontStop: false },
       options: { pumpDelay: true, valveDelayTime: 60 },
     })).toEqual([]);
+  });
+});
+
+/**
+ * Two settings the design depends on that nothing on any screen mentions.
+ *
+ * Both were prose in CLAUDE.md and nowhere else, which is the definition of a
+ * silent fault: correct today because somebody remembered, and wrong later
+ * with no way to find out.
+ */
+describe("valve device bindings", () => {
+  const unbound = [
+    { id: 1, name: "Intake", connectionId: "", deviceBinding: "" },
+    { id: 2, name: "Return" },
+  ];
+
+  it("says nothing when njsPC only defines the valves", () => {
+    /* The state of the live rig, checked 29 August 2026. */
+    expect(checkValveBinding(unbound)).toEqual([]);
+  });
+
+  it("says nothing when the configuration could not be read", () => {
+    /* Not knowing is not the same as knowing something is wrong — the rule
+       this whole file is built on. */
+    expect(checkValveBinding(undefined)).toEqual([]);
+    expect(checkValveBinding(null)).toEqual([]);
+  });
+
+  it("warns when a valve is also bound to a device", () => {
+    /* Two authorities on one actuator, which is the ADR-7 failure. It is a
+       warning rather than a note for that reason. */
+    const [f] = checkValveBinding([
+      { id: 1, name: "Intake", connectionId: "rem-1", deviceBinding: "gpio-4" },
+      { id: 2, name: "Return" },
+    ]);
+    expect(f.severity).toBe("warn");
+    expect(f.what).toMatch(/Intake/);
+    expect(f.what).not.toMatch(/Return/);
+  });
+
+  it("catches a binding that is only half filled in", () => {
+    /* A connection with no device is still njsPC believing it owns the
+       valve, and it is what a half-finished dashPanel form leaves behind. */
+    expect(checkValveBinding([{ id: 1, name: "Intake", connectionId: "rem-1" }]))
+      .toHaveLength(1);
+    expect(checkValveBinding([{ id: 1, name: "Intake", deviceBinding: "gpio-4" }]))
+      .toHaveLength(1);
+  });
+
+  it("names every bound valve, not just the first", () => {
+    const [f] = checkValveBinding([
+      { id: 1, name: "Intake", deviceBinding: "gpio-4" },
+      { id: 2, name: "Return", deviceBinding: "gpio-5" },
+    ]);
+    expect(f.what).toMatch(/Intake/);
+    expect(f.what).toMatch(/Return/);
+  });
+
+  it("does not treat whitespace as a binding", () => {
+    expect(checkValveBinding([{ id: 1, name: "Intake", connectionId: "   " }]))
+      .toEqual([]);
+  });
+});
+
+describe("a pump to bind programs to", () => {
+  it("says nothing when a pump exists", () => {
+    expect(checkPump([{ id: 50, name: "IntelliFlo", type: 4 }])).toEqual([]);
+  });
+
+  it("notes an empty pump list", () => {
+    /* A note, not a warning: nothing is unsafe, it is an unfinished
+       installation. */
+    const [f] = checkPump([]);
+    expect(f.severity).toBe("note");
+    expect(f.id).toBe("no-pump");
+  });
+
+  it("treats an empty slot as no pump", () => {
+    /* njsPC keeps unused slots in the same array — the lesson from
+       schedules.js, where a present-but-idless object read as real. */
+    expect(checkPump([{ name: "" }])).toHaveLength(1);
+  });
+
+  it("says nothing when the configuration could not be read", () => {
+    expect(checkPump(undefined)).toEqual([]);
   });
 });
