@@ -146,7 +146,7 @@ model, **13 of its 30 steps are things njsPC already does**, and the way to
 | `heater-off` (in `spa`/`pool`) | — | subsumed. The relay byte is written atomically, so there is no off-then-on to sequence |
 | `bypass-*` | supervisor | njsPC has no bypass concept (ADR-9). **Implemented** |
 | `heat-pool`, `heat-spa` | supervisor | CH4/CH5, derived from our own call. **Implemented** |
-| `blower-off` | supervisor | CH6. **Implemented** |
+| `blower-off` | supervisor | CH6. **Implemented 29 August** — the relay always followed `own.blower`, but nothing cleared it on the way out of spa. This table said otherwise for half a day |
 | `purge` | supervisor | **implemented.** Flow is held through the exchanger for `PURGE_MIN` after a call ends, before the bypass may isolate it. njsPC would not have done it: `NixieHeatpump.getCooldownTime()` returns 0, so `HeaterCooldownDelay` never fires for this heater type. Duration still unmeasured |
 | `pump-min` | supervisor | **not built, deliberately.** `floorRpm` computes it and `setRpm` refuses, so it has never reached equipment — and enforcing it now would encode an unmeasured threshold. See below |
 

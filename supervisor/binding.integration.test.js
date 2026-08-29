@@ -48,6 +48,10 @@ function fakeNjspc() {
   let temps = { temp: 84, heatStatus: { name: "off" } };
   let pumpRpm;
 
+  /* Whether the Spa circuit is on, which in njsPC's shared-body model is the
+     single fact that decides the body, the valve mode and both diverters. */
+  const spaOn = () => Boolean(circuits.find((c) => c.id === 1)?.isOn);
+
   const stateAll = () => ({
     circuits,
     /* njsPC's panel mode — what `toggleServiceMode` flips and what the
@@ -57,7 +61,7 @@ function fakeNjspc() {
        body and the valve mode with it — the nxps shared-body behaviour that
        ADR-10 is built around. Hardcoding "pool" here made a mode-change test
        silently unprovable. */
-    valveMode: { name: circuits.find((c) => c.id === 1)?.isOn ? "spa" : "pool" },
+    valveMode: { name: spaOn() ? "spa" : "pool" },
     temps: { bodies: [{ id: 1, isOn: true, ...temps }] },
     pumps: [{
       id: 50, name: "IntelliFlo", isActive: true, minSpeed: 450, maxSpeed: 3450,
@@ -68,7 +72,17 @@ function fakeNjspc() {
         circuit: { id: pc.circuit, isOn: Boolean(circuits.find((c) => c.id === pc.circuit)?.isOn) },
       })),
     }],
-    valves: [], chlorinators: [], delays: [],
+    /* njsPC's `nxps` shared-body model diverts both valves when the body
+       switches — the behaviour ADR-10 is built around, and it happens in the
+       same tick because njsPC has no travel model. Returning `valves: []`
+       here made the fake claim the opposite: the spa heat contact closed
+       while the valves still read pool, which is an ordering fault the real
+       controller cannot produce. Found by the first trace assertion. */
+    valves: [
+      { id: 1, isIntake: true, isDiverted: spaOn() },
+      { id: 2, isReturn: true, isDiverted: spaOn() },
+    ],
+    chlorinators: [], delays: [],
   });
 
   let options = { pumpDelay: true, valveDelayTime: 45 };
@@ -163,6 +177,15 @@ function fakeNjspc() {
       c.endTime = c.isOn && c.eggTimer
         ? new Date(Date.now() + c.eggTimer * 60000).toISOString()
         : undefined;
+      /* Shared bodies are exclusive: njsPC turns the other one off rather
+         than running both. The fake did not, so a switch back to pool left
+         the spa circuit on, `valveMode` stayed spa, and the supervisor was
+         being told the body never changed. Nothing noticed until a trace
+         asked what the card did about it. */
+      if (c.isOn && (c.id === 1 || c.id === 6)) {
+        const other = circuits.find((x) => x.id === (c.id === 1 ? 6 : 1));
+        if (other) { other.isOn = false; other.endTime = undefined; }
+      }
       return c;
     },
   };
@@ -776,6 +799,78 @@ describe("the evaluation loop", () => {
     const later = await settles((s) => s.violations.length > 0, 8000);
     expect(later.violations.map((v) => v.id)).toContain("heat-below-floor");
     await client.intent("setPoolHeat", { on: false });
+  });
+});
+
+describe("what the card actually does", () => {
+  /**
+   * Traces, not snapshots.
+   *
+   * The order is the safety property here — valve before contact, purge
+   * before isolation, boot passing through de-energised — and a resting byte
+   * cannot show any of it. Both bugs found on 29 August had the right end
+   * state and the wrong path: a boot that flashed `0x40` before the purge
+   * hold engaged, and a drift corrector re-asserting a byte the supervisor
+   * had just stopped wanting.
+   *
+   * These read as a specification. That is deliberate; someone who will never
+   * open the harness should be able to review them.
+   */
+  /* Quiesce the card, then start the trace from there. */
+  const from = async () => { await sup.card.quiet(); await sup.card.reset(); };
+
+  it("switches to spa in one write, heat contact included", async () => {
+    /* 0x25 rather than 0x05, and the difference is the authority change: the
+       spa heat call follows the mode now, because njsPC's heater has no
+       device binding and actuates nothing. */
+    await client.intent("setMode", { mode: "pool" });
+    await settles((s) => s.mode === "pool", 8000);
+    await from();
+
+    await client.intent("setMode", { mode: "spa" });
+    await sup.card.quiet();
+    expect(await sup.card.trace()).toEqual(["0x25  REL1 REL2 REL5"]);
+  });
+
+  it("adds the blower without disturbing anything else", async () => {
+    await client.intent("setMode", { mode: "spa" });
+    await settles((s) => s.mode === "spa", 8000);
+    await from();
+
+    await client.intent("toggle", { key: "blower" });
+    await sup.card.quiet();
+    expect(await sup.card.trace()).toEqual(["0xa5  REL1 REL2 REL5 REL6"]);
+  });
+
+  it("clears the blower on the way out of spa", async () => {
+    /* `mode !== 'spa' implies blower === false`. The toggle is gated to spa
+       mode, so a blower carried into pool mode is on and awkward to reach —
+       and sequences.js has an explicit blower-off step in the pool path. */
+    await client.intent("setMode", { mode: "spa" });
+    await settles((s) => s.mode === "spa", 8000);
+    if (!(await now()).blower) await client.intent("toggle", { key: "blower" });
+    await from();
+
+    await client.intent("setMode", { mode: "pool" });
+    await settles((s) => s.mode === "pool", 8000);
+    await sup.card.quiet();
+    const state = await now();
+    expect(state.blower, "the blower must not survive the mode change").toBe(false);
+    expect(state.violations.map((v) => v.id)).not.toContain("blower-out-of-spa");
+  });
+
+  it("leaves spa through de-energised, not through the bypass", async () => {
+    /* Spa heat was on, so the purge holds the bypass at flow — the card lands
+       on 0x00 and stays there. A 0x40 here would be the exchanger isolated
+       moments after the heater stopped. */
+    await client.intent("setMode", { mode: "spa" });
+    await settles((s) => s.mode === "spa", 8000);
+    await from();
+
+    await client.intent("setMode", { mode: "pool" });
+    await settles((s) => s.mode === "pool", 8000);
+    await sup.card.quiet();
+    expect(await sup.card.trace()).toEqual(["0x00  (all off)"]);
   });
 });
 

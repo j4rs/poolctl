@@ -11,6 +11,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocket } from "ws";
+import { describe as describeByte } from "./relays.js";
 
 const ENTRY = fileURLToPath(new URL("./index.js", import.meta.url));
 
@@ -60,8 +61,51 @@ async function fakeCard() {
     env: { I2C_TOOL_DIR: dir, I2C_DEVICE: device, FAKE_I2C_STATE: state },
     /** What the card holds right now. */
     async byte() { return (await load()).byte; },
-    /** Every write, in order — the foundation slice 2 builds traces on. */
+    /** Every write, in order, as raw bytes. */
     async writes() { return (await load()).writes.map((w) => w.byte); },
+
+    /**
+     * The same writes, named.
+     *
+     * Order is the safety property in this system — valve before contact,
+     * purge before isolation, boot passing through `0x00` — and a resting
+     * byte cannot show it. Two bugs this week had the right end state and the
+     * wrong path.
+     *
+     * Named rather than numeric so a failure explains itself: `0x25  REL1
+     * REL2 REL5` against `0x05  REL1 REL2` says which relay differs without
+     * anyone reaching for the map.
+     */
+    async trace() { return (await load()).writes.map((w) => describeByte(w.byte)); },
+
+    /**
+     * Resolve once the card has stopped changing.
+     *
+     * Trace tests need this and state assertions do not: `settles()` waits on
+     * a published field, which can be true a beat before the byte that
+     * follows from it has landed. Resetting the log in that gap captures a
+     * stray write and the trace reads as though the supervisor did something
+     * extra.
+     */
+    async quiet({ still = 700, timeout = 8000 } = {}) {
+      const deadline = Date.now() + timeout;
+      let count = (await load()).writes.length;
+      let unchangedSince = Date.now();
+      for (;;) {
+        await new Promise((r) => setTimeout(r, 100));
+        const now = (await load()).writes.length;
+        if (now !== count) { count = now; unchangedSince = Date.now(); }
+        else if (Date.now() - unchangedSince >= still) return;
+        if (Date.now() > deadline) return;
+      }
+    },
+
+    /** Forget the writes so far, so a trace can start from here. */
+    async reset() {
+      const s = await load();
+      s.writes = [];
+      await writeFile(state, JSON.stringify(s));
+    },
     /** Drive the card behind the supervisor's back, as a bench hand would. */
     async poke(byte) {
       const s = await load();

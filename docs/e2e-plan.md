@@ -74,7 +74,7 @@ that cannot fail is worse than no test.
 
 ---
 
-## Slice 2 — Traces, not snapshots
+## Slice 2 — Traces, not snapshots — **done, 29 August 2026**
 
 **What.** Record the ordered sequence of writes, and assert the whole path
 rather than the resting state.
@@ -95,6 +95,34 @@ call pool heat          0x10
 water reaches target    0x00
 + purge                 0x40
 ```
+
+**Shipped.** `card.trace()` returns the writes named — `0x25  REL1 REL2 REL5`
+rather than `37` — so a failure says which relay differs without anyone
+reaching for the map. `card.quiet()` waits until the card stops changing,
+which trace tests need and state assertions do not: `settles()` waits on a
+published field, and that can be true a beat before the byte following from it
+has landed.
+
+**It found three things on the first run**, which is the whole argument for
+the slice:
+
+1. **The fake never diverted its valves.** `/state/all` returned `valves: []`,
+   so the trace showed the spa heat contact closing while the valves still
+   read pool — an ordering fault the real controller cannot produce, because
+   `nxps` switches body and both diverters in one tick. The fake now models it.
+2. **The fake let both bodies run at once.** Turning the Pool circuit on left
+   the Spa circuit on, so `valveMode` never came back to pool. Shared bodies
+   are exclusive in njsPC; they are in the fake now too.
+3. **The blower survived the mode change.** `sequences.js` has a `blower-off`
+   step in the pool path and the invariants say
+   `mode !== 'spa' implies blower === false` — and nothing enforced it. The
+   invariant that was already watching for this reports rather than corrects,
+   so it would have raised a violation and left the blower running. Fixed in
+   `setMode`.
+
+The first two are slice 7's concern arriving early, which is worth noting: a
+fake that drifts from what it imitates makes a suite *less* trustworthy than
+no suite, because it fails confidently.
 
 **Cost** small, given slice 1. **Depends on** 1.
 
