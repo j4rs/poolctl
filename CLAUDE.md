@@ -400,41 +400,32 @@ is just something to respond to, which is why there is no state to sync.
 ## Next up
 
 Full lists in PRD §10 (open questions) and §11 (backlog). Available without
-hardware, highest value first:
+equipment on the bus, highest value first:
 
-1. **Commissioning checklist.** Several settings must be changed on the
-   equipment itself, not in software, and forgetting one is a silent fault —
-   `supervisor/commissioning.js` now makes some of them audible, comparing
-   what njsPC reports against what this repo believes and surfacing the
-   difference on the Water screen. It checks, it never corrects: njsPC owns
-   these, dashPanel edits them, and a process that quietly reverted a
-   deliberate change would be worse than one that says what it found. Only
-   the Spa egg timer is covered so far; the rest of this list is still on
-   you:
-   bind njsPC to loopback (`web.servers.http.ip` = `127.0.0.1` in its
-   `config.json`, then restart) — its API needs no password and dashPanel
-   bypasses every interlock here, so on `0.0.0.0` anyone on the wifi drives
-   the equipment; reach dashPanel over `ssh -L 4200:localhost:4200` instead.
-   The supervisor checks this one by trying to reach njsPC on its own LAN
-   address, so reopening it is caught rather than assumed. Still on you:
-   disable priming at the pump keypad, leave Thermal Mode enabled, set
-   `valveDelayTime` above real valve travel, size the transformer at 100 VA,
-   set the Spa circuit `eggTimer` to 120 (njsPC defaults to 720 — a
-   twelve-hour spa session), and configure njsPC's valves with **no device
-   binding** so the supervisor drives the relays instead of REM's latch.
-   Program circuits are no longer on this list — the supervisor creates them
-   (see below) — but njsPC does need a **pump** configured before any
-   program can bind, because the speed has nowhere else to live.
+1. **Commissioning — what is checked, and what no check can see.**
+   `supervisor/commissioning.js` compares what njsPC reports against what
+   this repo believes and surfaces the difference on the Water screen. It
+   checks, it never corrects: njsPC owns these settings, dashPanel edits
+   them, and a process that quietly reverted a deliberate change would be
+   worse than one that says what it found. Ten checks now, including njsPC's
+   LAN exposure — verified by trying to reach it on the Pi's own LAN
+   address, so reopening it is caught rather than assumed — the valve
+   bindings, the pump, the heater, the Spa egg timer, the valve delay, the
+   serial port, the clock and the password. Three settings live on the
+   equipment itself and are therefore invisible to all of it: **disable
+   priming at the pump keypad**, **leave Thermal Mode enabled**, and **size
+   the transformer at 100 VA**.
 2. **Authentication — two of four parts done.** njsPC is bound to loopback
    and the supervisor is behind a password. What remains is TLS (deferred
    deliberately — see the PRD) and a separate credential for Home Assistant
    in Phase 6. See PRD §11.
-3. **Scheduled preheat.** Still unimplemented, and still
-   refusing with a reason rather than doing nothing. Preheat wants a water
-   temperature, which wants the HAT.
+3. **Scheduled preheat.** Still unimplemented, and still refusing with a
+   reason rather than doing nothing. It wants a real water temperature,
+   which wants the bus.
 
-Blocked on the relay HAT: bus sniffing, the salt question (case 18), real
-`HEATER_MIN_RPM` / `CELL_MIN_RPM`, and thermals with the enclosure sealed.
+Blocked on the bus being attached — not on the HAT, which arrived 27 August:
+bus sniffing, the salt question (case 18), real `HEATER_MIN_RPM` /
+`CELL_MIN_RPM`, and thermals with the enclosure sealed.
 
 ---
 
