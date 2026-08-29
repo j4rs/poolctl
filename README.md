@@ -4,6 +4,11 @@ Controller UI and supervisor for a DIY pool/spa automation system replacing a
 Pentair IntelliConnect, built on nodejs-poolController. Runs against real
 njsPC, or standalone on mock data with no hardware at all.
 
+**[j4rs.github.io/poolctl](https://j4rs.github.io/poolctl/)** — the project
+site, with the interface [running live in your browser on mock
+data](https://j4rs.github.io/poolctl/app/) and the [panel build
+plan](https://j4rs.github.io/poolctl/panel/).
+
 > ### ⚠️ Safety
 >
 > This repository documents a system that switches **240 V pool equipment**:
