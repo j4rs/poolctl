@@ -437,6 +437,50 @@ this is a contact test only.
 
 ---
 
+## Pump: disabling priming, and changing speed live
+
+Two things about the IntelliFlo VSF that this project asserted without a
+source until 30 August 2026. Both quoted from the *IntelliFlo VSF Variable
+Speed and Flow Pump Installation and User's Guide*, p.19.
+
+**Speed can be changed while the pump runs, from the pump's own keypad.**
+
+> **Adjusting and Saving a Pump Speed/Flow** — 1. While the pump is running,
+> press the Up or Down arrow to adjust to desired speed or flow setting.
+
+The Pentair *app* requires stopping a program to edit its speed; the pump
+does not. That matters for any flow test — a ramp done at the keypad costs no
+pump restart, so no priming burst and no heater anti-short-cycle wait between
+steps.
+
+**Disabling priming must be done at the pump, and the automation cable comes
+off while you do it.**
+
+> When the IntelliFlo VSF […] is connected to an automation control system
+> […] the priming feature on the pump cannot be disabled by the external
+> automation control system only. It must also be disabled on the pump
+> itself.
+
+Procedure with automation connected:
+
+1. Disable the priming feature on the automation control system.
+2. **Temporarily disconnect the RS-485 communication cable.**
+3. Open the control panel lid. Press **Menu**, arrows to **Priming**, select
+   **Disabled**, press **Back**.
+4. Reinstall the RS-485 cable.
+
+Standalone the path is `Menu → Down to "Priming" → Select → "Disabled" →
+Select → Save → Back`.
+
+And the sentence ADR-9 rests on, which was previously paraphrased from
+nowhere in particular:
+
+> If priming is enabled on start up, the pump responds to its internal
+> settings **before** responding to commands from an automation control
+> system.
+
+---
+
 ## Stop conditions
 
 **Both heat contacts closed at once.** Should be impossible — `byteFor` sets
