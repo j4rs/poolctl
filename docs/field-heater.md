@@ -216,6 +216,28 @@ either beeps, it is on N.C. and must move.
 
 ## 5. Power up and test
 
+> ### ⚠︎ Turn the bypass to flow by hand, first
+>
+> **The bypass interlock does not exist yet in this phase.** The valve
+> actuators are not wired until Phase 4, so the supervisor drives CH3, updates
+> `valves.bypass`, and believes the exchanger has flow — while the physical
+> diverter sits wherever a human last left it. It has no sensor on that valve
+> and never has; the position is dead-reckoned from what it commanded.
+>
+> So `heaterCall !== 'off' ⟹ valves.bypass === 'flow'` holds perfectly in
+> `invariants.js` and means nothing at the pad. Nothing in software will stop
+> a heat call into a bypassed exchanger today, and nothing will report one.
+>
+> The bypass is binary — full flow or full bypass — so *around* with a call
+> standing is **zero** water through the heater, pump running or not. The
+> heater's water pressure switch is the only protection left, and ADR-5 is
+> explicit that it is a backstop rather than a control.
+>
+> **Before any call, including a hand-bridged one: turn the diverter to send
+> flow through the heater, and confirm it by hand.** You are the interlock
+> until Phase 4. Found the hard way on 30 August 2026 — pump running, bypass
+> around, contact bridged, heater attempting to start.
+
 Panel first, heater second. Watch the journal:
 
 ```bash
