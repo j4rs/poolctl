@@ -357,6 +357,30 @@ njsPC answers.
 
 ### Pool heat
 
+**Done, 30 August 2026 at 11:36:35 — the first equipment this system has
+ever controlled.**
+
+```
+Aug 30 11:36:35 poolctl node[1035]: relays -> 0x10  REL4
+```
+
+The heater turned on. Conditions: pump at 1800 rpm, bypass turned to the
+heater by hand, water 86 °F against a 90 °F setpoint.
+
+**One byte carries both halves.** The resting state was `0x40` — REL3, bypass
+around. The call is `0x10` — REL4 alone. So REL3 released and REL4 closed in
+a single write, which means there is no instant at which a heat call exists
+while the bypass is still commanded around. The interlock is not enforced by
+ordering the writes correctly; the bad combination cannot be observed at all.
+That is the whole reason `relays.js` writes the byte outright instead of
+read-modify-write, and it is the first time it has mattered on real
+equipment.
+
+Before this, the wiring had already proved itself: with the panel powered and
+nothing tapped, the heater read `Remote Off`. Relays de-energised, both
+contacts open, call wires confirmed on N.O. by the whole circuit rather than
+by a meter on one screw pair.
+
 1. Tap **Heat the pool**, confirm twice (`useConfirm` arms on the first tap).
 2. Journal should show `relays -> 0x10  REL4`.
 3. **CH3 goes off and CH4 comes on, together.** CH3 releasing is the bypass
