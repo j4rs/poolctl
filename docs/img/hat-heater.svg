@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 620" width="980" height="620" font-family="Helvetica, Arial, sans-serif">
+  <rect x="0" y="0" width="980" height="620" fill="#ffffff"/>
+
+  <text x="490" y="34" text-anchor="middle" font-size="21" font-weight="700" fill="#111">Heater 3-wire onto the HAT</text>
+  <text x="490" y="56" text-anchor="middle" font-size="13" fill="#555">Board landscape, GPIO header at the top. Right edge runs 1-2-3-4 down; left edge runs 5-6-7-8 <tspan font-style="italic">up</tspan>.</text>
+
+  <!-- board -->
+  <rect x="270" y="90" width="440" height="420" rx="8" fill="#eef3f1" stroke="#7a8f8c" stroke-width="2"/>
+  <rect x="330" y="104" width="320" height="34" rx="3" fill="#cdd8d5" stroke="#8fa19e"/>
+  <text x="490" y="127" text-anchor="middle" font-size="13" fill="#3a4a48" letter-spacing="2">GPIO HEADER</text>
+  <text x="490" y="300" text-anchor="middle" font-size="15" fill="#8a9a97" letter-spacing="3">RELAY HAT</text>
+  <text x="490" y="324" text-anchor="middle" font-size="12" fill="#a3b0ad">V 7.1</text>
+
+  <!-- ============ RIGHT EDGE : relays 1-4, top to bottom ============ -->
+  <text x="770" y="86" font-size="12" font-weight="700" fill="#444" letter-spacing="1">RELAY 1-4</text>
+  <text x="770" y="102" font-size="11" fill="#777">N.C. / COM / N.O.</text>
+
+  <!-- rel 1 -->
+  <rect x="710" y="112" width="54" height="86" fill="#dfe6e4" stroke="#8fa19e"/>
+  <circle cx="737" cy="132" r="8" fill="#fff" stroke="#8a9a97"/><circle cx="737" cy="155" r="8" fill="#fff" stroke="#8a9a97"/><circle cx="737" cy="178" r="8" fill="#fff" stroke="#8a9a97"/>
+  <text x="694" y="160" text-anchor="end" font-size="14" font-weight="700" fill="#666">1</text>
+  <!-- rel 2 -->
+  <rect x="710" y="206" width="54" height="86" fill="#dfe6e4" stroke="#8fa19e"/>
+  <circle cx="737" cy="226" r="8" fill="#fff" stroke="#8a9a97"/><circle cx="737" cy="249" r="8" fill="#fff" stroke="#8a9a97"/><circle cx="737" cy="272" r="8" fill="#fff" stroke="#8a9a97"/>
+  <text x="694" y="254" text-anchor="end" font-size="14" font-weight="700" fill="#666">2</text>
+  <!-- rel 3 -->
+  <rect x="710" y="300" width="54" height="86" fill="#dfe6e4" stroke="#8fa19e"/>
+  <circle cx="737" cy="320" r="8" fill="#fff" stroke="#8a9a97"/><circle cx="737" cy="343" r="8" fill="#fff" stroke="#8a9a97"/><circle cx="737" cy="366" r="8" fill="#fff" stroke="#8a9a97"/>
+  <text x="694" y="348" text-anchor="end" font-size="14" font-weight="700" fill="#666">3</text>
+
+  <!-- rel 4 : POOL  -->
+  <rect x="710" y="394" width="54" height="86" fill="#fdf0e3" stroke="#e08b4c" stroke-width="2.5"/>
+  <circle cx="737" cy="414" r="8" fill="#fff" stroke="#b9a893"/>
+  <circle cx="737" cy="437" r="9" fill="#2f6f6a" stroke="#1d4b47" stroke-width="2"/>
+  <circle cx="737" cy="460" r="9" fill="#e08b4c" stroke="#a8600f" stroke-width="2"/>
+  <text x="694" y="442" text-anchor="end" font-size="17" font-weight="700" fill="#c2700f">4</text>
+  <text x="694" y="462" text-anchor="end" font-size="11" fill="#c2700f">POOL</text>
+  <!-- callouts right -->
+  <text x="778" y="418" font-size="11.5" fill="#999">N.C. — unused</text>
+  <line x1="750" y1="437" x2="800" y2="437" stroke="#2f6f6a" stroke-width="2"/>
+  <text x="806" y="441" font-size="12.5" font-weight="700" fill="#2f6f6a">COM (middle)</text>
+  <line x1="750" y1="460" x2="800" y2="460" stroke="#e08b4c" stroke-width="2"/>
+  <text x="806" y="464" font-size="12.5" font-weight="700" fill="#c2700f">N.O. — BOTTOM</text>
+
+  <!-- ============ LEFT EDGE : relays 8-7-6-5, top to bottom ============ -->
+  <text x="130" y="86" text-anchor="end" font-size="12" font-weight="700" fill="#444" letter-spacing="1">RELAY 5-8</text>
+  <text x="130" y="102" text-anchor="end" font-size="11" fill="#777">N.O. / COM / N.C.</text>
+
+  <!-- rel 8 -->
+  <rect x="216" y="112" width="54" height="86" fill="#dfe6e4" stroke="#8fa19e"/>
+  <circle cx="243" cy="132" r="8" fill="#fff" stroke="#8a9a97"/><circle cx="243" cy="155" r="8" fill="#fff" stroke="#8a9a97"/><circle cx="243" cy="178" r="8" fill="#fff" stroke="#8a9a97"/>
+  <text x="286" y="160" font-size="14" font-weight="700" fill="#666">8</text>
+  <!-- rel 7 -->
+  <rect x="216" y="206" width="54" height="86" fill="#dfe6e4" stroke="#8fa19e"/>
+  <circle cx="243" cy="226" r="8" fill="#fff" stroke="#8a9a97"/><circle cx="243" cy="249" r="8" fill="#fff" stroke="#8a9a97"/><circle cx="243" cy="272" r="8" fill="#fff" stroke="#8a9a97"/>
+  <text x="286" y="254" font-size="14" font-weight="700" fill="#666">7</text>
+  <!-- rel 6 -->
+  <rect x="216" y="300" width="54" height="86" fill="#dfe6e4" stroke="#8fa19e"/>
+  <circle cx="243" cy="320" r="8" fill="#fff" stroke="#8a9a97"/><circle cx="243" cy="343" r="8" fill="#fff" stroke="#8a9a97"/><circle cx="243" cy="366" r="8" fill="#fff" stroke="#8a9a97"/>
+  <text x="286" y="348" font-size="14" font-weight="700" fill="#666">6</text>
+
+  <!-- rel 5 : SPA -->
+  <rect x="216" y="394" width="54" height="86" fill="#fdf0e3" stroke="#e08b4c" stroke-width="2.5"/>
+  <circle cx="243" cy="414" r="9" fill="#e08b4c" stroke="#a8600f" stroke-width="2"/>
+  <circle cx="243" cy="437" r="9" fill="#2f6f6a" stroke="#1d4b47" stroke-width="2"/>
+  <circle cx="243" cy="460" r="8" fill="#fff" stroke="#b9a893"/>
+  <text x="286" y="442" font-size="17" font-weight="700" fill="#c2700f">5</text>
+  <text x="286" y="462" font-size="11" fill="#c2700f">SPA</text>
+  <!-- callouts left -->
+  <line x1="204" y1="414" x2="176" y2="414" stroke="#e08b4c" stroke-width="2"/>
+  <text x="170" y="418" text-anchor="end" font-size="12.5" font-weight="700" fill="#c2700f">N.O. — TOP</text>
+  <line x1="204" y1="437" x2="176" y2="437" stroke="#2f6f6a" stroke-width="2"/>
+  <text x="170" y="441" text-anchor="end" font-size="12.5" font-weight="700" fill="#2f6f6a">COM (middle)</text>
+  <text x="170" y="464" text-anchor="end" font-size="11.5" fill="#999">N.C. — unused</text>
+
+  <!-- the mirror warning -->
+  <rect x="216" y="500" width="548" height="1.5" fill="none"/>
+  <path d="M 243 486 L 243 524 L 737 524 L 737 486" fill="none" stroke="#c2700f" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <rect x="386" y="510" width="208" height="28" rx="4" fill="#fff" stroke="#e08b4c"/>
+  <text x="490" y="529" text-anchor="middle" font-size="12.5" font-weight="700" fill="#c2700f">opposite ends — this is the trap</text>
+
+  <!-- heater terminal strip -->
+  <rect x="60" y="560" width="860" height="46" rx="6" fill="#f6f4ef" stroke="#9a948a" stroke-width="1.5"/>
+  <text x="80" y="589" font-size="13" font-weight="700" fill="#333">Raypak strip:</text>
+  <text x="186" y="589" font-size="13.5" font-weight="700" fill="#2f6f6a">44 Com</text>
+  <text x="252" y="589" font-size="12.5" fill="#555">&#8594; BOTH middle screws</text>
+  <text x="430" y="589" font-size="13.5" font-weight="700" fill="#c2700f">45 Pool</text>
+  <text x="494" y="589" font-size="12.5" fill="#555">&#8594; CH4 bottom</text>
+  <text x="620" y="589" font-size="13.5" font-weight="700" fill="#c2700f">46 Spa</text>
+  <text x="678" y="589" font-size="12.5" fill="#555">&#8594; CH5 top</text>
+  <text x="782" y="589" font-size="11.5" fill="#888">N.O. = open when off</text>
+</svg>

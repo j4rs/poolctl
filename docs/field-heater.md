@@ -167,6 +167,12 @@ you strip anything:
 
 Terminal 44 lands on two screws — it is the common return for both calls.
 
+![Where the heater's three conductors land on the HAT](img/hat-heater.svg)
+
+Both channels sit at the **bottom** of the card on **opposite edges** — the
+right edge runs 1-2-3-4 downward, the left edge runs 5-6-7-8 *upward*. Drawn
+from Test 1b in `bench-relays.md`, measured 28 August 2026.
+
 **COM to the middle screw on both.** Then:
 
 | | relay | block | screw | contact |
