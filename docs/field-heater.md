@@ -381,6 +381,34 @@ nothing tapped, the heater read `Remote Off`. Relays de-energised, both
 contacts open, call wires confirmed on N.O. by the whole circuit rather than
 by a meter on one screw pair.
 
+**The release, and the purge — also first-run on real equipment:**
+
+```
+Aug 30 11:39:58 poolctl node[1035]: relays -> 0x00  (all off)
+Aug 30 11:43:01 poolctl node[1035]: purge elapsed — bypass around the heater
+Aug 30 11:43:01 poolctl node[1035]: relays -> 0x40  REL3
+```
+
+Ending the call gives `0x00`, not `0x40`, and that is the purge. REL3
+de-energised is *flow*, so the supervisor is deliberately holding water
+through the exchanger rather than isolating it — `bypassHeld()` overriding
+the position back to flow while `purgeHolding` is set. Only once the purge
+elapses does the bypass go to around and the byte return to `0x40`.
+
+So the whole cycle, observed: `0x40` idle → `0x10` call → `0x00` purge →
+`0x40` idle.
+
+**Measured: the hold was 3 m 03 s against a configured 3 m 00 s.** The three
+seconds are the evaluation interval — `evaluate()` runs on the 5 s heartbeat,
+so it can only notice the purge has elapsed at the next beat. Late by design,
+and late in the direction that keeps flow on longer rather than shorter.
+
+**What this does not measure is whether three minutes is right.**
+`PURGE_MIN` is an invented number and remains one. What is now verified is
+that the mechanism runs, holds for its configured duration, and releases —
+not that the duration matches the Raypak's actual compressor-idle time. That
+still needs measuring, and PRD §10 still carries it.
+
 1. Tap **Heat the pool**, confirm twice (`useConfirm` arms on the first tap).
 2. Journal should show `relays -> 0x10  REL4`.
 3. **CH3 goes off and CH4 comes on, together.** CH3 releasing is the bypass
