@@ -925,8 +925,8 @@ The panel's own feed has two destinations, not five. An earlier
           <tr><td class="num mono">1</td><td>Intake actuator</td><td>COM / NO / NC</td><td><span class="tag v-24">24 VAC</span></td><td>TB2 &rarr; gland 1</td></tr>
           <tr><td class="num mono">2</td><td>Return actuator</td><td>COM / NO / NC</td><td><span class="tag v-24">24 VAC</span></td><td>TB3 &rarr; gland 2</td></tr>
           <tr><td class="num mono">3</td><td>Bypass actuator</td><td>COM / NO / NC</td><td><span class="tag v-24">24 VAC</span></td><td>TB4 &rarr; gland 3</td></tr>
-          <tr><td class="num mono">4</td><td>Heater POOL, terminal 23</td><td>dry, isolated</td><td><span class="tag v-lv">dry</span></td><td>direct to HAT, gland 4</td></tr>
-          <tr><td class="num mono">5</td><td>Heater SPA, terminal 24</td><td>dry, isolated</td><td><span class="tag v-lv">dry</span></td><td>direct to HAT, gland 4</td></tr>
+          <tr><td class="num mono">4</td><td>Heater POOL, terminal 45</td><td>dry, isolated</td><td><span class="tag v-lv">dry</span></td><td>direct to HAT, gland 4</td></tr>
+          <tr><td class="num mono">5</td><td>Heater SPA, terminal 46</td><td>dry, isolated</td><td><span class="tag v-lv">dry</span></td><td>direct to HAT, gland 4</td></tr>
           <tr><td class="num mono">6</td><td>Blower</td><td>NO &rarr; contactor coil</td><td><span class="tag v-24">24 VAC</span></td><td>TB5, coil in panel</td></tr>
           <tr><td class="num mono">7</td><td>Light</td><td>NO, in the load's loop</td><td><span class="tag v-line">120 VAC</span></td><td>gland 8, to and from T40004RT3</td></tr>
           <tr><td class="num mono">8</td><td><em>spare</em></td><td>&mdash;</td><td>&mdash;</td><td>chlorinator gate dropped &mdash; see below</td></tr>
@@ -1089,7 +1089,7 @@ The panel's own feed has two destinations, not five. An earlier
 
     <figure>
       <svg viewBox="0 0 908 854" role="img"
-           aria-label="Channel wiring diagram. Channels 1 to 3 drive Intermatic PE24GVA valve actuators through changeover contacts fed from the 24 volt AC bus, with red on normally open, white on normally closed and black returning to 24 volt common. Channels 4 and 5 are dry isolated contacts bridging Raypak terminals 22 to 23 and 22 to 24, enclosed in a boundary marking that they connect to nothing on this panel. Channel 6 pulls the blower contactor coil only. Channel 7 sits inside the pool light's own branch circuit. Channel 8 is spare and unwired. A footer shows the three unswitched runs: 5 volt DC, RS-485, and protective earth.">
+           aria-label="Channel wiring diagram. Channels 1 to 3 drive Intermatic PE24GVA valve actuators through changeover contacts fed from the 24 volt AC bus, with red on normally open, white on normally closed and black returning to 24 volt common. Channels 4 and 5 are dry isolated contacts bridging Raypak terminals 44 to 45 and 44 to 46, enclosed in a boundary marking that they connect to nothing on this panel. Channel 6 pulls the blower contactor coil only. Channel 7 sits inside the pool light's own branch circuit. Channel 8 is spare and unwired. A footer shows the three unswitched runs: 5 volt DC, RS-485, and protective earth.">
         <defs>
           <marker id="w-24" viewBox="0 0 10 10" refX="9" refY="5"
                   markerWidth="7" markerHeight="7" orient="auto-start-reverse">
@@ -1174,7 +1174,7 @@ The panel's own feed has two destinations, not five. An earlier
   <text x="150" y="349" class="lbl-sm">isolated contact</text>
   <line x1="290" y1="335" x2="344" y2="335" class="flow-n" marker-end="url(#w-n)"/>
   <rect x="344" y="306" width="262" height="58" rx="4" class="part"/>
-  <text x="358" y="330" class="lbl">Raypak TB &mdash; 22 &harr; 23</text>
+  <text x="358" y="330" class="lbl">Raypak TB &mdash; 44 &harr; 45</text>
   <text x="358" y="349" class="lbl-sm">close to call POOL heat</text>
   <text x="622" y="326" class="lbl-sm">Touches nothing on this panel. The Raypak</text>
   <text x="622" y="341" class="lbl-sm">supplies this low voltage from its own</text>
@@ -1188,7 +1188,7 @@ The panel's own feed has two destinations, not five. An earlier
   <text x="150" y="423" class="lbl-sm">isolated contact</text>
   <line x1="290" y1="409" x2="344" y2="409" class="flow-n" marker-end="url(#w-n)"/>
   <rect x="344" y="380" width="262" height="58" rx="4" class="part"/>
-  <text x="358" y="404" class="lbl">Raypak TB &mdash; 22 &harr; 24</text>
+  <text x="358" y="404" class="lbl">Raypak TB &mdash; 44 &harr; 46</text>
   <text x="358" y="423" class="lbl-sm">close to call SPA heat</text>
   <text x="622" y="400" class="lbl-sm">Same contact form, same isolation.</text>
   <text x="622" y="415" class="lbl-sm">The heater keeps its own thermostat and</text>

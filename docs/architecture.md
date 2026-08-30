@@ -52,7 +52,7 @@ flowchart TB
   WD -.->|SIGABRT, then restart| SEQ
   HAT -->|RS-485| PUMP
   HAT -->|RS-485| CELL
-  HAT -->|dry contacts 22/23/24| HTR
+  HAT -->|dry contacts 44/45/46| HTR
   HAT -->|24 VAC SPDT| VLV
   HAT -->|contactor / 120 V| AUX
 ```

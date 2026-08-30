@@ -320,7 +320,7 @@ ADR-10 is inherited or has to be built. See `bench-relays.md`.
 ### The serial bus, before anything else
 
 The pump and the iChlor are reached over RS-485. The heater is not — it is
-dry contacts on terminals 22/23/24, which is a relay job — so the bus matters
+dry contacts on terminals 44/45/46, which is a relay job — so the bus matters
 for exactly two devices, and without it both stay silent while everything
 else looks healthy.
 

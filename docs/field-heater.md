@@ -37,24 +37,89 @@ statement as "the contact is open".
 
 ---
 
-## 2. Find terminals 22, 23, 24
+## 2. Find terminals 44, 45, 46
 
-Per ADR-4 these are COMMON / POOL / SPA on the Raypak's low-voltage strip.
-**Confirm against the label inside the heater's door before wiring** — the
-numbering is from the manual, and nobody on this project has yet seen the
-actual strip.
+Per ADR-4 these are **COMMON / POOL / SPA** on the Raypak's low-voltage
+terminal strip, inside the cabinet. From the HPPH Installation & Operation
+manual, p.47:
 
-Two things to establish while the door is open, both currently unknown:
+> **3-Wire Controllers.** Install wires from the automation controller for
+> "Heat" on the terminal strip inside the HPPH on the terminals: # 44(Com),
+> # 45 (Pool) & # 46 (Spa).
 
-- **Does the heater need a mode setting for external control?** Some units
-  want thermostat/remote selected before the dry contacts do anything. If
-  there is such a setting, record what it was and what you changed it to.
-- **What are the heater's own setpoints?** They are the real thermostat —
-  ADR-4 exists so that the 95 °F pool and 104 °F spa caps live in firmware
-  rather than in this repository. Write down what they are set to.
+**This ADR said 22/23/24 until 30 August 2026 and those numbers were wrong.**
+Confirm against the label inside the door anyway — the manual covers a model
+range, and the point of this step is to stop trusting a number nobody has
+seen.
 
-If the terminals are not 22/23/24, **stop and update ADR-4** rather than
+Two things that were open questions here are now answered, and both are
+required before a contact does anything:
+
+- **Remote mode must be enabled at the keypad.** Hold UP and DOWN together
+  for 3+ seconds. The top line then reads `Remote`, and a live call shows as
+  `Remote Pool <setpoint>F` or `Remote Spa <setpoint>F`. Exiting remote
+  **defaults the board to OFF** — so if the heater ever stops responding
+  after someone touches the keypad, check this first.
+- **The INSTALLER menu has a `Remote Pool` setting**, and its factory default
+  is **Cool**. The manual's 3-wire procedure says to set it to `Heat` or
+  `Auto`. Record what it was before you change it.
+
+While the door is open, also write down:
+
+- **The heater's own POOL and SPA setpoints, and POOL MAX TEMP / SPA MAX
+  TEMP.** These are the real thermostat. ADR-4 exists so the caps live in
+  firmware rather than in this repository, and in remote mode it is those two
+  MAX values that bind.
+- **Which terminals the outgoing IntelliConnect pair lands on.** If it is
+  44/46, that install has been heating at the *spa* setpoint every time it
+  called — see ADR-4.
+- **The run length from the panel to this strip**, which is not recorded
+  anywhere and which you need before buying cable.
+
+If the terminals are not 44/45/46, **stop and update ADR-4** rather than
 adapting on the fly. The whole safety argument names those terminals.
+
+### Do not wire to the board's REMOTE header
+
+The main control board (Raypak `H000302`; silkscreen `1204-100`,
+`47-103748-02`, `HSCI 1204-83-102A`) carries a 5-pin header marked **REMOTE**
+along its top edge, between `EXV` and `POWER`. That is the factory link from
+the board to the numbered terminal strip. Field wiring goes on the **strip**,
+not on that header — the manual is explicit that the automation controller
+lands on "the terminal strip inside the HPPH".
+
+This is also why no harness kit exists for these units. The illustrated parts
+list for models 5450/6450/8450 (Raypak catalogue 9100.74) lists every control
+box part — board, display, transformer, contactor, relays, sensors — and
+contains **no remote harness of any kind**, because the strip is already
+there and takes bare conductors. Harness kits like `080349F` are for the Avia
+**gas** heaters, a different product line with a different control box.
+
+**If there is no numbered strip in your cabinet**, stop. That would mean the
+REMOTE header is the only connection point, the DIY cable plan is wrong, and
+the right next step is Raypak service on 800-260-2758 with the board numbers
+above — not improvising a connector.
+
+---
+
+## 2b. Prove the two calls before wiring anything
+
+Ten minutes, no panel involved, and it is the difference between believing
+the 3-wire model works on this unit and knowing it.
+
+With the heater in Remote and its supply **off at the breaker**:
+
+1. Jumper **44 – 45**. Restore power. The display should read
+   `Remote Pool <setpoint>F`.
+2. Kill power. Move the jumper to **44 – 46**. Restore power. It should read
+   `Remote Spa <setpoint>F`.
+
+Two distinct calls, each showing the heater's own setpoint, is ADR-4
+confirmed end to end. If only one of them lands, stop — spa heating to a spa
+temperature is then not available through contacts, and that is a design
+change rather than a wiring problem.
+
+Remove the jumper before going any further.
 
 ---
 
@@ -71,6 +136,17 @@ looking for a path.
 ---
 
 ## 4. Land the wires
+
+Three conductors, and the two ends are not symmetrical — so name them before
+you strip anything:
+
+| conductor | heater end | panel end |
+|---|---|---|
+| Com | terminal **44** | COM screw on **both** CH4 and CH5 |
+| Pool | terminal **45** | CH4, **N.O.** |
+| Spa | terminal **46** | CH5, **N.O.** |
+
+Terminal 44 lands on two screws — it is the common return for both calls.
 
 **COM to the middle screw on both.** Then:
 

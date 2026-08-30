@@ -114,8 +114,10 @@ form is here so it never gets skipped.
   `relay3.close()`. A phone loses signal; the state machine must hold
   regardless. (ADR-7)
 - **Do not move thermostat logic into software.** The heater owns its
-  setpoint, its sensor and its hard caps — 95 °F pool, 104 °F spa. That is why
-  no bug in this repo can produce a scalding spa. (ADR-4)
+  setpoint, its sensor and its hard caps — 95 °F pool, 104 °F spa, which are
+  the **top of the keypad's adjustable range**, not defaults someone can
+  raise (Raypak HPPH manual, User menu). That is why no bug in this repo can
+  produce a scalding spa. (ADR-4)
 - **Targets are cutoffs, not setpoints.** The 3-wire interface carries no
   temperature. `state.targets` says when to *stop* calling for heat. It can
   end a call early; it can never ask for more than the heater allows.
@@ -411,10 +413,12 @@ equipment on the bus, highest value first:
    LAN exposure — verified by trying to reach it on the Pi's own LAN
    address, so reopening it is caught rather than assumed — the valve
    bindings, the pump, the heater, the Spa egg timer, the valve delay, the
-   serial port, the clock and the password. Three settings live on the
+   serial port, the clock and the password. Four settings live on the
    equipment itself and are therefore invisible to all of it: **disable
-   priming at the pump keypad**, **leave Thermal Mode enabled**, and **size
-   the transformer at 100 VA**.
+   priming at the pump keypad**, **leave Thermal Mode enabled**, **size
+   the transformer at 100 VA**, and **set the heater's INSTALLER menu
+   `Remote Pool` to Heat or Auto** — it defaults to Cool, and the 3-wire
+   control does not behave without it (ADR-4).
 2. **Authentication — two of four parts done.** njsPC is bound to loopback
    and the supervisor is behind a password. What remains is TLS (deferred
    deliberately — see the PRD) and a separate credential for Home Assistant

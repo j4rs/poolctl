@@ -219,19 +219,82 @@ covers it.
 
 ### ADR-4 — 3-wire heater control, not 2-wire
 
-**Decision:** wire COMMON/POOL/SPA (terminals 22/23/24) and close one of two
-dry contacts to call for heat at the corresponding setpoint.
+**Decision:** wire COMMON/POOL/SPA — **terminals 44 (Com), 45 (Pool) and 46
+(Spa)** — and close one of two dry contacts to call for heat at the
+corresponding setpoint.
+
+**Corrected 30 August 2026.** This ADR said 22/23/24 from its first draft.
+Those numbers were wrong and no source was ever cited for them. The Raypak
+HPPH Installation & Operation manual, *Installing a Remote Control Device*,
+p.47, says:
+
+> **3-Wire Controllers.** Install wires from the automation controller for
+> "Heat" on the terminal strip inside the HPPH on the terminals: # 44(Com),
+> # 45 (Pool) & # 46 (Spa).
+
+The decision itself is unaffected — 3-wire is a documented, supported mode on
+this unit — but the numbers were load-bearing in five other documents and in
+the panel figures, and all of them were wrong together. See §10 on numbers
+without sources.
 
 **Rationale:** this is the single most important safety decision in the
 project. In 3-wire mode the heater retains its own thermostat, its own
-temperature sensor, and its own hard caps (95 °F pool, 104 °F spa). The
-scald limit on the spa is therefore enforced in the heater's firmware, not
-in application code. No bug in this repository can produce a dangerously hot
-spa.
+temperature sensor, and its own hard caps. The scald limit on the spa is
+therefore enforced in the heater's firmware, not in application code. No bug
+in this repository can produce a dangerously hot spa.
+
+That was an inference until the manual was read properly. It is now quoted,
+and it is specific to remote mode, which is the mode that matters here:
+
+> When in the Remote Mode, the maximum setpoint is the SPA MAX TEMP (Spa) &
+> POOL MAX TEMP (Pool).
+
+So the caps apply *while under our control*, which is the only case the
+safety argument needed and the one an installer would most reasonably have
+doubted.
+
+**And the caps are ceilings, not defaults.** The user menu gives:
+
+| Setting | Adjustable range | Default |
+|---|---|---|
+| Spa Max Temp | 65–104 °F (18–40 °C) | 104 °F |
+| Pool Max Temp | 65–95 °F (18–35 °C) | 95 °F |
+
+The 95/104 figures this repo has always quoted are correct — and they are the
+**top of the adjustable range**, so nobody can raise them from the keypad
+either. An owner can lower a cap; no one can lift it. That is a materially
+stronger property than "the factory shipped it at 104", which is all this ADR
+could previously claim.
+
+**A required commissioning step nobody knew about.** The manual's 3-wire
+procedure has a second line: *"Set the Remote Pool to 'Heat' or 'Auto' in the
+INSTALLER menu."* The factory default for that setting is **Cool**. It lives
+on the equipment, so no software check can see it — it belongs with the three
+already listed in §10 as invisible to commissioning.
+
+Remote mode must also be entered at the keypad — hold UP and DOWN together
+for 3+ seconds — and the manual notes the board **defaults back to OFF** when
+remote mode is exited.
 
 **Rejected:** 2-wire control, where the controller supplies its own sensor
 and thermostat logic. Cheaper in wire, far worse in risk profile. Do not
 migrate thermostat logic into software later.
+
+**The rejected alternative has now failed in the field, on this pool.** The
+IntelliConnect is a 2-wire controller of exactly that kind, and on 30 August
+2026 its heater screen read *"Temp sensor not detected. Heater cannot run
+without sensors connected."* Its own sensor had died, so it would not call
+for heat at all — while the heater, three feet away, knew the water was
+80 °F and was perfectly able to run. One dead sensor in the controller took
+out heating entirely. That is the failure mode this ADR was written to avoid,
+and it is no longer hypothetical.
+
+Worth knowing about the outgoing install: the manual's **2-wire** section
+uses terminals **44 (Com) & 46 (Spa)**, and states *"When the automation
+controller has a HEAT command the HPPH is in the SPA mode."* If the
+IntelliConnect's pair lands there, every pool heat call in this system's life
+has run at the **spa** setpoint. Unverified — check which terminals that
+cable is on before removing it.
 
 ### ADR-5 — Automate the heater bypass, but keep it interlocked
 
@@ -783,8 +846,8 @@ it would act on, and code that feeds nothing cannot be tested by anything.
 | 1 | Intake actuator | COM/NO/NC, 24 VAC | 180° |
 | 2 | Return actuator | COM/NO/NC, 24 VAC | 90° |
 | 3 | Bypass actuator | COM/NO/NC, 24 VAC | 90° |
-| 4 | Heater POOL | dry, isolated | terminal 23 |
-| 5 | Heater SPA | dry, isolated | terminal 24 |
+| 4 | Heater POOL | dry, isolated | terminal 45 |
+| 5 | Heater SPA | dry, isolated | terminal 46 |
 | 6 | Blower | NO → contactor coil | 30 A DP contactor |
 | 7 | Light | NO, direct 120 V | LED, <1 A |
 | 8 | *spare* | — | gate dropped, see below |
