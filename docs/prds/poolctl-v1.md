@@ -292,9 +292,15 @@ and it is no longer hypothetical.
 Worth knowing about the outgoing install: the manual's **2-wire** section
 uses terminals **44 (Com) & 46 (Spa)**, and states *"When the automation
 controller has a HEAT command the HPPH is in the SPA mode."* If the
-IntelliConnect's pair lands there, every pool heat call in this system's life
-has run at the **spa** setpoint. Unverified — check which terminals that
-cable is on before removing it.
+IntelliConnect's pair landed there, every pool heat call in that system's
+life ran at the **spa** setpoint.
+
+**Unresolvable, and closed.** The pair was removed from the strip on
+30 August 2026 to make room for ours, and which positions it occupied was not
+recorded. It cannot be recovered now and it changes nothing going forward —
+the controller had already failed on its own dead sensor. Noted here so the
+question is not reopened by someone who spots the 2-wire section in the
+manual and wonders.
 
 ### ADR-5 — Automate the heater bypass, but keep it interlocked
 
