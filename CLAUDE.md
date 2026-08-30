@@ -413,12 +413,15 @@ equipment on the bus, highest value first:
    LAN exposure — verified by trying to reach it on the Pi's own LAN
    address, so reopening it is caught rather than assumed — the valve
    bindings, the pump, the heater, the Spa egg timer, the valve delay, the
-   serial port, the clock and the password. Four settings live on the
+   serial port, the clock and the password. Five settings live on the
    equipment itself and are therefore invisible to all of it: **disable
    priming at the pump keypad**, **leave Thermal Mode enabled**, **size
-   the transformer at 100 VA**, and **set the heater's INSTALLER menu
+   the transformer at 100 VA**, **set the heater's INSTALLER menu
    `Remote Pool` to Heat or Auto** — it defaults to Cool, and the 3-wire
-   control does not behave without it (ADR-4).
+   control does not behave without it — and **raise the heater's spa
+   setpoint**, which cannot be done from Remote mode and which was found
+   sitting at the pool's 86 °F on 30 August 2026, so a spa call heated to a
+   pool temperature (ADR-4).
 2. **Authentication — two of four parts done.** njsPC is bound to loopback
    and the supervisor is behind a password. What remains is TLS (deferred
    deliberately — see the PRD) and a separate credential for Home Assistant
