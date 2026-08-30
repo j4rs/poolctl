@@ -223,6 +223,13 @@ covers it.
 (Spa)** — and close one of two dry contacts to call for heat at the
 corresponding setpoint.
 
+**Confirmed on the equipment, 30 August 2026.** Both calls were driven by
+hand at the panel end and both landed: bridging common to 45 gave
+`Remote Pool`, common to 46 gave `Remote Spa`, and each released on opening
+the bridge. The two-call model, the terminal numbers and the heater keeping
+its own setpoint are now observed rather than inferred. Procedure and the
+conductor mapping in `docs/field-heater.md` §2b.
+
 **Corrected 30 August 2026.** This ADR said 22/23/24 from its first draft.
 Those numbers were wrong and no source was ever cited for them. The Raypak
 HPPH Installation & Operation manual, *Installing a Remote Control Device*,

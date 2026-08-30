@@ -148,6 +148,33 @@ change rather than a wiring problem.
 
 Remove the jumper before going any further.
 
+### Done, 30 August 2026 — both calls land
+
+Bridged at the panel end, on the HAT's pluggable blocks with the blocks off
+the card, so no relay was involved. Both calls landed and both released
+cleanly when the jumper came off.
+
+| conductor | heater terminal | call | channel |
+|---|---|---|---|
+| **green** | 45 | `Remote Pool` | CH4 |
+| **red** | 46 | `Remote Spa` | CH5 |
+
+Common on 44 is pigtailed under a wire nut into two conductors, one to the
+middle screw of each block — 44 is the return for both calls, so it has to
+reach two channels from one cable core.
+
+**Green carries the pool call and that is against this project's own
+convention** — green means bonding, and this panel has a PE bar. It was
+already terminated at both ends when the mapping was established, and
+re-pulling it buys nothing electrically on a Class 2 dry circuit. Left as
+built, recorded here, and the conductors are labelled `44`/`45`/`46` at both
+ends so the colour is not what anyone reads.
+
+**Read the display, not the compressor.** The first bridge tried to start the
+heater and the anti-short-cycle delay then masked the second, so the top line
+is the result. `Remote Off` → `Remote Pool <setpoint>F` → `Remote Off` is the
+whole test.
+
 ---
 
 ## 3. Keep the heater's voltage away from the transformer
