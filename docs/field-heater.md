@@ -170,6 +170,25 @@ re-pulling it buys nothing electrically on a Class 2 dry circuit. Left as
 built, recorded here, and the conductors are labelled `44`/`45`/`46` at both
 ends so the colour is not what anyone reads.
 
+**What the heater reported.** Pool call, with the pump at 1800 rpm and the
+bypass turned to the heater by hand:
+
+```
+Remote Pool heating
+Remote Pool 86F
+```
+
+- **Pool setpoint is 86 °F.** ADR-4 carried this as unknown from the day it
+  was written. Water was 80 °F, so the call was real rather than nominal.
+- **It ran at 1800 rpm with no flow fault.** `HEATER_MIN_RPM` is 1900 and has
+  never been measured. This is the first evidence against it — but it proves
+  only that the heater's own flow switch is satisfied at 1800 with the bypass
+  open. It does **not** show the nameplate's 30–60 GPM is met. Do not lower
+  the constant on the strength of one absent fault; that needs a flow reading.
+- Still unrecorded: the **spa setpoint**, and **POOL MAX TEMP / SPA MAX
+  TEMP**, which are the caps ADR-4's safety argument actually rests on. The
+  setpoint is what it heats to; the MAX is what firmware will not exceed.
+
 **Read the display, not the compressor.** The first bridge tried to start the
 heater and the anti-short-cycle delay then masked the second, so the top line
 is the result. `Remote Off` → `Remote Pool <setpoint>F` → `Remote Off` is the
