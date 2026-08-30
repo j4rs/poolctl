@@ -40,6 +40,12 @@ routing does not match the driver its own product page names.
 every reading is null. That has still been enough to settle most of the
 design, and null-everywhere is the state the tests are written against.
 
+**The heater was driven for real on 30 August 2026, from a temporary rig that
+was removed the same afternoon.** Pool call, release, purge and spa call all
+ran end to end from the phone. It is not an installation — what it left
+behind is measurements: a sourced flow floor, a timed purge, and ADR-4's
+three-wire model confirmed against the equipment instead of a manual.
+
 Implemented in the supervisor: mode changes, heat targets with server-side
 clamping, blower and light, pool heat with the bypass interlock, the purge
 that holds flow through the exchanger after a call ends, pump run/stop,

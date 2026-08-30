@@ -481,6 +481,68 @@ nowhere in particular:
 
 ---
 
+## What happened on 30 August 2026
+
+Run once, from a temporary rig — lever connectors and pluggable blocks, no
+gland, no permanent cable — and **taken apart the same afternoon**. Nothing
+below describes an installation. It describes an afternoon of measurements
+that the installation will rest on.
+
+**The trace, in order:**
+
+```
+11:36:35  relays -> 0x10  REL4                          pool call, from the phone
+11:39:58  relays -> 0x00  (all off)                     released, purge holding
+11:43:01  purge elapsed — bypass around the heater      3 m 03 s
+11:43:01  relays -> 0x40  REL3
+11:56:38  relays -> 0x10  REL4                          again, pump now at 1600
+12:15:35  heat call ended — holding flow for 180 s      spa mode entered
+12:16:32  relays -> 0x25  REL1 REL2 REL5                spa call, CH5 by relay
+12:21:57  heat call ended — holding flow for 180 s
+12:24:59  relays -> 0x40  REL3                          3 m 02 s, clean rest
+```
+
+**What it established.**
+
+- **ADR-4's three-wire model, on the equipment.** Terminals 44/45/46 are
+  labelled `REMOTE` on the strip. Two distinct calls, each selecting the
+  heater's own setpoint. The numbers in that ADR were wrong for months.
+- **`HEATER_MIN_RPM` is 1600**, replacing an invented 1900 that sat above the
+  speed njsPC actually runs the Pool circuit at. The heater ran at 1600 with
+  its water pressure switch satisfied.
+- **The purge holds 3 m 02–03 s** against 180 s configured. The couple of
+  seconds are the 5 s heartbeat, late in the safe direction. The *duration*
+  is still an invented 3 minutes; only the mechanism is verified.
+- **The caps are the top of the adjustable range** — 65–95 pool, 65–104 spa —
+  quoted from the User Menu table rather than assumed.
+- **The fail-safe is real.** Panel powered, nothing tapped, heater reads
+  `Remote Off`. Both contacts open with the relays de-energised.
+
+**Two bugs, both found by reading traces rather than resting states.**
+
+- The bypass interlock is unenforced in this phase and nothing said so. The
+  supervisor commands CH3, updates `valves.bypass` and believes there is
+  flow, while the real diverter sits wherever a human left it. Hit live:
+  pump running, bypass around, contact bridged, heater attempting to start
+  into a dry exchanger.
+- `purge elapsed — bypass around the heater` was logged 57 s into a 180 s
+  hold, immediately above `relays -> 0x25`, which has no REL3 and is
+  therefore the bypass at *flow*. The hold ends two ways and the log claimed
+  the wrong one. Behaviour was correct; the message contradicted the byte on
+  the next line.
+
+**What was left behind.** The heater back on its own thermostat, out of
+Remote — in Remote with no contacts attached it would never heat again.
+Setpoints now 90 pool and 100 spa, where they were 86 and 86. Priming
+disabled at the pump. The bypass turned to the heater.
+
+**Two things this did not settle.** The true flow floor — 1600 is the lowest
+speed observed to work, not the point where the heater refuses, and a
+satisfied pressure switch is not proof of the nameplate's 30–60 GPM. And the
+purge duration, which remains an invented three minutes.
+
+---
+
 ## Stop conditions
 
 **Both heat contacts closed at once.** Should be impossible — `byteFor` sets

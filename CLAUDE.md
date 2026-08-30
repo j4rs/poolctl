@@ -9,6 +9,16 @@ across a reboot. Deployed with `scripts/deploy.sh`; see `docs/pi-bringup.md`.
 No equipment is attached, so njsPC has no serial port and every reading is
 null; that waits on the bus being attached. 666 tests; `npm test`, ~115 s.
 
+**The heater has been driven for real, once — 30 August 2026, then
+disassembled.** A temporary rig on CH4/CH5 ran the full path from the phone:
+pool call, release, purge, spa call. It is *not* installed; the wires came
+off the same afternoon and the heater went back to its own thermostat. What
+survives is measurements, not a working installation:
+`HEATER_MIN_RPM` is **1600 and sourced** (was 1900, invented), the purge
+holds **3 m 02–03 s** against 180 s configured, and ADR-4's three-wire model
+is confirmed on the equipment rather than inferred from a manual.
+`docs/field-heater.md` has the traces.
+
 **The integration suites are the ones that find things.** `docs/e2e-plan.md`
 records eight slices built 29 August and what each caught. Two habits came out
 of it and are worth keeping: **assert the trace, not the resting state** —
