@@ -52,6 +52,25 @@ Confirm against the label inside the door anyway — the manual covers a model
 range, and the point of this step is to stop trusting a number nobody has
 seen.
 
+**What you are looking for** is neither circuit board. Manual Fig. 16,
+*Heater Wiring Block*, photographs it: a beige barrier strip screwed to the
+chassis, two screws per row, with **40–49 printed on the panel beside it**
+rather than on the strip. The numbers are bracketed into groups:
+
+| Terminals | Panel label |
+|---|---|
+| 41–43 | 3-WAY VALVE |
+| **44–46** | **REMOTE** |
+| 47–48 | AUX SENSOR |
+
+It sits low in the control box near where the existing field wiring enters,
+and it will already have wires on it. Hunt for the printed numbers, not for
+the block.
+
+Do not confuse it with the small board carrying `P1` and `P2` screw terminals
+under an `RS-485` legend with green/yellow pairs — that is a separate comms
+board and has nothing to do with the heat call.
+
 Two things that were open questions here are now answered, and both are
 required before a contact does anything:
 
