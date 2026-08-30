@@ -234,6 +234,30 @@ The heater's own setpoints, set at its keypad on 30 August 2026, are **pool
 90 °F and spa 100 °F**, against caps of 95 and 104. Those four numbers are
 the entire thermostat. Nothing in this repository can raise any of them.
 
+**Choosing those two numbers is a real decision, and it was not made
+deliberately.** They were set to reasonable-sounding values while standing at
+the keypad. Two consequences, pulling in opposite directions:
+
+- **The setpoint is the ceiling on the app's usefulness.** Targets are
+  cutoffs, so the phone can only ever stop heat *earlier* than the heater
+  would. With the pool at 90, everything the stepper offers between 91 and 95
+  does nothing — and the supervisor cannot even say so, because the 3-wire
+  carries no reading back. Tracked as
+  [#2](https://github.com/j4rs/poolctl/issues/2).
+- **The setpoint is also the failure bound.** The relays latch, so a wedged
+  supervisor holding a call heats to exactly the heater's setpoint and stops
+  there. ADR-12's watchdog buys recovery, not prevention, so this number is
+  what actually bounds the bad case.
+
+Set them low and the app is crippled; set them at the caps and a failure
+parks the pool at 95 and the spa at 104. The useful framing is **the hottest
+you would ever want that body** — day-to-day control then lives in the app,
+below it, and the worst case is a temperature you already chose.
+
+Neither reading is unsafe: the firmware caps bind regardless, which is what
+this ADR exists to guarantee. But the choice should be made on those grounds
+rather than inherited from whatever felt sensible at the keypad.
+
 **Corrected 30 August 2026.** This ADR said 22/23/24 from its first draft.
 Those numbers were wrong and no source was ever cited for them. The Raypak
 HPPH Installation & Operation manual, *Installing a Remote Control Device*,
