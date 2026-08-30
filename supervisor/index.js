@@ -431,7 +431,24 @@ function runPurge(view) {
   const was = own.purgeHolding;
   own.purgeHolding = left > 0;
   own.purgeUntil = left > 0 ? own.heatEndedAt + PURGE_MS : null;
-  if (was && !own.purgeHolding) console.log("purge elapsed — bypass around the heater");
+
+  /* The hold ends two ways and they are not the same event. Either the clock
+     ran out, or a new call started — `left` is forced to 0 whenever the call
+     is not `off`, because a live call already requires the bypass at flow and
+     there is no isolation left to protect against.
+   *
+     Saying "purge elapsed" for both was wrong on the pad on 30 August 2026:
+     entering spa mode 57 s into a 180 s hold logged `purge elapsed — bypass
+     around the heater` and then wrote `0x25`, which has no REL3 and is
+     therefore the bypass at *flow*. The message contradicted the byte in the
+     next line of the same journal. Nothing misbehaved; the log was reporting
+     the wrong reason, which on a trace people read to diagnose valve
+     behaviour is its own kind of fault. */
+  if (was && !own.purgeHolding) {
+    console.log(call === "off"
+      ? "purge elapsed — bypass may isolate the heater"
+      : `purge cut short by a ${call} heat call — bypass stays at flow`);
+  }
 }
 
 function applyCutoff(view) {
