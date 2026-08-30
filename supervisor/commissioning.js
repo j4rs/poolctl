@@ -106,11 +106,12 @@ const nonEmpty = (v) => typeof v === "string" && v.trim() !== "";
  * sit on the Water screen for the whole of every heating run, and a monitor
  * that always fires is one nobody reads.
  *
- * Said here, before the pump is attached, it is a question with two honest
- * answers and no way yet to choose between them: either the circuit is too
- * slow or `HEATER_MIN_RPM` is wrong. It is a **placeholder** — the PRD's
- * instruction is to ramp the pump and find where the heat pump's flow fault
- * clears — so this deliberately does not say which one to change.
+ * This used to refuse to say which of two unmeasured numbers was wrong. On
+ * 30 August 2026 the measurement was taken and it was ours: the heater runs
+ * happily at njsPC's 1600, so `HEATER_MIN_RPM` came down from an invented
+ * 1900. The floor is now the lowest speed observed to work rather than a
+ * guess, and a circuit below it is genuinely unverified rather than merely
+ * disagreed with.
  *
  * A note, not a warning. Nothing is unsafe: the Raypak will not fire into
  * insufficient flow, it faults with `FLo`/`FL3`, and ADR-4 puts that
@@ -143,12 +144,13 @@ export function checkHeatFloor(pumps, bodyCircuits) {
     severity: "note",
     what: `Heating the ${slow.map((s) => s.label).join(" or ")} would run below the flow floor`,
     detail:
-      `njsPC runs ${which}, and this repo believes the heater needs ` +
-      `${HEATER_MIN_RPM} rpm. A heat call on that body breaches the pump-floor ` +
-      `invariant by configuration, so the alarm would stand for the whole run. ` +
-      `One of the two numbers is wrong and neither is measured: ramp the pump ` +
-      `at commissioning, find where the heat pump's flow fault clears, and ` +
-      `correct whichever it turns out to be.`,
+      `njsPC runs ${which}, below the ${HEATER_MIN_RPM} rpm floor. A heat call ` +
+      `on that body breaches the pump-floor invariant by configuration, so the ` +
+      `alarm would stand for the whole run. That floor is the lowest speed the ` +
+      `heater has been seen to run at, not the point where it refuses — below ` +
+      `it is unverified rather than known bad. Either raise the circuit, or ` +
+      `ramp the pump lower, find where the water pressure switch opens, and ` +
+      `correct the floor with margin above it.`,
   }];
 }
 

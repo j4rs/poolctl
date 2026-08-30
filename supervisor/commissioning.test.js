@@ -376,9 +376,10 @@ describe("a pump to bind programs to", () => {
 });
 
 describe("whether the pump can reach the heater's flow floor", () => {
-  /* HEATER_MIN_RPM is 1900 and a placeholder; these use explicit numbers
-     either side of it rather than importing it, so a future measurement
-     changing the constant does not quietly change what is being asserted. */
+  /* HEATER_MIN_RPM is 1600 as of the 30 August 2026 measurement. These use
+     explicit numbers either side of it rather than importing it, so a later
+     measurement changing the constant does not quietly change what is being
+     asserted — which is exactly what happened when it moved from 1900. */
   const bodies = { pool: 6, spa: 1 };
   const pump = (circuits) => [{ id: 50, circuits }];
 
@@ -389,30 +390,34 @@ describe("whether the pump can reach the heater's flow floor", () => {
   });
 
   it("notes a body circuit configured below the floor", () => {
-    /* The live rig: pool at 1600 against a believed floor of 1900. Once the
-       pump is on the bus this would breach the pump-floor invariant on every
-       heat call, permanently, by configuration rather than by fault. */
+    /* 1200 is below the verified floor. Once the pump is on the bus this
+       would breach the pump-floor invariant on every heat call, permanently,
+       by configuration rather than by fault. The live rig's own 1600 no
+       longer trips this — that is the measurement, not a weakened test. */
     const [f] = checkHeatFloor(pump([
-      { circuit: 6, speed: 1600 }, { circuit: 1, speed: 2800 },
+      { circuit: 6, speed: 1200 }, { circuit: 1, speed: 2800 },
     ]), bodies);
     expect(f.severity).toBe("note");
     expect(f.id).toBe("heat-floor-unreachable");
     expect(f.what).toMatch(/pool/);
     expect(f.what).not.toMatch(/spa/);
-    expect(f.detail).toMatch(/1600/);
+    expect(f.detail).toMatch(/1200/);
   });
 
-  it("refuses to say which of the two numbers is wrong", () => {
-    /* Both are unmeasured. Naming a culprit would be inventing a measurement
-       the project has not taken. */
-    const [f] = checkHeatFloor(pump([{ circuit: 6, speed: 1600 }]), bodies);
-    expect(f.detail).toMatch(/One of the two numbers is wrong/);
+  it("says the floor is the lowest verified speed, not where the heater refuses", () => {
+    /* It used to refuse to name a culprit, because neither number was
+       measured. One now is, so the honest statement changed: below the floor
+       is unverified rather than known bad, and finding the real refusal
+       point is offered as the way to lower it. */
+    const [f] = checkHeatFloor(pump([{ circuit: 6, speed: 1200 }]), bodies);
+    expect(f.detail).toMatch(/lowest speed the heater has been seen to run at/);
+    expect(f.detail).toMatch(/unverified rather than known bad/);
   });
 
   it("reads njsPC's expanded circuit shape as well as the bare id", () => {
     /* State expands enums into objects; config does not. Getting this wrong
        is the bug that has already cost this project twice. */
-    expect(checkHeatFloor(pump([{ circuit: { id: 6 }, speed: 1600 }]), bodies))
+    expect(checkHeatFloor(pump([{ circuit: { id: 6 }, speed: 1200 }]), bodies))
       .toHaveLength(1);
   });
 

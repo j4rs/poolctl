@@ -36,8 +36,29 @@
  * only to moves that involve no pump restart.
  */
 
-/** Flow thresholds. Placeholders. Measure on the real system and correct. */
-export const HEATER_MIN_RPM = 1900;
+/**
+ * The pump speed below which a heat call is not allowed.
+ *
+ * **1600, and it means "lowest verified", not "measured floor".** Observed on
+ * 30 August 2026: pump at 1600 with the bypass open, a standing pool heat
+ * call, and the heater running — its water pressure switch satisfied, no
+ * `Water PS Open`. 1800 was verified the same afternoon.
+ *
+ * This was **1900 and invented**, which put it above the 1600 njsPC actually
+ * runs the Pool circuit at, so `checkHeatFloor` reported a permanent conflict
+ * it could not resolve. The measurement resolved it against this repo's
+ * number, not njsPC's.
+ *
+ * The true floor is still unknown and deliberately so. Finding it means
+ * ramping until the heater faults, and nobody would configure the pool
+ * circuit at the flow floor anyway — the operationally useful number is the
+ * lowest speed known to work, which is this one. Note also that a satisfied
+ * pressure switch is not proof of the nameplate's 30–60 GPM; that needs a
+ * flow reading, not the absence of a fault.
+ */
+export const HEATER_MIN_RPM = 1600;
+
+/** Placeholder. Measure on the real system and correct. */
 export const CELL_MIN_RPM = 1150;
 export const SPA_TIMEOUT_MIN = 120;
 

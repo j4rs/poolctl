@@ -413,9 +413,11 @@ describe("Schedule editor", () => {
   it("shows the chosen circuit's speed and what it means", () => {
     const { container } = editor(base);
     expect(container.textContent).toMatch(/1600 rpm/);
-    /* 1600 is under HEATER_MIN_RPM (1900), and saying so is the point of
-       showing it: this is the speed the schedule will hold all window. */
-    expect(container.textContent).toMatch(/below heater minimum/i);
+    /* Showing the speed is the point: this is what the schedule holds all
+       window. 1600 no longer draws the "below heater minimum" note — the
+       30 August 2026 measurement brought HEATER_MIN_RPM down to it from an
+       invented 1900, and the heater runs there. */
+    expect(container.textContent).not.toMatch(/below heater minimum/i);
   });
 
   it("says there is nothing to run before commissioning", () => {
