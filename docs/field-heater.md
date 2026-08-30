@@ -48,9 +48,17 @@ manual, p.47:
 > # 45 (Pool) & # 46 (Spa).
 
 **This ADR said 22/23/24 until 30 August 2026 and those numbers were wrong.**
-Confirm against the label inside the door anyway — the manual covers a model
-range, and the point of this step is to stop trusting a number nobody has
-seen.
+
+**Confirmed on the equipment, 30 August 2026.** The strip is real and the
+legend beside it brackets **44 / 45 / 46 as `REMOTE`** — with 42/43 as the
+3-way valve above it, 47/48 as `AUX SENSOR` below, and 49 `NOT USED`. So the
+manual's numbers and this unit's silkscreen agree.
+
+One thing the manual does not mention: a factory harness already runs from
+those strip positions to a **5-pin `REMOTE` header** on the control board.
+That harness is the internal path from the field strip to the board — leave
+it connected. The strip is the field interface, so field wires land on the
+**opposite side of the same positions**, not in place of the harness.
 
 **What you are looking for** is neither circuit board. Manual Fig. 16,
 *Heater Wiring Block*, photographs it: a beige barrier strip screwed to the
