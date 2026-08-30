@@ -185,9 +185,38 @@ Remote Pool 86F
   only that the heater's own flow switch is satisfied at 1800 with the bypass
   open. It does **not** show the nameplate's 30–60 GPM is met. Do not lower
   the constant on the strength of one absent fault; that needs a flow reading.
-- Still unrecorded: the **spa setpoint**, and **POOL MAX TEMP / SPA MAX
-  TEMP**, which are the caps ADR-4's safety argument actually rests on. The
-  setpoint is what it heats to; the MAX is what firmware will not exceed.
+The spa call was then bridged the same way and reported:
+
+```
+Remote SPA heating
+Remote SPA 86F
+```
+
+**Both calls report 86 °F, and that is not yet interpretable.** Two readings
+fit it:
+
+- **Two setpoints, both currently 86.** ADR-4 holds as written — the contact
+  picks which setpoint applies — and spa use needs the spa one raised.
+- **One setpoint, with the mode selecting only which cap applies.** The
+  manual's sentence is about the *maximum*: *"When in the Remote Mode, the
+  maximum setpoint is the SPA MAX TEMP (Spa) & POOL MAX TEMP (Pool)."* It
+  never says there are two independent setpoints. If this is what happens,
+  ADR-4's "call for heat at the corresponding setpoint" is wrong — the
+  contact selects a **ceiling**, and picking `spa` would not on its own heat
+  the spa hotter.
+
+The consequence is not cosmetic: under the second reading, pool-at-86 and
+spa-at-102 cannot be had by choosing a contact, and a hotter spa needs a
+keypad action this system cannot perform.
+
+**To settle it:** look for two setpoint entries in the keypad menu versus
+one. If that is unclear, set the pool setpoint to something distinctive, then
+bridge spa and re-read — a spa reading that follows the change means there is
+only one setpoint.
+
+- Still unrecorded: **POOL MAX TEMP / SPA MAX TEMP**, which are the caps
+  ADR-4's safety argument actually rests on. The setpoint is what it heats
+  to; the MAX is what firmware will not exceed.
 
 **Read the display, not the compressor.** The first bridge tried to start the
 heater and the anti-short-cycle delay then masked the second, so the top line
