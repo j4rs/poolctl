@@ -192,31 +192,52 @@ Remote SPA heating
 Remote SPA 86F
 ```
 
-**Both calls report 86 °F, and that is not yet interpretable.** Two readings
-fit it:
+**Both calls report 86 °F, and the manual explains why.** There are two
+independent setpoints and the contact selects between them:
 
-- **Two setpoints, both currently 86.** ADR-4 holds as written — the contact
-  picks which setpoint applies — and spa use needs the spa one raised.
-- **One setpoint, with the mode selecting only which cap applies.** The
-  manual's sentence is about the *maximum*: *"When in the Remote Mode, the
-  maximum setpoint is the SPA MAX TEMP (Spa) & POOL MAX TEMP (Pool)."* It
-  never says there are two independent setpoints. If this is what happens,
-  ADR-4's "call for heat at the corresponding setpoint" is wrong — the
-  contact selects a **ceiling**, and picking `spa` would not on its own heat
-  the spa hotter.
+> The control uses the appropriate Pool or Spa setpoint as selected in the
+> Operating mode.
 
-The consequence is not cosmetic: under the second reading, pool-at-86 and
-spa-at-102 cannot be had by choosing a contact, and a hotter spa needs a
-keypad action this system cannot perform.
+> When POOL HEAT mode is selected, each press of the UP or DOWN buttons will
+> increase / decrease the pool heating setpoint temperature. […] When SPA mode
+> is selected, each press of the UP or DOWN buttons will increase / decrease
+> the spa setpoint temperature.
 
-**To settle it:** look for two setpoint entries in the keypad menu versus
-one. If that is unclear, set the pool setpoint to something distinctive, then
-bridge spa and re-read — a spa reading that follows the change means there is
-only one setpoint.
+So ADR-4 holds as written. They read alike because this heater had never been
+under remote control before today and nobody had ever set the spa one.
 
-- Still unrecorded: **POOL MAX TEMP / SPA MAX TEMP**, which are the caps
-  ADR-4's safety argument actually rests on. The setpoint is what it heats
-  to; the MAX is what firmware will not exceed.
+**Raising the spa setpoint is a commissioning step, and it cannot be done
+from Remote.** *"If the UP, DOWN or MENU buttons are pressed while in REMOTE
+mode, the display will read 'Exit Remote Mode to Adjust Temp'. Mode and
+temperature setpoints are not changed."* The sequence is: exit Remote, select
+SPA mode, UP/DOWN to the wanted temperature, re-enter Remote. Exiting Remote
+drops the control to OFF, so re-entering is not optional.
+
+Until that is done, a spa call heats to 86 °F, which is a pool temperature.
+
+**The caps, confirmed with their ranges** (User Menu, Table C):
+
+| | range | default |
+|---|---|---|
+| Pool Max Temp | 65–95 °F | 95 °F |
+| Spa Max Temp | 65–104 °F | 104 °F |
+
+95 and 104 are the **top of the adjustable range**, not defaults that can be
+raised — which is the exact claim ADR-4's safety argument rests on, now
+quoted rather than assumed.
+
+**The manual states our hazard outright**, which is worth having in the
+record beside ADR-9:
+
+> **WARNING:** If the Spa heating (in a pool/spa system) is controlled by an
+> external controller, 3-way valves MAY need to be manually adjusted in order
+> to use the TIMED SPA feature of this HPPH. Failure to properly adjust the
+> 3-way valves may result in **overheating of the pool water** or other
+> undesirable results.
+
+The call selects a setpoint, not a body — the plumbing decides which water
+gets heated. That is why the supervisor ties the spa heat call to spa mode
+rather than exposing it as a switch of its own.
 
 **Read the display, not the compressor.** The first bridge tried to start the
 heater and the anti-short-cycle delay then masked the second, so the top line
