@@ -215,6 +215,18 @@ drops the control to OFF, so re-entering is not optional.
 
 Until that is done, a spa call heats to 86 °F, which is a pool temperature.
 
+**Done, 30 August 2026.** Set at the keypad to **pool 90 °F, spa 100 °F** —
+both inside the caps, and now distinguishable, so the two calls can be told
+apart by their number rather than only by the word on the top line:
+
+| call | expected display |
+|---|---|
+| common → 45 | `Remote Pool 90F` |
+| common → 46 | `Remote Spa 100F` |
+
+That is a better confirmation of the two-setpoint model than the manual
+quote above, because it is this unit answering rather than a document.
+
 **The caps, confirmed with their ranges** (User Menu, Table C):
 
 | | range | default |

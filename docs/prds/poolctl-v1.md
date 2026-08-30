@@ -230,6 +230,10 @@ the bridge. The two-call model, the terminal numbers and the heater keeping
 its own setpoint are now observed rather than inferred. Procedure and the
 conductor mapping in `docs/field-heater.md` §2b.
 
+The heater's own setpoints, set at its keypad on 30 August 2026, are **pool
+90 °F and spa 100 °F**, against caps of 95 and 104. Those four numbers are
+the entire thermostat. Nothing in this repository can raise any of them.
+
 **Corrected 30 August 2026.** This ADR said 22/23/24 from its first draft.
 Those numbers were wrong and no source was ever cited for them. The Raypak
 HPPH Installation & Operation manual, *Installing a Remote Control Device*,
