@@ -180,6 +180,16 @@ from Test 1b in `bench-relays.md`, measured 28 August 2026.
 | Pool heat | 4 | right edge, 4th from top | **bottom** | N.O. |
 | Spa heat | 5 | left edge, bottom | **top** | N.O. |
 
+> **CH4/CH5 is a hold, not a conclusion.** The two channels are on opposite
+> edges of the card, so a single jacketed cable cannot reach both without
+> fanning conductors across it — past the 24 VAC channels the heater pair is
+> supposed to stay clear of. Moving the heater to CH5+CH6 fixes that, and is
+> tracked in
+> [#1](https://github.com/j4rs/poolctl/issues/1). It is deliberately **not**
+> being done before the first test: a bench rig uses loose leads that reach
+> either edge, and renumbering costs the same tomorrow as today. Do it before
+> wire goes in a gland.
+
 **The pair does not wire symmetrically.** CH4 and CH5 straddle the boundary
 between the board's two connector groups, which are mirrored — so the same
 job takes opposite screws. This is the easiest mistake available on this card
