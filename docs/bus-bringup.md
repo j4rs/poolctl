@@ -51,15 +51,17 @@ Retiring the IntelliConnect from the bus means the pool's current controller
 stops controlling it. If njsPC then cannot drive the pump, circulation stops
 — in Florida, in summer, which is how a pool turns green.
 
-**The mitigation is already in the pump.** The IntelliFlo VSF runs Programs
-1–8 from its own keypad, and Programs 1–4 support Schedule mode with start
-and stop times (Installation and User's Guide, Program Menu Tree). A pump
-running its own schedule does not care whether anything is on the bus.
+**The mitigation is already in the pump.** It has a manual program that runs
+from its own keypad, and the IntelliFlo VSF also supports Schedule mode with
+start and stop times on Programs 1–4 if a timed fallback is ever wanted
+(Installation and User's Guide, Program Menu Tree). Either way the pump does
+not care whether anything is on the bus.
 
-So: **set a standalone filtration schedule on the pump keypad before touching
-the bus.** That converts "the pool has no controller" into "the pool has no
+That converts "the pool has no controller" into "the pool has no
 *automation*", which is survivable for as long as it takes to put two wires
-back.
+back. What is **not** yet established is that the program runs with the bus
+disconnected, which is the only state in which the fallback matters — hence
+slice 1.
 
 The other way back is the wires themselves. Both home runs currently land at
 the IntelliConnect; moving them to the HAT is reversible in minutes.
@@ -68,23 +70,30 @@ the IntelliConnect; moving them to the HAT is reversible in minutes.
 
 ## Slices
 
-### 1. Standalone pump schedule, before anything else
+### 1. Prove the standalone fallback, and disable priming, in one go
 
-At the pump keypad, not in any app. A daily filtration window that will run
-with the bus dead. Write down what it was set to, and what it is now.
+These were two slices and they are one, because both need the same state: the
+**RS-485 cable off the pump**.
 
-**Done when** the pump has run its own schedule through one cycle with
-automation not involved.
+The pump already has a manual program that can be run from its keypad, so
+nothing needs setting up. What has not been established is that it still runs
+**with the bus disconnected** — this pump has been taking orders from the
+IntelliConnect for years and has never been asked to work alone.
 
-### 2. Disable priming — the one thing that must happen with the bus down
+1. Pull the RS-485 cable at the pump.
+2. Start the manual program from the keypad. Confirm it runs and holds speed.
+3. While the cable is off, disable priming — `Menu`, arrows to `Priming`,
+   select `Disabled`, `Back`. Procedure and the quotes behind it are in
+   `docs/field-heater.md`.
+4. Reconnect the cable.
 
-`docs/field-heater.md` has the procedure. It has to be done at the pump, and
-the RS-485 cable comes off while you do it, so it belongs in the same visit as
-the handover rather than in its own trip.
+**Done when** the pump has run standalone with nothing on the bus, and
+priming reads `Disabled`.
 
-Factory default is Enabled. Until it is off, *"the pump responds to its
-internal settings before responding to commands from an automation control
-system"* — which is ADR-9's whole reason for existing.
+*A manual program is not a schedule.* It runs until stopped rather than
+between times, so leaning on it means circulating around the clock — safe,
+and it costs electricity. Acceptable for the days it would take to put two
+wires back; not something to leave in place.
 
 ### 3. Move both home runs to the HAT
 
@@ -141,8 +150,8 @@ ADR-6's summary implies, and best closed against real bytes.
 
 ## Before going out
 
-- [ ] Pump running a standalone schedule, verified through one cycle.
-- [ ] Priming procedure to hand — it is in `docs/field-heater.md`.
+- [ ] Pump's manual program verified to run with the RS-485 cable off.
+- [ ] Priming disabled while that cable is off — same visit, same state.
 - [ ] Find the HAT's third DIP. `docs/pi-bringup.md` documents TX and RX and
       not termination.
 - [ ] Price a REM temperature probe, so an absent case 22 ends in a decision
