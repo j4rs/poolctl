@@ -50,14 +50,14 @@
      the same thing the browser's own zoom does, rather than making the text
      big inside a layout sized for smaller text.
 
-     Dialled back on narrow screens: 200% of a 375px phone is a column about
-     eleven characters wide. The page still reads larger there than it did,
-     just not absurdly so. */
+     150% was arrived at by overshooting: 200% was tried and needed two zoom
+     steps back. Narrow screens sit lower still — 150% of a 375px phone is a
+     column around fifteen characters wide. */
   html {
     -webkit-text-size-adjust: 100%;
-    font-size: 200%;
+    font-size: 150%;
   }
-  @media (max-width: 40rem) { html { font-size: 125%; } }
+  @media (max-width: 40rem) { html { font-size: 115%; } }
 
   body {
     margin: 0;
