@@ -159,6 +159,31 @@
     .finding .tag { padding-top: 0; }
   }
 
+  /* ---- the trace: this project's own idiom, so it reads as evidence ---- */
+  /* A grid rather than a <pre>, so the annotation can drop to its own line
+     on a phone. As one preformatted block it scrolled sideways, which put
+     the bytes on screen and the meaning off it — exactly backwards. */
+  .trace {
+    margin: 0 0 1.4rem; padding: 1.1rem 1.3rem;
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 8px;
+    display: grid; align-items: baseline;
+    grid-template-columns: max-content max-content 1fr;
+    gap: 0.5rem 1.4rem;
+    font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+    font-size: 0.8rem; line-height: 1.6; color: var(--stone);
+  }
+  .trace .t { color: var(--faint); }
+  .trace .b { color: var(--water); white-space: pre; }
+  .trace .ann { color: var(--muted); }
+  .trace .warm { color: var(--heat); white-space: pre; }
+  @media (max-width: 46rem) {
+    /* A shade smaller so `relays -> 0x00  (all off)` and its timestamp still
+       fit a 375px screen on one line rather than scrolling. */
+    .trace { grid-template-columns: max-content 1fr; gap: 0.2rem 1rem; font-size: 0.7rem; }
+    .trace .ann { grid-column: 1 / -1; padding-bottom: 0.5rem; }
+  }
+
   /* ---- status table ---- */
   .scroll { overflow-x: auto; }
   table { border-collapse: collapse; width: 100%; font-size: 0.94rem; min-width: 30rem; }
@@ -315,6 +340,50 @@
           </div>
         </div>
       </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>The afternoon it was real</h2>
+      <p style="color:var(--muted);max-width:62ch">
+        Everything above is a discovery that something was wrong. Here is the
+        other half. On 30 August 2026 a temporary rig — lever connectors,
+        pluggable blocks, no gland and no permanent cable — put the heat pump
+        on two relay channels for one afternoon.
+      </p>
+
+      <div class="trace">
+        <span class="t">11:36:35</span><span class="b">relays -&gt; 0x10  REL4</span><span class="ann">pool heat, tapped on a phone</span>
+        <span class="t">11:39:58</span><span class="b">relays -&gt; 0x00  (all off)</span><span class="ann">released — flow held through the exchanger</span>
+        <span class="t">11:43:01</span><span class="warm">purge elapsed</span><span class="ann">3 m 03 s, against 180 s configured</span>
+        <span class="t">11:43:01</span><span class="b">relays -&gt; 0x40  REL3</span><span class="ann">bypass isolates — at rest</span>
+      </div>
+
+      <p>
+        The interesting line is the first one. Resting state was
+        <code>0x40</code> — the bypass valve held around the heater. The call
+        is <code>0x10</code>. So the bypass released and the heat call closed
+        in a <strong>single write to a single byte</strong>: there is no
+        instant at which the heater is firing into an exchanger that has no
+        water going through it. That interlock is not enforced by getting the
+        order of two writes right. The bad combination cannot be represented.
+      </p>
+
+      <p>
+        The third line is the other half of the same idea. Ending a call does
+        not isolate the exchanger — it keeps water moving through it for three
+        minutes first, and only then lets the valve swing. A spa call ran the
+        same way on the other channel.
+      </p>
+
+      <p style="color:var(--muted);max-width:62ch">
+        Then the wires came off and the heater went back to its own
+        thermostat. It is not installed. What survives is measurements: a
+        flow floor that had been invented, a purge that had never run, and a
+        three-wire control model that had been read from a manual and was
+        wrong about which terminals it used.
+      </p>
     </div>
   </section>
 
