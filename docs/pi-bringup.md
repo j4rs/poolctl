@@ -334,12 +334,21 @@ mapping and wrong about the hardware watchdog. The silkscreen carries an
 `485-RX` and `485-TERM` beside the DIP block. So no USB adapter is needed and
 the bus lands on the GPIO UART as assumed.
 
-Two things the photograph does **not** settle. All six DIP positions were
-down, `ON` being the top edge, so the transceiver is disconnected from the
-UART as shipped. And the three labels sit beside the block rather than under
-individual switches, so **which numbered position is which is not legible and
-must be read off the card in hand.** Getting `485-TERM` on while the panel is
-mid-bus degrades the whole bus rather than failing visibly.
+**The numbering, from the owner at the card:** positions **4 and 5 are
+`485-TX` and `485-RX`**, and both were deliberately moved to **OFF** during
+bench work — which is why nothing has been on the UART. By position, **6 is
+`485-TERM`**; 1–3 are not accounted for and the stack-level `ID0/ID1/ID2`
+jumpers are a separate block, so do not assume 1–3 are spare.
+
+So the handover flips **4 and 5 back ON**, and **leaves 6 OFF** — the panel
+sits mid-bus with the pump and the cell at the two physical ends. Termination
+on at a mid-bus node degrades the whole bus rather than failing visibly,
+which makes it the one switch worth checking twice.
+
+**There are two `A`/`B` pairs on the card**, confirming the topology section
+of the PRD against the hardware rather than the datasheet: they are one port
+landed twice, not two ports. The pump's home run goes on one, the cell's on
+the other, and njsPC tells them apart by address.
 Three things have to be true, and none of them are by default:
 
 **1. The DIP switches.** TX and RX **ON**, so the Pi drives the bus directly.
