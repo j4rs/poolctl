@@ -428,10 +428,13 @@ equipment on the bus, highest value first:
    priming at the pump keypad**, **leave Thermal Mode enabled**, **size
    the transformer at 100 VA**, **set the heater's INSTALLER menu
    `Remote Pool` to Heat or Auto** — it defaults to Cool, and the 3-wire
-   control does not behave without it — and **raise the heater's spa
-   setpoint**, which cannot be done from Remote mode and which was found
-   sitting at the pool's 86 °F on 30 August 2026, so a spa call heated to a
-   pool temperature (ADR-4).
+   control does not behave without it — and **the heater's own pool and spa
+   setpoints**, which cannot be changed from Remote mode. Set on 30 August
+   2026 to pool 90 °F and spa 100 °F — both had been sitting at 86, so a spa
+   call heated to a pool temperature. Those two numbers are load-bearing in
+   two directions: targets are cutoffs, so the setpoint caps how warm the app
+   can ever ask for, and the relays latch, so it is also where a wedged
+   supervisor parks the water (ADR-4, and issue #2).
 2. **Authentication — two of four parts done.** njsPC is bound to loopback
    and the supervisor is behind a password. What remains is TLS (deferred
    deliberately — see the PRD) and a separate credential for Home Assistant
@@ -440,9 +443,12 @@ equipment on the bus, highest value first:
    reason rather than doing nothing. It wants a real water temperature,
    which wants the bus.
 
-Blocked on the bus being attached — not on the HAT, which arrived 27 August:
-bus sniffing, the salt question (case 18), real `HEATER_MIN_RPM` /
-`CELL_MIN_RPM`, and thermals with the enclosure sealed.
+Blocked on the bus being attached: bus sniffing, the salt question (case
+18), `CELL_MIN_RPM`, and thermals with the enclosure sealed. **Not**
+`HEATER_MIN_RPM` — that was measured on 30 August and is 1600. What is still
+open there is the *floor*: 1600 is the lowest speed seen to work, not the
+speed at which the heater refuses, and a satisfied pressure switch is not
+proof of the nameplate's 30–60 GPM.
 
 ---
 
