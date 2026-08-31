@@ -131,7 +131,38 @@ export function createHat({ dryRun = false, log = console, exec = run } = {}) {
      * they stay disagreeing forever, and every subsequent `set` short-circuits
      * on a belief that is wrong.
      */
-    async read() {
+    /**
+     * The card's byte **and** our shadow, sampled with no write able to land
+     * between them.
+     *
+     * `read()` alone is not enough to check for drift, and the way it fails
+     * is subtle. It spawns `i2cget` outside the write chain, so a write can
+     * complete during the read — and `put()` assigns `last` only *after* its
+     * own await resolves. That leaves a window where the card already holds
+     * the new byte and the shadow still holds the old one, with nothing to
+     * distinguish it from genuine drift.
+     *
+     * Observed on the Pi, 31 August 2026: the purge released the bypass
+     * mid-read, the corrector compared a fresh card against a stale shadow,
+     * called it drift, and forced the *old* byte back on. The valve was
+     * commanded around, then to flow, then around again in three seconds.
+     * Sampling `lastWritten` either side of the read — the 29 August fix for
+     * the same family of bug — does not catch this one, because the shadow
+     * is unchanged at both samples.
+     *
+     * Taking both inside the chain removes the window rather than narrowing
+     * it: while this task runs, no write can be in flight by construction.
+     * It costs a pending write one read's latency, which is the correct
+     * trade — a write landing mid-read is exactly what must not happen.
+     */
+    async inspect() {
+      return serial(async () => ({ actual: await readCard(), shadow: last }));
+    },
+
+    async read() { return serial(readCard); },
+  };
+
+  async function readCard() {
       if (dryRun) return last;
       try {
         const { stdout } = await exec(I2CGET, ["-y", String(BUS), ADDRESS, INPUT_REG]);
@@ -149,6 +180,5 @@ export function createHat({ dryRun = false, log = console, exec = run } = {}) {
         if (!failing) { log.error(`relay card: read failed — ${err.message}`); failing = true; }
         return null;
       }
-    },
-  };
+  }
 }

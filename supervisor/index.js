@@ -323,21 +323,23 @@ function driveRelays(view) {
  */
 async function verifyRelays() {
   if (!hat) return;
-  const before = hat.lastWritten;
-  if (before == null) return;                 /* nothing written yet */
 
-  const actual = await hat.read();
+  /* Both readings in one shot, from inside the write chain.
+   *
+   * This used to sample `lastWritten`, read the card, then sample again and
+   * bail if it had moved — narrowing the window where a write lands mid-read
+   * rather than closing it. On 31 August 2026 it went through the remaining
+   * gap: `put()` assigns the shadow only after its own await resolves, so the
+   * card can already hold the new byte while the shadow still holds the old
+   * one, and *both* samples see the old one. The corrector called that drift
+   * and forced the superseded byte back onto the card. The bypass went
+   * around, to flow, and around again inside three seconds.
+   *
+   * `inspect()` takes the card and the shadow with no write able to run
+   * between them, so the comparison is meaningful by construction. */
+  const { actual, shadow: expected } = await hat.inspect();
+  if (expected == null) return;               /* nothing written yet */
   if (actual == null) return;                 /* read failed; hat says so once */
-
-  /* Sampled again, because the read is a process spawn and a write can land
-     inside it. It did: the purge released the bypass mid-read, so a fresh
-     card was compared against a stale expectation, reported as a hardware
-     fault, and "corrected" back to the byte the supervisor had just stopped
-     wanting. The corrector fought the controller. If anything moved during
-     the read, this pass knows nothing — say so by doing nothing, and look
-     again on the next heartbeat. */
-  const expected = hat.lastWritten;
-  if (expected !== before) return;
 
   if (actual === expected) {
     if (own.relayDrift) {

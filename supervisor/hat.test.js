@@ -118,6 +118,73 @@ describe("dry run", () => {
   });
 });
 
+/**
+ * The window that let the corrector fight the controller, twice.
+ *
+ * `put()` assigns the shadow only after its own await resolves, so between
+ * `i2cset` exiting and that assignment there is a moment where the card holds
+ * the new byte and `lastWritten` still holds the old one. A read taken in
+ * that moment looks exactly like drift, and the corrector's response to drift
+ * is to force the shadow's byte back onto the card — undoing a change the
+ * supervisor had just decided on.
+ *
+ * Seen on the Pi on 31 August 2026: the purge released the bypass mid-read
+ * and the valve was commanded around, to flow, and around again in three
+ * seconds. Guarding by sampling the shadow either side of the read does not
+ * catch it — the shadow is unchanged at both samples. The window has to be
+ * closed, not narrowed.
+ */
+describe("a read taken while a write is landing", () => {
+  it("never reports the card and the shadow disagreeing over the same write", async () => {
+    /* The window is held open explicitly rather than by counting microtasks:
+       `i2cset` changes the card and then blocks, so while the gate is shut
+       the card holds the new byte and `put` has not yet assigned the shadow.
+       That is exactly the state the Pi was in. */
+    let card = 0x00;
+    let release = () => {};
+    let hold = false;
+    const exec = async (cmd, args) => {
+      if (/i2cset/.test(cmd)) {
+        card = Number(args[args.length - 1]);
+        if (hold) await new Promise((r) => { release = r; });
+        return { stdout: "" };
+      }
+      return { stdout: `0x${card.toString(16).padStart(2, "0")}` };
+    };
+
+    const hat = createHat({ exec, log: quiet });
+    await hat.set(0x00);
+
+    hold = true;
+    const writing = hat.set(0x40);              /* card -> 0x40, shadow 0x00 */
+    await new Promise((r) => setTimeout(r, 10));
+
+    const looking = hat.inspect();              /* started, deliberately not awaited */
+    setTimeout(() => release(), 10);            /* now let the write land */
+    const looked = await looking;
+    await writing;
+
+    /* Either side of the write, never across it. A disagreement here is what
+       the corrector reads as drift, and its answer to drift is to force the
+       stale byte back onto the card — undoing a live decision. */
+    expect(looked.actual).toBe(looked.shadow);
+  });
+
+  it("still sees genuine drift, which is the whole point of looking", async () => {
+    let card = 0x00;
+    const exec = async (cmd, args) => {
+      if (/i2cset/.test(cmd)) { card = Number(args[args.length - 1]); return { stdout: "" }; }
+      return { stdout: `0x${card.toString(16).padStart(2, "0")}` };
+    };
+    const hat = createHat({ exec, log: quiet });
+    await hat.set(0x40);
+    card = 0x08;                                  /* somebody else drove it */
+    const { actual, shadow } = await hat.inspect();
+    expect(actual).toBe(0x08);
+    expect(shadow).toBe(0x40);
+  });
+});
+
 describe("concurrent writes", () => {
   it("does not let two callers race the same change onto the card", async () => {
     /* `set` compares against the shadow, awaits a spawn, and updates the
