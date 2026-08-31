@@ -77,14 +77,15 @@
      the same thing the browser's own zoom does, rather than making the text
      big inside a layout sized for smaller text.
 
-     150% was arrived at by overshooting: 200% was tried and needed two zoom
-     steps back. Narrow screens sit lower still — 150% of a 375px phone is a
-     column around fifteen characters wide. */
+     135% was arrived at by overshooting twice: 200% needed two zoom steps
+     back, then 150% needed one more. A browser zoom step is ×0.9, so this is
+     150 × 0.9. Narrow screens sit lower still, since a phone has no room to
+     spend on the same generosity. */
   html {
     -webkit-text-size-adjust: 100%;
-    font-size: 150%;
+    font-size: 135%;
   }
-  @media (max-width: 40rem) { html { font-size: 115%; } }
+  @media (max-width: 40rem) { html { font-size: 105%; } }
 
   body {
     margin: 0;
