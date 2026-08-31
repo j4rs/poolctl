@@ -372,9 +372,10 @@ The pump takes the **highest** speed among the circuits that are on, so a
 **Valves move at zero flow, one at a time.** Settled against the IntelliFlo
 manual: with priming enabled the pump runs 1800 RPM for 3 sec on every restart
 and *ignores automation commands while priming*, so a 1000 rpm floor through a
-restart is unenforceable by anyone. Disable priming at the pump during
-commissioning (Pentair documents the procedure — it must be disabled on the
-pump itself, not just in automation); a restart then costs only ramp time, and
+restart is unenforceable by anyone. **Priming was disabled at the pump on 30
+August 2026** — it has to be done on the pump itself, not just in automation,
+and the RS-485 cable comes off while you do it; a restart now costs only ramp
+time, and
 njsPC's stop-move-start is both cheap and gentler on the actuator than turning
 under load. `VALVE_RPM` survives only for moves with no pump restart.
 

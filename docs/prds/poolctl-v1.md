@@ -1622,11 +1622,16 @@ this repo believes, and reports the difference on the Water screen. It cannot
 see anything that lives on the equipment itself. These five are therefore
 permanently a human's job, and forgetting one is a silent fault — the reason
 this list exists in one place rather than scattered through the sections that
-argued for each:
+argued for each.
+
+**Two of the five are done**, both on 30 August 2026, and both are struck
+through below rather than deleted: a setting that has been made is not a
+setting that stops mattering. If this control panel is ever swapped, or the
+pump replaced, they come back.
 
 | Setting | Where | Why it matters |
 |---|---|---|
-| **Disable priming** | IntelliFlo keypad — disconnect RS-485 first | A priming pump ignores automation commands, so no low-flow rule is enforceable through a restart (ADR-9). Procedure in `docs/field-heater.md` |
+| ~~**Disable priming**~~ **done 30 Aug 2026** | IntelliFlo keypad — disconnect RS-485 first | A priming pump ignores automation commands, so no low-flow rule is enforceable through a restart (ADR-9). Procedure in `docs/field-heater.md` |
 | **Leave Thermal Mode enabled** | IntelliFlo keypad | Protects the drive at 40 °F. Means an uncommanded pump start is expected a few nights a year and must never read as a fault |
 | **100 VA transformer** | the BOM, at build time | 3 actuators plus the contactor coil; sits exactly at the Class 2 ceiling |
 | **`Remote Pool` = Heat or Auto** | Raypak INSTALLER menu | Factory default is **Cool**. The 3-wire control does not behave without it (ADR-4) |
@@ -1805,8 +1810,8 @@ argued for each:
 
       Pentair documents the fix (p.19): disable priming on the automation
       system, disconnect RS-485, disable priming at the pump keypad, reconnect.
-      **Do this at commissioning.** The cost is that genuine air — after filter
-      service — needs a manual prime instead of a self-heal.
+      **Done 30 August 2026.** The cost, now paid, is that genuine air — after
+      filter service — needs a manual prime instead of a self-heal.
 
 - [x] **Thermal Mode.** *Decided: leave it enabled.* It is on by default and
       starts the pump at **1000 RPM at 40 °F**, outside njsPC's control. It is

@@ -70,25 +70,20 @@ the IntelliConnect; moving them to the HAT is reversible in minutes.
 
 ## Slices
 
-### 1. Prove the standalone fallback, and disable priming, in one go
+### 1. Prove the standalone fallback
 
-These were two slices and they are one, because both need the same state: the
-**RS-485 cable off the pump**.
-
-The pump already has a manual program that can be run from its keypad, so
-nothing needs setting up. What has not been established is that it still runs
-**with the bus disconnected** — this pump has been taking orders from the
+The pump already has a manual program that runs from its keypad, and priming
+was disabled on 30 August, so there is nothing to set up. One thing is still
+unverified, and it is the only one that matters here: **does that program run
+with the RS-485 cable off?** This pump has taken orders from the
 IntelliConnect for years and has never been asked to work alone.
 
 1. Pull the RS-485 cable at the pump.
 2. Start the manual program from the keypad. Confirm it runs and holds speed.
-3. While the cable is off, disable priming — `Menu`, arrows to `Priming`,
-   select `Disabled`, `Back`. Procedure and the quotes behind it are in
-   `docs/field-heater.md`.
-4. Reconnect the cable.
+3. Reconnect the cable.
 
-**Done when** the pump has run standalone with nothing on the bus, and
-priming reads `Disabled`.
+Two minutes, and it is the difference between having a fallback and believing
+you have one.
 
 *A manual program is not a schedule.* It runs until stopped rather than
 between times, so leaning on it means circulating around the clock — safe,
@@ -151,7 +146,6 @@ ADR-6's summary implies, and best closed against real bytes.
 ## Before going out
 
 - [ ] Pump's manual program verified to run with the RS-485 cable off.
-- [ ] Priming disabled while that cable is off — same visit, same state.
 - [ ] Find the HAT's third DIP. `docs/pi-bringup.md` documents TX and RX and
       not termination.
 - [ ] Price a REM temperature probe, so an absent case 22 ends in a decision
