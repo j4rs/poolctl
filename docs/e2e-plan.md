@@ -438,7 +438,7 @@ only measure that matters:
 | 2 | the blower surviving a mode change; the fake never diverting its valves; both bodies able to run at once |
 | 4 | the purge's last hole — an intent isolating the exchanger for a heartbeat before the hold engaged |
 | 5 | a pool heat call outliving the body it was made for; the blower outliving a spa session njsPC ended |
-| 6 | *(confirmed the drift race, already fixed)* |
+| 6 | *(confirmed the drift race, already fixed)* — and **missed a second one**, see below |
 | 7 | nine fake-fidelity drifts, most from serving one `circuits` array as both state and config |
 | 1, 3, 8 | no bugs — enablers and a contract check |
 
@@ -456,3 +456,42 @@ The estimate that held: slice 8 was called the weakest at planning time and
 found nothing. The estimate that did not: slice 7 was filed as cheap
 insurance, and turned up nine real drifts in an instrument the other seven
 slices depend on.
+
+
+---
+
+## Slice 6, revisited — 31 August 2026
+
+The drift slice had a test called *"does not call a write landing inside a
+read a drift"*. It passed continuously while a second instance of that exact
+bug was live, and the bug was found on the Pi instead. Two reasons, and the
+second is the useful one.
+
+**It asserted the log, not the trace.** `expect(logOf(sup)).not.toMatch(/drifted/)`
+is weaker than it looks: the corrector prints that line only on the *first*
+pass of a drift, so a card already in the drift state gets undone silently and
+the assertion holds. The write itself cannot be silent. Asserting
+`card.writes()` — one intent, one write — catches the correction regardless of
+what gets logged, and it is what actually caught the regression when the fix
+was reverted to check.
+
+**Its timing only opened the coarse window.** The test wrote *early* in a long
+read, where the shadow has been assigned by the time the read returns. The
+failure on the Pi landed in a window narrower than the process boundary can
+address: between `i2cset` exiting and `put()` assigning `last`. That one
+belongs in `hat.test.js`, where a promise gate can hold it open exactly.
+
+**The division that came out of it.** The unit test owns the *mechanism*,
+because only there can the window be held open deterministically. The
+integration test owns the *symptom* — one intent, one write; a purge release,
+one write — and is mechanism-independent on purpose, so it fails for causes
+nobody has thought of yet. Neither is redundant, and the integration one had
+been doing the weaker job of the two.
+
+**And it was flaky in the direction that hides bugs.** Rewriting it to assert
+the trace made it fail one run in three against *correct* code: it reset the
+trace on a timer, and a purge release emitted on the heartbeat rather than at
+expiry sometimes landed after the reset and was counted against the intent.
+Waiting for the write instead of the clock fixed it — the same correction the
+boot-purge test needed the same morning. Verified five runs each way before
+committing.

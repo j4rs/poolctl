@@ -719,6 +719,21 @@ describe("when the card misbehaves", () => {
     await sup.stop();
   }, 30000);
 
+  /* Wait for the card to have made `n` writes.
+   *
+   * Sleeping instead is the trap this file keeps relearning: a purge release
+   * is emitted by `evaluate()` on the heartbeat, not when the purge expires,
+   * so "long enough" is up to a heartbeat later than the arithmetic suggests.
+   * A test that resets the trace on a timer captures that stray write and
+   * blames it on whatever it was actually measuring. */
+  const afterWrites = async (card, n, timeout = 20000) => {
+    const deadline = Date.now() + timeout;
+    while ((await card.writes()).length < n && Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    await card.quiet();
+  };
+
   it("does not call a write landing inside a read a drift", async () => {
     /* The bug this slice exists for. `verifyRelays` sampled what it expected
        *before* spawning `i2cget`, so a write during the read produced a fresh
@@ -731,18 +746,65 @@ describe("when the card misbehaves", () => {
     const sup = await start({ card: true, purgeMs: 500 });
     const client = await connect(sup.port);
     await client.state(HEARTBEAT_MS * 2);
-    await new Promise((r) => setTimeout(r, 1500));
-    await sup.card.quiet();
+    /* 0x00 at boot, then 0x40 when the purge release is noticed. Both must
+       have landed before the trace is reset, or the release is counted
+       against the intent below. */
+    await afterWrites(sup.card, 2);
 
+    await sup.card.reset();
     await sup.card.setReadDelay(2500);
     await sup.card.whileReading();
     await client.intent("toggle", { key: "light" });
     await new Promise((r) => setTimeout(r, 4000));
-
-    expect(logOf(sup), "a legitimate write is not a drift").not.toMatch(/drifted/);
     await sup.card.setReadDelay(0);
+    await sup.card.quiet();
+
+    /* Assert the trace, not the log line.
+     *
+     * This used to grep the journal for "drifted", which is weaker in a way
+     * that mattered: the corrector prints that message only on the *first*
+     * pass of a drift, so a card already in the drift state would be undone
+     * silently and this test would pass. The write itself cannot be silent.
+     *
+     * One intent, one write. Three writes is the signature of the corrector
+     * undoing a live change and the next heartbeat putting it back — which is
+     * what the Pi did on 31 August, through a window narrower than this test
+     * can open. Mechanism-independent on purpose: it fails for any cause. */
+    expect(await sup.card.writes(), "one intent must produce one write")
+      .toEqual([0x48]);
+    expect(logOf(sup), "a legitimate write is not a drift").not.toMatch(/drifted/);
     await sup.stop();
   }, 30000);
+
+  it("does not undo a purge release that lands inside a read", async () => {
+    /* The same failure with no intent involved, which is how it actually
+       happened: nobody tapped anything. `evaluate()` released the bypass on
+       the heartbeat while a read was open, and the corrector forced the
+       superseded byte back. The valve went around, to flow, and around again
+       in three seconds.
+     *
+     * Boot seeds the purge, so the release is a scheduled event this test can
+     * arrange a read around rather than provoke. */
+    const sup = await start({ card: true, purgeMs: 3000 });
+    const client = await connect(sup.port);
+    await client.state(HEARTBEAT_MS * 2);
+
+    await sup.card.setReadDelay(2500);
+    await sup.card.whileReading();
+    /* The purge elapses while that read is open. Wait for the release write
+       rather than for a duration — the heartbeat decides when it lands. */
+    await afterWrites(sup.card, 2);
+    await sup.card.setReadDelay(0);
+    /* A correction, if one came, would be a third write. Give it room to
+       appear rather than asserting into the gap where it has not yet. */
+    await new Promise((r) => setTimeout(r, HEARTBEAT_MS + 1500));
+    await sup.card.quiet();
+
+    /* 0x00 while holding, 0x40 once released. Never back to 0x00 after. */
+    expect(await sup.card.writes()).toEqual([0x00, 0x40]);
+    expect(logOf(sup)).not.toMatch(/drifted/);
+    await sup.stop();
+  }, 40000);
 
   it("keeps supervising a card that has gone away, and says so once", async () => {
     /* A dead card must not take the process with it. The invariants still
