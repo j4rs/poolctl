@@ -305,7 +305,7 @@ could previously claim.
 procedure has a second line: *"Set the Remote Pool to 'Heat' or 'Auto' in the
 INSTALLER menu."* The factory default for that setting is **Cool**. It lives
 on the equipment, so no software check can see it — it belongs with the three
-already listed in §10 as invisible to commissioning.
+listed in §10 under *Settings no software check can see*.
 
 Remote mode must also be entered at the keypad — hold UP and DOWN together
 for 3+ seconds — and the manual notes the board **defaults back to OFF** when
@@ -1590,6 +1590,23 @@ eyes on bonding.
 ---
 
 ## 10. Open questions
+
+### Settings no software check can see
+
+`supervisor/commissioning.js` compares njsPC's configuration against what
+this repo believes, and reports the difference on the Water screen. It cannot
+see anything that lives on the equipment itself. These five are therefore
+permanently a human's job, and forgetting one is a silent fault — the reason
+this list exists in one place rather than scattered through the sections that
+argued for each:
+
+| Setting | Where | Why it matters |
+|---|---|---|
+| **Disable priming** | IntelliFlo keypad — disconnect RS-485 first | A priming pump ignores automation commands, so no low-flow rule is enforceable through a restart (ADR-9). Procedure in `docs/field-heater.md` |
+| **Leave Thermal Mode enabled** | IntelliFlo keypad | Protects the drive at 40 °F. Means an uncommanded pump start is expected a few nights a year and must never read as a fault |
+| **100 VA transformer** | the BOM, at build time | 3 actuators plus the contactor coil; sits exactly at the Class 2 ceiling |
+| **`Remote Pool` = Heat or Auto** | Raypak INSTALLER menu | Factory default is **Cool**. The 3-wire control does not behave without it (ADR-4) |
+| **Pool and spa setpoints** | Raypak keypad, and **not** from Remote mode | Set 30 August 2026 to 90 / 100; both had been 86, so a spa call heated to a pool temperature. They bound how warm the app can ask for *and* where a wedged supervisor parks the water (ADR-4, issue #2) |
 
 - [x] **The relay HAT's contact rating.** *Resolved 27 August 2026, from the
       card in hand.* The board that arrived is **V 7.1**, not the V6.0 the

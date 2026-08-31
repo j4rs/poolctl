@@ -409,46 +409,18 @@ is just something to respond to, which is why there is no state to sync.
 
 ---
 
-## Next up
+## Where the status lives
 
-Full lists in PRD §10 (open questions) and §11 (backlog). Available without
-equipment on the bus, highest value first:
+**Not here.** This file holds the rules; the state of the work is in
+`docs/prds/poolctl-v1.md` §10 (open questions, including *Settings no
+software check can see*) and §11 (backlog), plus the repo's open issues.
 
-1. **Commissioning — what is checked, and what no check can see.**
-   `supervisor/commissioning.js` compares what njsPC reports against what
-   this repo believes and surfaces the difference on the Water screen. It
-   checks, it never corrects: njsPC owns these settings, dashPanel edits
-   them, and a process that quietly reverted a deliberate change would be
-   worse than one that says what it found. Ten checks now, including njsPC's
-   LAN exposure — verified by trying to reach it on the Pi's own LAN
-   address, so reopening it is caught rather than assumed — the valve
-   bindings, the pump, the heater, the Spa egg timer, the valve delay, the
-   serial port, the clock and the password. Five settings live on the
-   equipment itself and are therefore invisible to all of it: **disable
-   priming at the pump keypad**, **leave Thermal Mode enabled**, **size
-   the transformer at 100 VA**, **set the heater's INSTALLER menu
-   `Remote Pool` to Heat or Auto** — it defaults to Cool, and the 3-wire
-   control does not behave without it — and **the heater's own pool and spa
-   setpoints**, which cannot be changed from Remote mode. Set on 30 August
-   2026 to pool 90 °F and spa 100 °F — both had been sitting at 86, so a spa
-   call heated to a pool temperature. Those two numbers are load-bearing in
-   two directions: targets are cutoffs, so the setpoint caps how warm the app
-   can ever ask for, and the relays latch, so it is also where a wedged
-   supervisor parks the water (ADR-4, and issue #2).
-2. **Authentication — two of four parts done.** njsPC is bound to loopback
-   and the supervisor is behind a password. What remains is TLS (deferred
-   deliberately — see the PRD) and a separate credential for Home Assistant
-   in Phase 6. See PRD §11.
-3. **Scheduled preheat.** Still unimplemented, and still refusing with a
-   reason rather than doing nothing. It wants a real water temperature,
-   which wants the bus.
-
-Blocked on the bus being attached: bus sniffing, the salt question (case
-18), `CELL_MIN_RPM`, and thermals with the enclosure sealed. **Not**
-`HEATER_MIN_RPM` — that was measured on 30 August and is 1600. What is still
-open there is the *floor*: 1600 is the lowest speed seen to work, not the
-speed at which the heater refuses, and a satisfied pressure switch is not
-proof of the nameplate's 30–60 GPM.
+That is a deliberate deletion. A *Next up* section lived here and went stale
+three times in a week — claiming one commissioning check when there were ten,
+naming the relay HAT as a blocker two days after it arrived, listing a
+measured constant as unmeasured. Everything that rotted was status; none of
+the rules ever did. Status has a source of truth and this file was a copy of
+it, so the copy is gone.
 
 ---
 
