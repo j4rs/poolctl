@@ -6,6 +6,7 @@ import PumpControl from "./PumpControl";
 import HeatControl from "./HeatControl";
 import ScheduleEditor from "../components/ScheduleEditor";
 import ProgramEditor from "../components/ProgramEditor";
+import TargetTemp from "../components/TargetTemp";
 import PreheatSheet from "../components/PreheatSheet";
 import { SEQUENCES, HEATER_MIN_RPM } from "../lib/sequences";
 
@@ -277,6 +278,61 @@ describe("Water — transition step list", () => {
 });
 
 /* ----------------------------------------------------------------- pump */
+
+/**
+ * The stepper used to offer degrees that could not do anything.
+ *
+ * Targets are cutoffs, so heat stops at whichever comes first — ours or the
+ * heater's own setpoint. With the heater set to 90, everything the pool
+ * stepper offered between 91 and 95 was inert, and the 3-wire interface
+ * carries no reading back that could have said so. The fix is not to guess
+ * the setpoint but to let someone state it, and then stop there.
+ */
+describe("Heat — targets against the heater's stated setpoint", () => {
+  const targets = { pool: 88, spa: 100 };
+  const paint = (heaterSetpoint, onSetSetpoint = () => {}) =>
+    render(
+      <TargetTemp targets={targets} activeCall={null} onAdjust={() => {}}
+        heaterSetpoint={heaterSetpoint} onSetSetpoint={onSetSetpoint} />,
+    );
+
+  it("names the heater as the source when it is the lower ceiling", () => {
+    const { container } = paint({ pool: 90, spa: 104 });
+    expect(container.textContent).toMatch(/Up to 90°F — the heater's setting/);
+  });
+
+  it("stops the stepper at the setpoint, not at the firmware cap", () => {
+    paint({ pool: 90, spa: 104 });
+    expect(screen.getByLabelText("Raise Pool target").disabled).toBe(false);
+    cleanup();
+    /* Target already at the stated setpoint: 89..95 would all be inert. */
+    paint({ pool: 88, spa: 104 });
+    expect(screen.getByLabelText("Raise Pool target").disabled).toBe(true);
+    expect(screen.getByText(/Heater is set to 88°F/)).toBeDefined();
+  });
+
+  it("falls back to the firmware cap, and says nobody has stated one", () => {
+    const { container } = paint({ pool: null, spa: null });
+    expect(container.textContent).toMatch(/Max 95°F/);
+    expect(container.textContent).toMatch(/Nobody has said what the heater itself is set to/);
+    /* Absent a statement it must not invent a lower ceiling. */
+    expect(screen.getByLabelText("Raise Pool target").disabled).toBe(false);
+  });
+
+  it("offers a way to state it rather than pretending to read it", () => {
+    const onSet = vi.fn();
+    paint({ pool: null, spa: null }, onSet);
+    fireEvent.click(screen.getByLabelText("Record the heater's Pool setting"));
+    /* Opens at the firmware cap, so stating it changes nothing until the
+       number is lowered to whatever the keypad actually says. */
+    expect(onSet).toHaveBeenCalledWith("pool", 95);
+  });
+
+  it("never lets a stated setting exceed the firmware cap", () => {
+    paint({ pool: 95, spa: 104 });
+    expect(screen.getByLabelText("Raise the Pool heater setting").disabled).toBe(true);
+  });
+});
 
 describe("Pump — who is driving", () => {
   const badge = (over) => pump(makeController(over)).container.textContent;

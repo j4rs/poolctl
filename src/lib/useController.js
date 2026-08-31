@@ -112,7 +112,15 @@ export function useController() {
     /* App-side targets. The heater holds its own setpoint on its board and
        the 3-wire contacts carry no temperature (ADR-4), so these can only
        end a heat call early — never raise the heater's cap. */
-    targets: { pool: 88, spa: 102 },
+    /* Pool sits below its ceiling and spa sits on it, so the demo shows both
+       states the label has to describe. Spa was 102 against a stated 100,
+       which rendered as "Heater is set to 100°F" beside a target of 102 — the
+       exact incoherence this feature exists to remove. */
+    targets: { pool: 88, spa: 100 },
+    /* Invented like everything else in this file, but *stated* rather than
+       null so the demo shows the interesting case: a pool ceiling of 90 that
+       comes from the heater's own keypad, which no wire can read. */
+    heaterSetpoint: { pool: 90, spa: 100 },
     /* Manual programs, and which one is running. njsPC holds these as
        circuits with pump speeds and egg timers; here they are plain data. */
     programs: DEFAULT_PROGRAMS,
@@ -421,6 +429,20 @@ export function useController() {
   /** Relative form, matching the live transport. */
   const adjustTarget = (body, delta) => setTarget(body, (v) => v + delta);
 
+  /* Invented like everything else here, but set rather than null so the demo
+     shows the interesting case: a ceiling below the firmware cap, sourced
+     from something no wire can read. */
+  const setHeaterSetpoint = (body, degrees) =>
+    setState((s) => ({
+      ...s,
+      heaterSetpoint: { ...s.heaterSetpoint, [body]: degrees },
+      targets: {
+        ...s.targets,
+        [body]: degrees == null ? s.targets[body]
+          : Math.min(s.targets[body], degrees),
+      },
+    }));
+
   /* The spa is always full, so the blower is never unsafe here. It is
      gated to spa mode as a preference: jets while spilling just dump heat
      and noise into the pool. Relax if you disagree — and drop the matching
@@ -482,7 +504,8 @@ export function useController() {
   useEffect(() => () => clearTimeout(timer.current), []);
 
   return {
-    state, setMode, setRpm, setTarget, adjustTarget, setPoolHeat, toggle,
+    state, setMode, setRpm, setTarget, adjustTarget, setHeaterSetpoint,
+    setPoolHeat, toggle,
     setPumpRunning, setPanelMode, startProgram, stopProgram, saveProgram, deleteProgram,
     bindProgram, saveSchedule, deleteSchedule, setScheduleEnabled,
     extendSpa, schedulePreheat, cancelPreheat, simulateOutage,

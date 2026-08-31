@@ -13,7 +13,7 @@ import { useConfirm } from "../lib/useConfirm";
  * is standing between a target and the water right now.
  */
 export default function HeatControl({ controller, onBack }) {
-  const { state, adjustTarget, setPoolHeat } = controller;
+  const { state, adjustTarget, setPoolHeat, setHeaterSetpoint } = controller;
   /* Calling for heat starts a heat pump that will run for hours, and ending
      a call mid-cycle is its own event. Both ask twice. */
   const confirm = useConfirm();
@@ -124,7 +124,8 @@ export default function HeatControl({ controller, onBack }) {
         </div>
       )}
 
-      <TargetTemp targets={targets} activeCall={heaterCall} onAdjust={adjustTarget} />
+      <TargetTemp targets={targets} activeCall={heaterCall} onAdjust={adjustTarget}
+        heaterSetpoint={state.heaterSetpoint} onSetSetpoint={setHeaterSetpoint} />
 
       {/* Why a pool target may look inert: in pool mode the bypass routes
           flow around the exchanger, so nothing happens until heat is called

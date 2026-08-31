@@ -140,6 +140,9 @@ export function toUiState(njs, own) {
 
     /* Cutoffs are ours; njsPC believes it owns setpoints. */
     targets: own.targets,
+    /* Stated, not measured — the UI labels it that way. It is here so the
+       stepper knows where its own range stops meaning anything. */
+    heaterSetpoint: own.heaterSetpoint ?? { pool: null, spa: null },
     /* Derived against the body, not reported raw. A pool call belongs to the
        pool: ADR-4 gives the heater to spa mode outright, and `setMode` used
        to clear this — which worked right up until njsPC took the body by

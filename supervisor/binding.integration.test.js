@@ -405,12 +405,17 @@ const now = async () => (await (await fetch(sup.url("/state"))).json());
  */
 /* Findings about njsPC's configuration, which is what these tests move.
  *
- * Two checks describe the *host* instead, and would otherwise make the suite
- * depend on where it runs: `no-password` fires because the harness points
- * AUTH_FILE at nothing, and `clock-utc` fires on any box set to UTC — which
- * is every CI runner, and every developer in London for half the year. Both
- * are correct findings; neither is about anything asserted here. */
-const HOST_FINDINGS = new Set(["no-password", "clock-utc", "clock-unsynced"]);
+ * The rest of `commissioning.js` reports on things njsPC does not own, and
+ * those would otherwise make this suite depend on where it runs and what the
+ * harness happens to have set. `no-password` fires because the harness points
+ * AUTH_FILE at nothing; `clock-utc` fires on any box set to UTC, which is
+ * every CI runner and every developer in London for half the year; and
+ * `heater-setpoint-unknown` fires because no one has told a freshly spawned
+ * supervisor what the heater's keypad says. All three are correct findings.
+ * None is about anything asserted here. */
+const HOST_FINDINGS = new Set([
+  "no-password", "clock-utc", "clock-unsynced", "heater-setpoint-unknown",
+]);
 const njspcFindings = (state) =>
   (state.commissioning ?? []).filter((f) => !HOST_FINDINGS.has(f.id));
 

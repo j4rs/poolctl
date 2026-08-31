@@ -33,7 +33,7 @@ export const NJSPC_DEFAULT_EGG_TIMER = 720;
  */
 export function checkCommissioning({
   spaCircuit, options, njspcOnLan, passwordSet, rs485, clock, heaters,
-  valves, pumps, bodyCircuits,
+  valves, pumps, bodyCircuits, heaterSetpoint,
 } = {}) {
   return [
     ...checkPassword(passwordSet),
@@ -43,6 +43,7 @@ export function checkCommissioning({
     ...checkPump(pumps),
     ...checkHeatFloor(pumps, bodyCircuits),
     ...checkHeater(heaters),
+    ...checkHeaterSetpoint(heaterSetpoint),
     ...checkClock(clock),
     ...checkSpaEggTimer(spaCircuit),
     ...checkValveDelay(options),
@@ -328,6 +329,40 @@ export function checkClock({ synchronized, timeZone } = {}) {
  * nobody mentions is exactly the silent fault this file exists to end, so it
  * is said on the screen as well as logged at startup.
  */
+/**
+ * Whether anybody has said what the heater's own setpoints are.
+ *
+ * The one check in this file that is not about njsPC. Everything else
+ * compares a setting we can read against a belief; this reports a belief we
+ * do not hold at all, because nothing can read it — ADR-4's three wires carry
+ * two dry contacts and nothing coming back.
+ *
+ * Unset is not a fault and never blocks anything. It means the target
+ * steppers offer their full firmware range, and somewhere in that range the
+ * degrees quietly stop doing anything. On 30 August 2026 that boundary was
+ * 86 °F against a stepper that went to 95.
+ */
+export function checkHeaterSetpoint(heaterSetpoint) {
+  /* Absent argument means nobody asked, which is this file's convention for
+     "not knowing is not the same as knowing something is wrong". The
+     supervisor always passes its store, where the keys exist and are null
+     until stated, so the note still fires where it should. */
+  if (heaterSetpoint === undefined) return [];
+  const missing = ["pool", "spa"].filter((b) => heaterSetpoint?.[b] == null);
+  if (missing.length === 0) return [];
+  return [{
+    id: "heater-setpoint-unknown",
+    severity: "note",
+    what: `Nobody has said what the heater's ${missing.join(" and ")} setpoint is`,
+    detail:
+      `Targets are cutoffs, so heat stops at whichever comes first — ours or ` +
+      `the heater's. Above the heater's own setpoint the target stepper does ` +
+      `nothing, and the 3-wire interface carries no reading that could say ` +
+      `so. Read it off the heater's keypad and set it on the Heat screen; it ` +
+      `commands nothing, it only tells this app where its range ends.`,
+  }];
+}
+
 export function checkPassword(passwordSet) {
   if (passwordSet !== false) return [];
   return [{

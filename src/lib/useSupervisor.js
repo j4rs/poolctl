@@ -32,6 +32,7 @@ const STALE_MS = HEARTBEAT_MS * 3;
 const INTENT_LABEL = {
   setMode: "Change mode",
   setTarget: "Set target",
+  setHeaterSetpoint: "Record the heater's setting",
   setRpm: "Set pump speed",
   setPoolHeat: "Pool heat",
   setPumpRunning: "Run the pump",
@@ -281,6 +282,10 @@ export function useSupervisor({ enabled = true } = {}) {
        state that may be a frame behind would drop taps. The supervisor
        accumulates and clamps. */
     adjustTarget: (body, delta) => intent("setTarget", { body, delta }),
+    /* Records a belief; commands nothing. Absolute rather than a delta —
+       it is typed from a keypad reading, not accumulated by tapping. */
+    setHeaterSetpoint: (body, degrees) =>
+      intent("setHeaterSetpoint", { body, degrees }),
     setRpm: (rpm) => intent("setRpm", { rpm }),
     setPoolHeat: (on) => intent("setPoolHeat", { on }),
     setPumpRunning: (on) => intent("setPumpRunning", { on }),

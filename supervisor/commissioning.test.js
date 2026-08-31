@@ -2,7 +2,7 @@
 import { describe, it, expect } from "vitest";
 import {
   checkCommissioning, checkExposure, checkSerialPort, checkClock, checkHeater,
-  checkValveBinding, checkPump, checkHeatFloor,
+  checkValveBinding, checkPump, checkHeatFloor, checkHeaterSetpoint,
   NJSPC_DEFAULT_EGG_TIMER,
 } from "./commissioning.js";
 import { SPA_TIMEOUT_MIN } from "../src/lib/sequences.js";
@@ -16,6 +16,33 @@ import { SPA_TIMEOUT_MIN } from "../src/lib/sequences.js";
  */
 
 const spa = (over) => ({ id: 1, name: "Spa", eggTimer: SPA_TIMEOUT_MIN, dontStop: false, ...over });
+
+describe("the heater's own setpoint, which nothing can read", () => {
+  it("says nothing when it was not asked about", () => {
+    /* This file's convention: an absent argument is "not knowing", never a
+       finding. Every other check here reads njsPC; this one reads our own
+       store, so undefined means the caller did not ask. */
+    expect(checkHeaterSetpoint(undefined)).toEqual([]);
+    expect(checkCommissioning({ spaCircuit: spa() })).toEqual([]);
+  });
+
+  it("says nothing once both are stated", () => {
+    expect(checkHeaterSetpoint({ pool: 90, spa: 100 })).toEqual([]);
+  });
+
+  it("names only the bodies nobody has stated", () => {
+    const [f] = checkHeaterSetpoint({ pool: 90, spa: null });
+    expect(f.id).toBe("heater-setpoint-unknown");
+    expect(f.what).toMatch(/spa setpoint/);
+    expect(f.what).not.toMatch(/pool/);
+  });
+
+  it("is a note, never a fault — an unstated setpoint blocks nothing", () => {
+    const [f] = checkHeaterSetpoint({ pool: null, spa: null });
+    expect(f.severity).toBe("note");
+    expect(f.detail).toMatch(/commands nothing/);
+  });
+});
 
 describe("the spa egg timer", () => {
   it("says nothing when it matches", () => {

@@ -37,6 +37,7 @@ const FIELDS_THE_UI_READS = [
   "spaExpiresAt", "preheat", "delays", "poolHeatDemand", "purgeUntil",
   "programs", "schedules", "violations", "commissioning", "pumpRunning",
   "panelMode", "pumpLimits", "pumpCircuits", "activeProgram", "lastCutoff",
+  "heaterSetpoint",
 ];
 
 describe("the client, talking to a supervisor that is really running", () => {

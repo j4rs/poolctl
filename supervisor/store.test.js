@@ -50,6 +50,7 @@ describe("Store", () => {
 describe("what persists", () => {
   const own = {
     targets: { pool: 88, spa: 102 },
+    heaterSetpoint: { pool: 90, spa: null },
     preheat: null,
     programs: [{ id: "skimming", name: "Skimming", rpm: 2100, minutes: 30 }],
     bypass: "flow",
@@ -61,6 +62,16 @@ describe("what persists", () => {
   it("keeps preferences", () => {
     expect(Object.keys(pickPersisted(own)).sort()).toEqual([...PERSISTED].sort());
     expect(pickPersisted(own).targets).toEqual({ pool: 88, spa: 102 });
+  });
+
+  it("keeps what the owner said the heater is set to", () => {
+    /* Nothing can read it off the heater — ADR-4's three wires carry two dry
+       contacts and nothing back — so losing it on restart means the target
+       stepper silently goes back to offering degrees that do nothing. */
+    expect(pickPersisted(own).heaterSetpoint).toEqual({ pool: 90, spa: null });
+    const back = applyPersisted(
+      { heaterSetpoint: { pool: null, spa: null } }, pickPersisted(own));
+    expect(back.heaterSetpoint).toEqual({ pool: 90, spa: null });
   });
 
   it("keeps user-defined programs", () => {

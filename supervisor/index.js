@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
 import { NjsPC } from "./njspc.js";
 import { toUiState, SPA_CIRCUIT, POOL_CIRCUIT } from "./map.js";
-import { applyTarget } from "./targets.js";
+import { applyTarget, applySetpoint, ceilingFor } from "./targets.js";
 import { Store, pickPersisted, applyPersisted } from "./store.js";
 import {
   verifyPassword, issueToken, verifyToken, parseCookies,
@@ -119,6 +119,10 @@ const own = {
   lastCutoff: null,
   panelMode: "auto",
   targets: { pool: 88, spa: 102 },
+  /* What the owner says the heater's own setpoints are. Null means nobody
+     has said, and we do not guess: the 3-wire carries no reading, so this is
+     the only way the app can know where its own targets stop working. */
+  heaterSetpoint: { pool: null, spa: null },
   poolHeatDemand: false,
   preheat: null,
   blower: false,
@@ -634,6 +638,9 @@ async function reviewCommissioning() {
       valves: config.value?.valves,
       pumps: config.value?.pumps,
       bodyCircuits: { pool: POOL_CIRCUIT, spa: SPA_CIRCUIT },
+      /* Ours, not njsPC's — the only check here about something nothing can
+         read. See checkHeaterSetpoint. */
+      heaterSetpoint: own.heaterSetpoint,
     });
     const changed = JSON.stringify(findings) !== JSON.stringify(own.commissioning);
     own.commissioning = findings;
@@ -1031,7 +1038,28 @@ const intents = {
 
   async setTarget({ body, degrees, delta }) {
     if (!(body in own.targets)) throw new Error(`unknown body ${body}`);
-    own.targets[body] = applyTarget(own.targets[body], body, { degrees, delta });
+    own.targets[body] = applyTarget(
+      own.targets[body], body, { degrees, delta }, own.heaterSetpoint[body]);
+    remember();
+    publish();
+  },
+
+  /**
+   * Record what the heater's own setpoint is, because nothing can read it.
+   *
+   * Not a command to the heater — it changes nothing out at the pad. It tells
+   * this process where its own targets stop having any effect, so the stepper
+   * can stop offering degrees that do nothing.
+   *
+   * Lowering it re-clamps the target that depends on it. Leaving a target
+   * stranded above the new ceiling would recreate the exact problem this
+   * exists to end, one screen refresh later.
+   */
+  async setHeaterSetpoint({ body, degrees }) {
+    if (!(body in own.heaterSetpoint)) throw new Error(`unknown body ${body}`);
+    own.heaterSetpoint[body] = applySetpoint(body, degrees);
+    own.targets[body] = applyTarget(
+      own.targets[body], body, { delta: 0 }, own.heaterSetpoint[body]);
     remember();
     publish();
   },
@@ -1303,6 +1331,18 @@ wss.on("connection", (ws) => {
 /* Restore before the first client can connect, so nobody sees defaults
    flash past on the way to the real values. */
 Object.assign(own, applyPersisted(own, await store.load()));
+
+/* Re-clamp targets against whatever ceiling the loaded setpoints imply.
+ *
+ * `setHeaterSetpoint` re-clamps as it writes, so the two cannot diverge
+ * through the app. They can through the file: state.json is deliberately
+ * hand-editable over SSH, and a target left above a stated setpoint would
+ * render as a number beside a label saying the ceiling is lower — which is
+ * the incoherence this whole feature exists to remove. */
+for (const body of Object.keys(own.targets)) {
+  own.targets[body] = applyTarget(
+    own.targets[body], body, { delta: 0 }, own.heaterSetpoint?.[body]);
+}
 await loadCredential();
 
 njs.start();
