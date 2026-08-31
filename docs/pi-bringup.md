@@ -326,6 +326,20 @@ else looks healthy.
 
 The relay HAT carries the RS-485 transceiver (with TVS diodes and a
 resettable fuse), and it presents on the **Pi's GPIO UART**, not on USB.
+
+**Confirmed on the card, 31 August 2026** — this had been taken from product
+documentation until then, which on this board has been wrong about the driver
+mapping and wrong about the hardware watchdog. The silkscreen carries an
+`A`/`B` terminal pair at the top-left corner and the labels `485-TX`,
+`485-RX` and `485-TERM` beside the DIP block. So no USB adapter is needed and
+the bus lands on the GPIO UART as assumed.
+
+Two things the photograph does **not** settle. All six DIP positions were
+down, `ON` being the top edge, so the transceiver is disconnected from the
+UART as shipped. And the three labels sit beside the block rather than under
+individual switches, so **which numbered position is which is not legible and
+must be read off the card in hand.** Getting `485-TERM` on while the panel is
+mid-bus degrades the whole bus rather than failing visibly.
 Three things have to be true, and none of them are by default:
 
 **1. The DIP switches.** TX and RX **ON**, so the Pi drives the bus directly.
