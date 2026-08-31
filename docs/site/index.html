@@ -44,13 +44,27 @@
   }
 
   *, *::before, *::after { box-sizing: border-box; }
-  html { -webkit-text-size-adjust: 100%; }
+
+  /* One knob for the whole page's scale. Every length below is in rem, ch or
+     vw, so changing this scales type, spacing and column widths together —
+     the same thing the browser's own zoom does, rather than making the text
+     big inside a layout sized for smaller text.
+
+     Dialled back on narrow screens: 200% of a 375px phone is a column about
+     eleven characters wide. The page still reads larger there than it did,
+     just not absurdly so. */
+  html {
+    -webkit-text-size-adjust: 100%;
+    font-size: 200%;
+  }
+  @media (max-width: 40rem) { html { font-size: 125%; } }
+
   body {
     margin: 0;
     background: var(--ground);
     color: var(--stone);
     font-family: 'Archivo', ui-sans-serif, -apple-system, system-ui, sans-serif;
-    font-size: 16px;
+    font-size: 1rem;
     line-height: 1.6;
   }
   .wrap { max-width: 62rem; margin: 0 auto; padding: 0 1.5rem; }
