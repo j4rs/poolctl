@@ -481,13 +481,43 @@
   .w4-lv   { fill: none; stroke: var(--water); stroke-width: 2.0; stroke-linejoin: round; stroke-linecap: round; }
   .w4-dry  { fill: none; stroke: var(--muted); stroke-width: 2.4; stroke-linejoin: round; stroke-linecap: round; stroke-dasharray: 7 4; }
   .note { font-size: 13.5px; color: var(--muted); margin-top: 18px; }
+
+  /* Appearance control. The [data-theme] rules above have been in this file
+     since it was written and nothing ever stamped them — they only ever
+     worked as the inverse guard on the media query. This is what sets them. */
+  .theme {
+    position: absolute; top: 0; right: 0;
+    font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+    font-size: 0.64rem; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--muted); background: transparent;
+    border: 1px solid var(--line); border-radius: 999px;
+    padding: 0.4rem 0.85rem; cursor: pointer;
+    transition: border-color 120ms ease, color 120ms ease;
+  }
+  .theme:hover { border-color: var(--water); color: var(--water); }
+  @media (prefers-reduced-motion: reduce) { .theme { transition: none; } }
+  header { position: relative; }
 </style>
+
+<script>
+  /* Stamped in the head so a stored choice never flashes the other theme.
+     localStorage throws outright in some privacy modes, hence the wrapper. */
+  (function () {
+    try {
+      var t = localStorage.getItem("poolctl.site.theme");
+      if (t === "dark" || t === "light") {
+        document.documentElement.setAttribute("data-theme", t);
+      }
+    } catch (e) { /* follow the system */ }
+  })();
+</script>
 </head>
 <body>
 
 <div class="wrap">
 
   <header>
+    <button id="theme" class="theme" type="button">System</button>
     <p class="eyebrow">Poolctl &middot; equipment pad</p>
     <h1>Panel build</h1>
     <p class="lede">
@@ -2088,6 +2118,41 @@ The panel's own feed has two destinations, not five. An earlier
   </section>
 
 </div>
+
+<script>
+  /* The same three-state control as the landing page, and the same storage
+     key, so a choice made on one carries to the other. Duplicated rather than
+     shared: this file is meant to open straight off the filesystem, where a
+     path that works from the published site does not. */
+  (function () {
+    var KEY = "poolctl.site.theme";
+    var ORDER = ["system", "dark", "light"];
+    var LABEL = { system: "System", dark: "Dark", light: "Light" };
+    var root = document.documentElement;
+    var btn = document.getElementById("theme");
+    if (!btn) return;
+    var current = root.getAttribute("data-theme") || "system";
+
+    function show(mode) {
+      btn.textContent = LABEL[mode];
+      btn.setAttribute("aria-label", "Appearance: " + LABEL[mode] + ". Activate to change.");
+    }
+    function apply(mode) {
+      current = mode;
+      if (mode === "system") root.removeAttribute("data-theme");
+      else root.setAttribute("data-theme", mode);
+      try {
+        if (mode === "system") localStorage.removeItem(KEY);
+        else localStorage.setItem(KEY, mode);
+      } catch (e) { /* holds for this page view either way */ }
+      show(mode);
+    }
+    show(current);
+    btn.addEventListener("click", function () {
+      apply(ORDER[(ORDER.indexOf(current) + 1) % ORDER.length]);
+    });
+  })();
+</script>
 
 </body>
 </html>

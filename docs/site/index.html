@@ -43,6 +43,33 @@
     }
   }
 
+  /* The same palette again, for an explicit choice.
+   *
+   * Three states, not two. Nothing stamped means "follow the system", and the
+   * media query above handles it; `[data-theme="dark"]` is excluded there so
+   * an explicit dark choice survives a light OS. This block is the other
+   * direction — explicit light on a dark OS — and without it the switch does
+   * nothing for the majority of visitors, since this page is dark-first.
+   *
+   * Duplicated rather than factored: a media query and an attribute selector
+   * cannot share one rule, and the alternative is stamping the theme from
+   * JavaScript on every load, which leaves the page dark for anyone who has
+   * scripting off. */
+  :root[data-theme="light"] {
+    --ground: #f2f5f4;
+    --surface: #ffffff;
+    --surface-up: #e7ecea;
+    --line: #c2d0cd;
+    --water: #0f7a70;
+    --heat: #a9530c;
+    --stone: #14201f;
+    --muted: #465957;
+    --faint: #677876;
+    --alert: #a8321f;
+    --wash-water: rgba(15, 122, 112, 0.10);
+    --wash-heat: rgba(169, 83, 12, 0.10);
+  }
+
   *, *::before, *::after { box-sizing: border-box; }
 
   /* One knob for the whole page's scale. Every length below is in rem, ch or
@@ -83,6 +110,24 @@
   /* ---- masthead ---- */
   header.top { border-bottom: 1px solid var(--line); background: var(--surface); }
   .top .wrap { padding-top: 3.5rem; padding-bottom: 3rem; }
+  .masthead {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 1.5rem;
+  }
+  /* Mono uppercase rather than an icon: this page already speaks in
+     instrument labels, and a word cannot be misread the way a half-filled
+     circle can. It names the state it is in, not the one it would move to. */
+  .theme {
+    flex-shrink: 0; margin-top: 0.6rem;
+    font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+    font-size: 0.6rem; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--muted); background: transparent;
+    border: 1px solid var(--line); border-radius: 999px;
+    padding: 0.45rem 0.9rem; cursor: pointer;
+    transition: border-color 120ms ease, color 120ms ease;
+  }
+  .theme:hover { border-color: var(--water); color: var(--water); }
+  @media (prefers-reduced-motion: reduce) { .theme { transition: none; } }
   h1 {
     font-size: clamp(2.4rem, 7vw, 3.6rem); font-weight: 700;
     letter-spacing: -0.02em; margin: 0; line-height: 1.05;
@@ -211,12 +256,30 @@
   footer p { max-width: 68ch; }
   .links { display: flex; flex-wrap: wrap; gap: 0.4rem 1.4rem; margin: 0 0 1.2rem; padding: 0; list-style: none; }
 </style>
+
+<script>
+  /* Applied here, in the head, rather than after the body parses: stamping a
+     stored choice later means the page paints in the other theme first and
+     then jumps. Wrapped because localStorage throws outright in some privacy
+     modes rather than returning null. */
+  (function () {
+    try {
+      var t = localStorage.getItem("poolctl.site.theme");
+      if (t === "dark" || t === "light") {
+        document.documentElement.setAttribute("data-theme", t);
+      }
+    } catch (e) { /* no stored preference is readable; follow the system */ }
+  })();
+</script>
 </head>
 <body>
 
 <header class="top">
   <div class="wrap">
-    <h1>poolctl<span class="dot">.</span></h1>
+    <div class="masthead">
+      <h1>poolctl<span class="dot">.</span></h1>
+      <button id="theme" class="theme" type="button">System</button>
+    </div>
     <p class="lede">
       A DIY pool and spa controller replacing a Pentair IntelliConnect — and
       the record of everything that had to be measured rather than assumed.
@@ -233,7 +296,7 @@
     <dl class="readout">
       <div><dt>Stack</dt><dd>on the Pi</dd></div>
       <div><dt>njsPC</dt><dd>v10.0.1</dd></div>
-      <div><dt>Tests</dt><dd>666</dd></div>
+      <div><dt>Tests</dt><dd>686</dd></div>
       <div><dt>Equipment on bus</dt><dd class="warn">none yet</dd></div>
     </dl>
   </div>
@@ -459,6 +522,43 @@
     </p>
   </div>
 </footer>
+
+<script>
+  (function () {
+    var KEY = "poolctl.site.theme";
+    var ORDER = ["system", "dark", "light"];
+    var LABEL = { system: "System", dark: "Dark", light: "Light" };
+    var root = document.documentElement;
+    var btn = document.getElementById("theme");
+    if (!btn) return;
+
+    var current = root.getAttribute("data-theme") || "system";
+
+    function show(mode) {
+      btn.textContent = LABEL[mode];
+      /* The button says what it *is*; the label says what it does, because a
+         control that names its own next state is ambiguous about which of the
+         two it is reporting. */
+      btn.setAttribute("aria-label", "Appearance: " + LABEL[mode] + ". Activate to change.");
+    }
+
+    function apply(mode) {
+      current = mode;
+      if (mode === "system") root.removeAttribute("data-theme");
+      else root.setAttribute("data-theme", mode);
+      try {
+        if (mode === "system") localStorage.removeItem(KEY);
+        else localStorage.setItem(KEY, mode);
+      } catch (e) { /* the choice holds for this page view either way */ }
+      show(mode);
+    }
+
+    show(current);
+    btn.addEventListener("click", function () {
+      apply(ORDER[(ORDER.indexOf(current) + 1) % ORDER.length]);
+    });
+  })();
+</script>
 
 </body>
 </html>
