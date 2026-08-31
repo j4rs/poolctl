@@ -438,12 +438,36 @@ Encouragingly, the iChlor clearly participates in the shared protocol — it
 answers Get Model — so case 18 probably arrives. Probably is what Phase 1 is
 for.
 
-**The reverse engineering was done against an IntelliConnect.** Case 22 is
-commented *"temp and output as seen from IntelliConnect"* (issue #157), and
-case 21 notes the packet "coming through differently on the IntelliConnect."
-That is this site's current configuration, so Phase 1 sniffing with the
-IntelliConnect still live reproduces exactly the conditions this code was
-written for.
+**Corrected 31 August 2026, by reading the installed source rather than
+quoting it second-hand.** Two things above were wrong.
+
+*Case 22 does not depend on the IntelliConnect.* The full comment in
+`ChlorinatorStateMessage.ts` reads **"Chlorinator->OCP this is actually an
+iChlor message and has no bearing on IntelliConnect."** The
+*"temp and output as seen from IntelliConnect"* line that this ADR quoted is
+the next line down, and it describes where the sample capture came from — not
+a dependency. The cell originates the message. So there is no window that
+closes when the IntelliConnect is retired, and no reason to sniff before the
+handover in order to catch it.
+
+The handler is unambiguous about the rest: under `ControllerType.Nixie` it
+assigns `extractPayloadByte(2)` to `getBodyIsOn()` behind a `>= 40` floor,
+which is exactly the behaviour §11 assumed.
+
+*And case 18 is not separable from control.* `nixie/chemistry/Chlorinator.ts`
+sends `action: 17` with the target output and declares
+`response: Response.create({ action: 18 })`, `retries: 3`. Case 18 is the
+**acknowledgement of the control message**, not merely a salt report. If an
+iChlor 30 does not emit it, `sendAsync` rejects and the catch sets
+`currentOutput = 0`, `status = 128` and a persistent *"Communication error
+with Chlorinator"*.
+
+That materially changes this ADR's risk. Path A treats salt as expendable —
+but the message carrying salt is the same message that acknowledges output
+control. Losing it does not cost a reading; it costs njsPC's belief that
+chlorination is working at all, on every poll, whether or not the cell is in
+fact obeying. **The question is unchanged; what rides on the answer is
+larger.**
 
 **Before the HAT arrives:** njsPC ships an equipment simulator at `anslq25/`
 with a `MockChlorinator`. It covers cases 0, 17, 19 and 20 — but *not* 18 or
