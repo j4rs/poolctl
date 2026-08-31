@@ -593,14 +593,26 @@ describe("the purge, at speed", () => {
        the hold engages. Seeding only `heatEndedAt` left one, seen on the Pi. */
     expect(await sup.card.trace()).toEqual(["0x00  (all off)"]);
 
-    await new Promise((r) => setTimeout(r, 3500));
+    /* Wait for the write, not for the clock.
+     *
+     * A fixed 3.5 s sleep lived here and failed on a slow runner. The purge
+     * expiring is not what emits the write — `evaluate()` notices it on the
+     * heartbeat, which is 5 s and deliberately not overridable, so a 2.5 s
+     * purge is released somewhere between 2.5 s and 7.5 s after boot
+     * depending on where the beat lands. The sleep assumed the lucky end of
+     * that range and was right most of the time, which is the worst way for
+     * a test to be wrong. */
+    const deadline = Date.now() + 20000;
+    while ((await sup.card.trace()).length < 2 && Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 200));
+    }
     await sup.card.quiet();
     /* njsPC is unreachable, so mode reads pool and the released bypass goes
        around the heater — REL3, the one coil held energised in normal pool
        running. */
     expect(await sup.card.trace()).toEqual(["0x00  (all off)", "0x40  REL3"]);
     await sup.stop();
-  }, 30000);
+  }, 40000);
 
   it("reports how long it is holding for", async () => {
     /* Not on the first frame: that is published when njsPC connects, before
