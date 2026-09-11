@@ -1582,10 +1582,12 @@ It runs as a launchd agent, and its log is the diagnostic the September
 incident lacked. Every hour leaves one line, telling apart a name that does
 not resolve, a box that does not answer on port 22, and an SSH key the Mac
 cannot use — the three failures that were indistinguishable that day. The
-last matters in practice: with a passphrase-protected key and no `UseKeychain`,
-the job works until the Mac next reboots and then logs *"REACHABLE, BUT SSH
-REFUSED"* until the key is loaded again. Whether to store that passphrase in
-the Keychain is an owner's decision, not made here.
+last mattered in practice: the key is passphrase-protected, so the job would
+have worked until the Mac next rebooted and then logged *"REACHABLE, BUT SSH
+REFUSED"* every hour. Closed 11 September 2026 — the passphrase is in the
+Keychain and a `~/.ssh/config` scoped to the Pi sets `UseKeychain yes`.
+Verified the way that counts: with the agent removed entirely, as after a
+reboot, the backup still authenticates.
 
 **And a fix aimed at the ambiguity, not the failure:** make *reachable by
 name* and *reachable by address* separately testable. Reserve the Pi a fixed

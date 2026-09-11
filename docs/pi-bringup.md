@@ -312,14 +312,22 @@ without rebuilding, the pre-patch build is kept beside the new one:
 cd ~/njspc && rm -rf dist && mv dist.pre-atomic dist && sudo systemctl restart njspc
 ```
 
-**This checkout is also six commits behind upstream `master`**, and one of
-them matters to this repository specifically. `4c3975d6` *"correct cooldown
-delay calculation"* touches heater cooldown — and the supervisor runs its own
-purge **because** `NixieHeatpump.getCooldownTime()` returned 0 for heat pumps.
-If that commit changes the heat-pump case, upgrading njsPC would put two
-authorities on the exchanger at once, which ADR-7 forbids. Read it before
-moving `~/njspc` forward; the others include this project's own #1237 and new
-chlorinator model handling that the bus handover will want.
+**This checkout is also six commits behind upstream `master`.** The one that
+looked dangerous has been read and is not. `4c3975d6` *"correct cooldown delay
+calculation"* is the fix for this project's own report, njsPC #1238 —
+`getDate()` where `getTime()` was meant, which made the cooldown arithmetic
+meaningless and effectively zero. It changes `NixieGasHeater.getCooldownTime()`
+only. `NixieHeatpump` extends `NixieHeaterBase`, not `NixieGasHeater`, and
+keeps its own override on master:
+
+```ts
+public getCooldownTime(): number { return 0; } // There is no cooldown delay at this time for a heatpump
+```
+
+So the assumption the supervisor's purge rests on survives an upgrade, and
+moving `~/njspc` forward would not put a second authority on the exchanger.
+The other five include this project's #1237 and chlorinator model handling the
+bus handover will want; none has been read with the same care yet.
 
 ## 6. When the HAT arrives
 
