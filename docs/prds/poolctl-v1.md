@@ -1540,6 +1540,32 @@ Three consequences, none of them optional:
 
 ### Storage note
 
+**Requirement, from the owner, September 2026: the box must survive losing
+power uncleanly, unattended.** It lives on an outdoor outlet and will lose
+power again. This section previously ended *"Revisit at commissioning"* and
+was never revisited — none of the mitigations below were applied — and an
+outlet-pull then left the Pi powered, reading its card, and off the network
+for days. See the failure table in `docs/architecture.md`.
+
+Recovery from power loss has three layers, and only two were designed:
+
+| Layer | Status |
+|---|---|
+| During the cut, the equipment goes safe | Designed — relays de-energise, heater contacts open |
+| **After the cut, the box boots on its own** | **Not designed. This is what failed** |
+| After boot, it resumes correctly | Designed — `0x00`, purge hold, then normal |
+
+The candidate fix, pending the diagnosis of what actually failed: a
+read-only root (the overlay filesystem in `raspi-config`), so the OS cannot
+be corrupted by a cut at all; a small writable partition for the state that
+must persist, where the supervisor's store already writes atomically;
+`fsck.repair=yes`, so a dirty data partition is repaired rather than waiting
+in emergency mode for a keyboard nobody will plug in; and an off-box backup
+of njsPC's configuration, which is the one thing on the card that exists
+nowhere else.
+
+The original note follows.
+
 A microSD is cheaper; an SSD is more reliable. SD cards fail on 24/7 Pis
 through write wear and unclean power loss, and an outdoor pad supplies both.
 SanDisk's own support position is that retail (non-endurance) cards are not

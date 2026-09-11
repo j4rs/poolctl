@@ -253,6 +253,7 @@ server mirrors.
 | Pi loses power | — | **nothing** — the HDR-60-5 feeds the HAT upstream of the Pi, so the expander stays powered and latched |
 | HAT loses 5 V, mains still up | — | relays de-energise and the valves **move**: the N.C. line goes live and drives them to pool / bypass to flow. Heater contacts open, blower off |
 | Mains lost entirely | — | relays de-energise but **nothing moves** — no 24 VAC to drive an actuator, so each valve stays where it was, held by gearing. Harmless: no pump, no heater, no call. Corrected at the next boot, which de-energises to `0x00` before serving anything |
+| **Mains restored, but the Pi does not come back** | **nothing** | **Not designed for, and it happened.** Early September 2026 the Pi lost power at the outlet with no clean halt, and came back with power and SD activity but **no network, for days** — a stuck state, not a slow one. The row above says the relays are *"corrected at the next boot"*; that silently assumes the next boot succeeds. Nothing in these docs mentioned fsck or emergency mode until this row. Cause still being diagnosed; see PRD §7, *Storage note* |
 | Client loses network | client's own staleness timer | nothing happens to equipment — the entire point of ADR-7 |
 | Valve position drifts | nothing; there is no feedback | re-driven to pool on every boot |
 | Valve de-energises mid-hold | nothing yet | open question — REM `latch` semantics against a PE24GVA SPDT selector |
