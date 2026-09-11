@@ -133,10 +133,11 @@ rather than on every socket upgrade:
 sudo -u poolctl env AUTH_FILE=/var/lib/poolctl/auth.json node /opt/poolctl/supervisor/passwd.js && sudo systemctl restart poolctl
 ```
 
-Skip the restart and nothing tells you so from the phone: the running process
-keeps the old password, the new one is refused at sign-in, and any tab that
-was open keeps retrying its socket. That exact confusion happened on 11
-September 2026, the first time this command was run.
+`passwd.js` says so when it finishes — *"Restart the supervisor for it to take
+effect"* — and the restart is part of the command anyway, so it cannot be
+missed by someone who copies the line without reading what it prints. Skip it
+and the phone gives no hint: the running process keeps the old password, the
+new one is refused at sign-in, and any open tab keeps retrying its socket.
 
 There is deliberately no way to do this over the network. Without it the
 supervisor still runs, warns at startup and raises a finding on the Water
