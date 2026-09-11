@@ -423,7 +423,7 @@ support is less mature" was too vague to act on. What njsPC actually has, in
 
 | Reading | Status in njsPC | Case |
 |---|---|---|
-| Model identification | **Yes**, `ichlor-ic30` is an enumerated model (30k capacity, 1.0 lb/day). iChlor does not report a model, so it is inferred from a name beginning `iChlor` | 3 |
+| Model identification | **Not on `v10.0.1` in Nixie mode — corrected 11 September 2026.** `ichlor-ic30` is enumerated in the *base* model table, which is what was read. Nixie replaces that table with its own, and on `v10.0.1` it has no iChlor entries, so the inference from a name beginning `iChlor` sets the model to `undefined`, silently. Fixed upstream in `50c31447`, on master and in no release yet; see `docs/pi-bringup.md` §5 | 3 |
 | Output % | **Yes** | 17, 21, 22 |
 | Water temperature | **Yes**, and in Nixie mode it is assigned to the current body | 22 |
 | Keep-alive | Recognised, payload unknown — comment says *"perhaps simply a keep alive"* | 19 |

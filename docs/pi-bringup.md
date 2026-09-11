@@ -312,22 +312,37 @@ without rebuilding, the pre-patch build is kept beside the new one:
 cd ~/njspc && rm -rf dist && mv dist.pre-atomic dist && sudo systemctl restart njspc
 ```
 
-**This checkout is also six commits behind upstream `master`.** The one that
-looked dangerous has been read and is not. `4c3975d6` *"correct cooldown delay
-calculation"* is the fix for this project's own report, njsPC #1238 —
-`getDate()` where `getTime()` was meant, which made the cooldown arithmetic
-meaningless and effectively zero. It changes `NixieGasHeater.getCooldownTime()`
-only. `NixieHeatpump` extends `NixieHeaterBase`, not `NixieGasHeater`, and
-keeps its own override on master:
+**This checkout is six commits behind upstream `master`, and all six have
+been read** (11 September 2026). No release contains any of them — `v10.0.1`
+is still the newest tag — so the delta between what the Pi runs and master is
+exactly these:
+
+| commit | what it does | here |
+|---|---|---|
+| `50c31447` chlorinator models | Adds `ichlor-ic15` and `ichlor-ic30` to **Nixie's** model table | **Needed.** Nixie replaces the base table, and on `v10.0.1` its version has no iChlor entries — so an iChlor 30 is identified as *no model at all*, silently, every poll. See below |
+| `7cb488f5` #1237 (ours) | Port-0 writes stop wiping an existing ScreenLogic block | **Helps.** Enabling comms for the bus handover is exactly that write; this Pi's ScreenLogic password was already blanked by one |
+| `4c3975d6` #1238 (ours) | Gas-heater cooldown used `getDate()` for `getTime()` | **Inert.** `NixieHeatpump` is a sibling of `NixieGasHeater`, not a subclass, and keeps `getCooldownTime() { return 0; }` — so the purge's founding assumption survives |
+| `fdb8ba8c` #1239 | Logs *"body temperature cannot be determined"* once per episode, not every pass | **Helps**, logging only. That is this site's exact state until the bus is up |
+| `c6f784b0` ci | Also declares the `_warnedNoTemp` field the previous commit used without declaring | Inert — the build fix for `fdb8ba8c` |
+| `d6823cc9` schedules | Clears stale schedule `isOn` flags | **Inert.** Entirely inside `IntelliCenterWSBoard`; this site is Nixie |
+
+**The iChlor gap, precisely.** On `v10.0.1` in Nixie mode:
 
 ```ts
-public getCooldownTime(): number { return 0; } // There is no cooldown delay at this time for a heatpump
+if (name.startsWith('iChlor')) chlor.model = sys.board.valueMaps.chlorinatorModel.getValue('ichlor-ic30');
 ```
 
-So the assumption the supervisor's purge rests on survives an upgrade, and
-moving `~/njspc` forward would not put a second authority on the exchanger.
-The other five include this project's #1237 and chlorinator model handling the
-bus handover will want; none has been read with the same care yet.
+`getValue` of a name the table lacks returns `{ name }` with no value, so
+`chlor.model` becomes `undefined` without an error. Output %, salt,
+temperature and control do not depend on the model; the capacity and
+production figures derived from it do. It cannot be worked around by picking
+the model by hand, because it is not in the list to pick from.
+
+**So: move to `c6f784b0` before the bus handover, pinned to that commit rather
+than tracking `master`.** Master is unreleased code, and the only reason
+following it is safe today is that its whole delta has been read. Pinning
+keeps it that way — anything that lands afterwards arrives unread. The atomic
+patch was written against master and applies to it as it is.
 
 ## 6. When the HAT arrives
 
