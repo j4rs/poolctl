@@ -1542,27 +1542,38 @@ Three consequences, none of them optional:
 
 **Requirement, from the owner, September 2026: the box must survive losing
 power uncleanly, unattended.** It lives on an outdoor outlet and will lose
-power again. This section previously ended *"Revisit at commissioning"* and
-was never revisited — none of the mitigations below were applied — and an
-outlet-pull then left the Pi powered, reading its card, and off the network
-for days. See the failure table in `docs/architecture.md`.
+power again.
 
-Recovery from power loss has three layers, and only two were designed:
+**What happened.** An outlet pull with no clean halt, after which
+`poolctl.local` would not resolve and SSH by name failed for days, while the
+Pi showed power and SD activity. A second power cycle brought it back, and
+the root filesystem did ordinary ext4 journal recovery on the way up
+(`orphan cleanup on readonly fs`). That is everything that is known.
 
-| Layer | Status |
+**What is not known, and why.** The cause, because the journal is volatile
+and the failed boot left no record. And whether the Pi was off the network
+at all or merely unnamed — the scan used to look for it filtered by a list of
+Raspberry Pi MAC prefixes that did not include this Pi's own, so its answer
+of "not present" meant nothing. An earlier draft of this note stated both as
+fact. They were inferences.
+
+**Two mitigations this section recommended are the OS default**, and were
+listed as work because nobody checked the platform before writing the list:
+
+| Mitigation | State on this box |
 |---|---|
-| During the cut, the equipment goes safe | Designed — relays de-energise, heater contacts open |
-| **After the cut, the box boots on its own** | **Not designed. This is what failed** |
-| After boot, it resumes correctly | Designed — `0x00`, purge hold, then normal |
+| `fsck.repair=yes` on the kernel command line | **Already present** — Raspberry Pi OS default. A dirty root is repaired rather than dropping to emergency mode |
+| Volatile journald | **Already present** — `40-rpi-volatile-storage.conf`, shipped by `raspberrypi-sys-mods`. It spares the card and destroys the evidence; this incident is the cost |
+| Read-only root (overlay filesystem) | **Not done.** The one change that makes the OS itself immune to a cut |
+| Off-box backup of njsPC's configuration | **Not done.** The one thing on the card that exists nowhere else |
 
-The candidate fix, pending the diagnosis of what actually failed: a
-read-only root (the overlay filesystem in `raspi-config`), so the OS cannot
-be corrupted by a cut at all; a small writable partition for the state that
-must persist, where the supervisor's store already writes atomically;
-`fsck.repair=yes`, so a dirty data partition is repaired rather than waiting
-in emergency mode for a keyboard nobody will plug in; and an off-box backup
-of njsPC's configuration, which is the one thing on the card that exists
-nowhere else.
+**And a fix aimed at the ambiguity, not the failure:** make *reachable by
+name* and *reachable by address* separately testable. Reserve the Pi a fixed
+address at the router and keep it somewhere local — not in this repository,
+which is public. Then the first question next time is one command rather
+than an afternoon: if `ssh` by address works and by name does not, it is
+mDNS; if neither does, it is the network or the box. Today that question
+could not be answered at all.
 
 The original note follows.
 
