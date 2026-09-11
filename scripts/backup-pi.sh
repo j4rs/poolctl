@@ -7,9 +7,13 @@
 # strategy prevents. Almost everything on that card can be rebuilt from this
 # repository and docs/pi-bringup.md. These cannot:
 #
-#   njspc/data/poolConfig.json    every circuit, pump speed, schedule, valve
-#   njspc/config.json             njsPC's own settings: comms, interfaces
-#   poolctl/supervisor/state.json programs, targets, the heater's setpoints
+#   /opt/njspc/data/poolConfig.json   every circuit, pump speed, schedule, valve
+#   /opt/njspc/config.json            njsPC's own settings: comms, interfaces
+#   /var/lib/poolctl/state.json       programs, targets, the heater's setpoints
+#
+# Absolute paths since 11 September 2026, when both services moved to their
+# own unprivileged users (docs/pi-bringup.md §5). The account this connects as
+# reads them through membership of the `poolctl` and `njspc` groups.
 #
 # Deliberately not copied: auth.json, which is a password hash and a session
 # secret that `passwd.js` regenerates, so spreading it buys nothing; and
@@ -50,11 +54,11 @@ if [ -z "$PI" ]; then
   exit 2
 fi
 
-# remote path (relative to the Pi's home) : path inside the backup repository
+# remote path : path inside the backup repository
 FILES=(
-  "njspc/data/poolConfig.json:njspc/poolConfig.json"
-  "njspc/config.json:njspc/config.json"
-  "poolctl/supervisor/state.json:supervisor/state.json"
+  "/opt/njspc/data/poolConfig.json:njspc/poolConfig.json"
+  "/opt/njspc/config.json:njspc/config.json"
+  "/var/lib/poolctl/state.json:supervisor/state.json"
 )
 
 log() { printf '%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S')" "$*"; }

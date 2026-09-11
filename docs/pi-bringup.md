@@ -121,12 +121,14 @@ here failed.
 
 The script never copies `auth.json` or `state.json`. Those exist only on the
 Pi, and overwriting them would sign the household out and reset the targets
-on every deploy.
+on every deploy. Since 11 September 2026 they are not in the code tree at
+all — see *Each service runs as its own user*, below.
 
-**Set a password before it is reachable by anything.**
+**Set a password before it is reachable by anything.** It is written as the
+service's own user, into the service's own data directory:
 
 ```bash
-node ~/poolctl/supervisor/passwd.js
+sudo -u poolctl env AUTH_FILE=/var/lib/poolctl/auth.json node /opt/poolctl/supervisor/passwd.js
 ```
 
 There is deliberately no way to do this over the network. Without it the
@@ -356,6 +358,61 @@ batch gets this right: its "already warned" set is `static`, which survives
 across instances. It was only ever log noise here, and it would have stopped by itself once the
 bus supplied a water temperature; the reason to fix it anyway is that the
 issue was closed as fixed and was not.
+
+## Each service runs as its own user
+
+**Since 11 September 2026, neither service runs as the admin account.** The
+admin account has passwordless sudo, so before this change a compromise of
+either network-facing process — the supervisor on the LAN, njsPC on loopback
+— was a compromise of the whole box. Now each runs as a system user with no
+login, no home and no sudo:
+
+| service | user | extra group, and why | writes | reads only |
+|---|---|---|---|---|
+| supervisor | `poolctl` | `i2c` — the relay card, `/dev/i2c-1` | `/var/lib/poolctl` | `/opt/poolctl` |
+| njsPC | `njspc` | `dialout` — RS-485, `/dev/ttyAMA0` | `/opt/njspc/{data,logs,backups}`, `config.json` | the rest of `/opt/njspc` |
+
+**The service can write its data but never its code.** Code in `/opt/poolctl`
+and `/opt/njspc` stays owned by the admin account, so deploys, `git` and `tsc`
+work as before with no sudo — and a compromised service cannot make itself
+permanent by rewriting its own `dist/`. The supervisor's data moved out of its
+code tree entirely, via the `STATE_FILE` and `AUTH_FILE` variables it already
+honoured; njsPC's cannot, because it resolves its data against its working
+directory, so only its three data directories and `config.json` belong to it.
+
+Both units also carry `NoNewPrivileges=true`, so nothing inside the service can
+gain privileges through sudo or a setuid binary even if one were reachable;
+`ProtectHome=true`, so `/home` — the admin's SSH keys included — is empty to
+the service; and `UMask=0027`, so the files they write are group-readable for
+the backup and invisible to everyone else. The admin account is in both
+services' groups for exactly that reason.
+
+**Checked on the Pi, not assumed**, as each service's own user:
+
+| attempt | result |
+|---|---|
+| either service user runs `sudo` | refused |
+| njsPC reads the supervisor's password hash, or its state | refused |
+| the supervisor reads njsPC's configuration | refused |
+| either service rewrites its own code | refused |
+| each writes its own data | allowed |
+| the admin reads both, for `scripts/backup-pi.sh` | allowed |
+
+And on the running processes: `NoNewPrivs=1`, exactly one device group each,
+and `/home` showing zero entries to both.
+
+**Paths.** Everything is under `/opt` and `/var/lib`; `~/poolctl` and
+`~/njspc` in the admin's home are symlinks to `/opt`, so commands elsewhere in
+this document still work. On a fresh box, install to `/opt` directly rather
+than into the home directory and moving it — the home directory is `700`, so a
+service user cannot reach anything inside it.
+
+The configuration is two drop-ins, leaving the original unit files alone:
+`/etc/systemd/system/{poolctl,njspc}.service.d/10-unprivileged.conf`. The
+units as they were before are kept in `/root/unit-backup-2026-09-11`, and
+`~/rollback-unprivileged.sh` undoes the whole change — stops both services,
+removes the drop-ins, moves the trees and the supervisor's data back, and
+restarts.
 
 ## 6. When the HAT arrives
 

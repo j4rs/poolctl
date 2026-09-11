@@ -14,13 +14,17 @@
 # Never copies auth.json or state.json. Those are the Pi's own — a password
 # and a set of preferences that exist only there — and a deploy that
 # overwrote them would sign the household out and reset their targets every
-# time somebody shipped a CSS change.
+# time somebody shipped a CSS change. Since 11 September 2026 they are not
+# even in the code tree: they live in /var/lib/poolctl, owned by the
+# unprivileged `poolctl` user, and the code in /opt/poolctl is owned by the
+# deploying account — so the service can write its data but never its code,
+# and a deploy needs no sudo to write.
 
 set -euo pipefail
 
 PI="${PI:-}"
 DRY_RUN=""
-REMOTE_DIR="${REMOTE_DIR:-~/poolctl}"
+REMOTE_DIR="${REMOTE_DIR:-/opt/poolctl}"
 SERVICE="${SERVICE:-poolctl}"
 
 for arg in "$@"; do

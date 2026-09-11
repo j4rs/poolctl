@@ -188,6 +188,14 @@ honest fix then is to raise njsPC's `valveDelayTime`, not to dead-reckon here.
   its 30 steps are njsPC configuration** and only two — the purge and the pump
   floor — are supervisor work still outstanding. The full attribution is in
   `docs/architecture.md`, "Sequence ownership".
+- **A service writes only its data directory, never next to its code.** On
+  the Pi the supervisor runs as `poolctl` and njsPC as `njspc`, and the code in
+  `/opt` belongs to the admin account, so the running process cannot write
+  there. Anything new the supervisor persists goes under `/var/lib/poolctl` —
+  take the path from an environment variable, as `STATE_FILE` and `AUTH_FILE`
+  do. A file written beside `index.js` works on a laptop and fails on the Pi
+  with `EACCES`, and no test here would notice. `docs/pi-bringup.md`, *Each
+  service runs as its own user*.
 - **Every number needs a source.** Two figures in the PRD turned out to be
   invented outright — a pool-heating duration and the exchanger pressure drop
   that justifies automating the bypass. If a number cannot say where it came
@@ -218,7 +226,9 @@ Three things here are easy to "fix" and break:
   and cross-site POSTs, which covers both ways state can change here.
 - **No `Secure` flag.** The supervisor serves plain HTTP; setting it means
   the cookie is never stored at all. It belongs with TLS, which is not built.
-- **The password is set over SSH, not in the app.** `node supervisor/passwd.js`.
+- **The password is set over SSH, not in the app.** On the Pi, as the
+  service's own user: `sudo -u poolctl env AUTH_FILE=/var/lib/poolctl/auth.json
+  node /opt/poolctl/supervisor/passwd.js`. Locally, `node supervisor/passwd.js`.
   A first-run "choose a password" screen is unauthenticated by definition, so
   on a shared network it is a race between the owner and everyone else. There
   is deliberately no network path to setting it.
