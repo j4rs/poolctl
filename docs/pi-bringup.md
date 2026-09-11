@@ -288,61 +288,64 @@ it keeps the supervisor's program-to-circuit bindings valid.
 
 ---
 
-### The Pi carries one local njsPC patch
+### The Pi runs a pinned njsPC, plus one local patch
 
-**Since 11 September 2026 the Pi does not run stock njsPC.** `~/njspc` is on a
-local branch, `poolctl/atomic-persistence`, one commit on top of `v10.0.1`
-(`8648c98`): `poolConfig.json` and `poolState.json` are written to a temporary
-file, fsynced and renamed into place, instead of with `fs.writeFileSync`, which
-truncates first. Without it, a power cut mid-save leaves njsPC's configuration
-empty. Proposed upstream as
-[tagyoureit/nodejs-poolController#1240](https://github.com/tagyoureit/nodejs-poolController/pull/1240);
-this is ADR-13's holding position while that is in flight.
+**Since 11 September 2026 the Pi does not run a released njsPC.** `~/njspc`
+is on a local branch, `poolctl/pinned-c6f784b0`: upstream master at
+`c6f784b0` — six commits past `v10.0.1`, the newest release — with one commit
+of ours on top.
 
-Verified live: both files gained a new inode on njsPC's first save after the
-restart — a plain write keeps the inode — and came back valid across a reboot.
-The cost is about 11 ms of blocked event loop per save, measured on this card,
-at most once every three seconds.
+**Why master, and why pinned.** No release contains the six, and one of them
+is needed: on `v10.0.1`, Nixie mode's chlorinator model table has no iChlor
+entries, so an iChlor 30 is identified as no model at all, silently, every
+poll. All six were read before moving (table below). Following master is safe
+only because its whole delta has been read, so the checkout is **pinned to
+that commit, not tracking master** — anything that lands later arrives unread.
 
-**Anything that resets `~/njspc` loses it** — a fresh clone, `git checkout` of
-a tag, a reinstall. Check with `git -C ~/njspc log --oneline -1`. To roll back
-without rebuilding, the pre-patch build is kept beside the new one:
+**Our patch** writes `poolConfig.json` and `poolState.json` to a temporary
+file, fsyncs and renames it into place, instead of with `fs.writeFileSync`,
+which truncates first; without it, a power cut mid-save empties njsPC's
+configuration. Proposed upstream as
+[tagyoureit/nodejs-poolController#1240](https://github.com/tagyoureit/nodejs-poolController/pull/1240)
+— ADR-13's holding position. Verified live twice, on each build: both files
+gained a new inode on the first save after a restart, which a plain write
+never does. It costs about 11 ms of blocked event loop per save, at most once
+every three seconds.
+
+**Anything that resets `~/njspc` loses all of this** — a fresh clone, checking
+out a tag, a reinstall. Check with `git -C ~/njspc log --oneline -2`. Two
+earlier builds are kept for a rollback that needs no compiler:
+
+| directory | what it is |
+|---|---|
+| `dist.v10.0.1-atomic` | the release plus our patch — the build this one replaced |
+| `dist.pre-atomic` | stock `v10.0.1` |
 
 ```bash
-cd ~/njspc && rm -rf dist && mv dist.pre-atomic dist && sudo systemctl restart njspc
+cd ~/njspc && rm -rf dist && cp -a dist.v10.0.1-atomic dist && sudo systemctl restart njspc
 ```
 
-**This checkout is six commits behind upstream `master`, and all six have
-been read** (11 September 2026). No release contains any of them — `v10.0.1`
-is still the newest tag — so the delta between what the Pi runs and master is
-exactly these:
+**The six commits, read before moving:**
 
 | commit | what it does | here |
 |---|---|---|
-| `50c31447` chlorinator models | Adds `ichlor-ic15` and `ichlor-ic30` to **Nixie's** model table | **Needed.** Nixie replaces the base table, and on `v10.0.1` its version has no iChlor entries — so an iChlor 30 is identified as *no model at all*, silently, every poll. See below |
-| `7cb488f5` #1237 (ours) | Port-0 writes stop wiping an existing ScreenLogic block | **Helps.** Enabling comms for the bus handover is exactly that write; this Pi's ScreenLogic password was already blanked by one |
-| `4c3975d6` #1238 (ours) | Gas-heater cooldown used `getDate()` for `getTime()` | **Inert.** `NixieHeatpump` is a sibling of `NixieGasHeater`, not a subclass, and keeps `getCooldownTime() { return 0; }` — so the purge's founding assumption survives |
-| `fdb8ba8c` #1239 | Logs *"body temperature cannot be determined"* once per episode, not every pass | **Helps**, logging only. That is this site's exact state until the bus is up |
-| `c6f784b0` ci | Also declares the `_warnedNoTemp` field the previous commit used without declaring | Inert — the build fix for `fdb8ba8c` |
+| `50c31447` chlorinator models | Adds `ichlor-ic15` and `ichlor-ic30` to **Nixie's** model table | **Needed.** Nixie replaces the base table, and on `v10.0.1` its version lacks iChlor. `getValue` of a missing name returns `{ name }` with no value, so `chlor.model` becomes `undefined` without an error. Output, salt, temperature and control do not depend on it; capacity and production figures do. It cannot be picked by hand either — it is not in the list |
+| `7cb488f5` #1237 (ours) | Port-0 writes stop wiping an existing ScreenLogic block | **Helps.** Enabling comms for the bus handover is exactly that write |
+| `4c3975d6` #1238 (ours) | Gas-heater cooldown used `getDate()` for `getTime()` | **Inert.** `NixieHeatpump` is a sibling of `NixieGasHeater`, not a subclass, and keeps `getCooldownTime() { return 0; }` — the purge's founding assumption survives |
+| `fdb8ba8c` #1239 (ours) | Meant to log the missing-temperature warning once per episode | **Does not work** — see below |
+| `c6f784b0` ci | Declares the field the previous commit used without declaring | Inert — a build fix |
 | `d6823cc9` schedules | Clears stale schedule `isOn` flags | **Inert.** Entirely inside `IntelliCenterWSBoard`; this site is Nixie |
 
-**The iChlor gap, precisely.** On `v10.0.1` in Nixie mode:
-
-```ts
-if (name.startsWith('iChlor')) chlor.model = sys.board.valueMaps.chlorinatorModel.getValue('ichlor-ic30');
-```
-
-`getValue` of a name the table lacks returns `{ name }` with no value, so
-`chlor.model` becomes `undefined` without an error. Output %, salt,
-temperature and control do not depend on the model; the capacity and
-production figures derived from it do. It cannot be worked around by picking
-the model by hand, because it is not in the list to pick from.
-
-**So: move to `c6f784b0` before the bus handover, pinned to that commit rather
-than tracking `master`.** Master is unreleased code, and the only reason
-following it is safe today is that its whole delta has been read. Pinning
-keeps it that way — anything that lands afterwards arrives unread. The atomic
-patch was written against master and applies to it as it is.
+**#1239's fix does not take effect, and the issue is closed as if it had.**
+Measured after the move: 39 warnings in two minutes, one every ~3 s — the
+rate the issue reported. The flag it adds, `_warnedNoTemp`, is a plain field
+on `BodyTempState`, and `syncHeaterStates()` gets its bodies from
+`state.temps.bodies.toArray()`, which builds a **new** wrapper for every entry
+on every call. So every pass begins with a fresh `false`, warns, sets `true` on
+a wrapper that is discarded, and repeats. The chlorinator commit in the same
+batch gets this right: its "already warned" set is `static`, which survives
+across instances. Harmless here in the meantime — it is log noise, journald is
+volatile, and it stops by itself once the bus supplies a water temperature.
 
 ## 6. When the HAT arrives
 
