@@ -226,9 +226,12 @@ Three things here are easy to "fix" and break:
   and cross-site POSTs, which covers both ways state can change here.
 - **No `Secure` flag.** The supervisor serves plain HTTP; setting it means
   the cookie is never stored at all. It belongs with TLS, which is not built.
-- **The password is set over SSH, not in the app.** On the Pi, as the
-  service's own user: `sudo -u poolctl env AUTH_FILE=/var/lib/poolctl/auth.json
-  node /opt/poolctl/supervisor/passwd.js`. Locally, `node supervisor/passwd.js`.
+- **The password is set over SSH, not in the app, and needs a restart.** On
+  the Pi, as the service's own user: `sudo -u poolctl env
+  AUTH_FILE=/var/lib/poolctl/auth.json node /opt/poolctl/supervisor/passwd.js
+  && sudo systemctl restart poolctl`. The supervisor reads `auth.json` once at
+  startup, so without the restart the old password stays live and the new one
+  is refused. Locally, `node supervisor/passwd.js`.
   A first-run "choose a password" screen is unauthenticated by definition, so
   on a shared network it is a race between the owner and everyone else. There
   is deliberately no network path to setting it.
@@ -236,7 +239,7 @@ Three things here are easy to "fix" and break:
 Sessions are signed rather than stored, so a Pi restart does not sign the
 household out; the signature covers the expiry, so a token cannot be extended
 by editing it. Rotating the secret — which setting a new password does —
-revokes every session at once. `auth.json` is 0600 and gitignored: the
+revokes every session at once, from the next restart. `auth.json` is 0600 and gitignored: the
 session secret alone would let anyone mint a valid cookie.
 
 Running without a password still works, because bricking a pool mid-season

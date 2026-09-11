@@ -125,11 +125,18 @@ on every deploy. Since 11 September 2026 they are not in the code tree at
 all — see *Each service runs as its own user*, below.
 
 **Set a password before it is reachable by anything.** It is written as the
-service's own user, into the service's own data directory:
+service's own user, into the service's own data directory, and **takes effect
+only after a restart** — the supervisor reads `auth.json` once, at startup,
+rather than on every socket upgrade:
 
 ```bash
-sudo -u poolctl env AUTH_FILE=/var/lib/poolctl/auth.json node /opt/poolctl/supervisor/passwd.js
+sudo -u poolctl env AUTH_FILE=/var/lib/poolctl/auth.json node /opt/poolctl/supervisor/passwd.js && sudo systemctl restart poolctl
 ```
+
+Skip the restart and nothing tells you so from the phone: the running process
+keeps the old password, the new one is refused at sign-in, and any tab that
+was open keeps retrying its socket. That exact confusion happened on 11
+September 2026, the first time this command was run.
 
 There is deliberately no way to do this over the network. Without it the
 supervisor still runs, warns at startup and raises a finding on the Water
