@@ -288,12 +288,12 @@ it keeps the supervisor's program-to-circuit bindings valid.
 
 ---
 
-### The Pi runs a pinned njsPC, plus one local patch
+### The Pi runs a pinned njsPC, plus two local patches
 
 **Since 11 September 2026 the Pi does not run a released njsPC.** `~/njspc`
 is on a local branch, `poolctl/pinned-c6f784b0`: upstream master at
-`c6f784b0` — six commits past `v10.0.1`, the newest release — with one commit
-of ours on top.
+`c6f784b0` — six commits past `v10.0.1`, the newest release — with two commits
+of ours on top, each proposed upstream.
 
 **Why master, and why pinned.** No release contains the six, and one of them
 is needed: on `v10.0.1`, Nixie mode's chlorinator model table has no iChlor
@@ -302,7 +302,7 @@ poll. All six were read before moving (table below). Following master is safe
 only because its whole delta has been read, so the checkout is **pinned to
 that commit, not tracking master** — anything that lands later arrives unread.
 
-**Our patch** writes `poolConfig.json` and `poolState.json` to a temporary
+**The first patch** writes `poolConfig.json` and `poolState.json` to a temporary
 file, fsyncs and renames it into place, instead of with `fs.writeFileSync`,
 which truncates first; without it, a power cut mid-save empties njsPC's
 configuration. Proposed upstream as
@@ -312,17 +312,25 @@ gained a new inode on the first save after a restart, which a plain write
 never does. It costs about 11 ms of blocked event loop per save, at most once
 every three seconds.
 
+**The second patch** makes njsPC's *"body temperature … cannot be determined"*
+warning fire once per episode, as upstream's fix for this project's #1239
+meant to and does not (below). Proposed as
+[#1241](https://github.com/tagyoureit/nodejs-poolController/pull/1241).
+Measured on this Pi in back-to-back three-minute windows: **60 warnings
+before, 1 after**.
+
 **Anything that resets `~/njspc` loses all of this** — a fresh clone, checking
-out a tag, a reinstall. Check with `git -C ~/njspc log --oneline -2`. Two
+out a tag, a reinstall. Check with `git -C ~/njspc log --oneline -3`. Three
 earlier builds are kept for a rollback that needs no compiler:
 
 | directory | what it is |
 |---|---|
-| `dist.v10.0.1-atomic` | the release plus our patch — the build this one replaced |
+| `dist.c6f784b0-atomic` | the pinned commit plus the first patch only — the build this one replaced |
+| `dist.v10.0.1-atomic` | the release plus the first patch |
 | `dist.pre-atomic` | stock `v10.0.1` |
 
 ```bash
-cd ~/njspc && rm -rf dist && cp -a dist.v10.0.1-atomic dist && sudo systemctl restart njspc
+cd ~/njspc && rm -rf dist && cp -a dist.c6f784b0-atomic dist && sudo systemctl restart njspc
 ```
 
 **The six commits, read before moving:**
@@ -336,7 +344,8 @@ cd ~/njspc && rm -rf dist && cp -a dist.v10.0.1-atomic dist && sudo systemctl re
 | `c6f784b0` ci | Declares the field the previous commit used without declaring | Inert — a build fix |
 | `d6823cc9` schedules | Clears stale schedule `isOn` flags | **Inert.** Entirely inside `IntelliCenterWSBoard`; this site is Nixie |
 
-**#1239's fix does not take effect, and the issue is closed as if it had.**
+**#1239's fix did not take effect, and the issue was closed as if it had** —
+fixed here by the second patch, and reported back on the issue with #1241.
 Measured after the move: 39 warnings in two minutes, one every ~3 s — the
 rate the issue reported. The flag it adds, `_warnedNoTemp`, is a plain field
 on `BodyTempState`, and `syncHeaterStates()` gets its bodies from
@@ -344,8 +353,9 @@ on `BodyTempState`, and `syncHeaterStates()` gets its bodies from
 on every call. So every pass begins with a fresh `false`, warns, sets `true` on
 a wrapper that is discarded, and repeats. The chlorinator commit in the same
 batch gets this right: its "already warned" set is `static`, which survives
-across instances. Harmless here in the meantime — it is log noise, journald is
-volatile, and it stops by itself once the bus supplies a water temperature.
+across instances. It was only ever log noise here, and it would have stopped by itself once the
+bus supplied a water temperature; the reason to fix it anyway is that the
+issue was closed as fixed and was not.
 
 ## 6. When the HAT arrives
 
