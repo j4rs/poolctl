@@ -288,6 +288,39 @@ it keeps the supervisor's program-to-circuit bindings valid.
 
 ---
 
+### The Pi carries one local njsPC patch
+
+**Since 11 September 2026 the Pi does not run stock njsPC.** `~/njspc` is on a
+local branch, `poolctl/atomic-persistence`, one commit on top of `v10.0.1`
+(`8648c98`): `poolConfig.json` and `poolState.json` are written to a temporary
+file, fsynced and renamed into place, instead of with `fs.writeFileSync`, which
+truncates first. Without it, a power cut mid-save leaves njsPC's configuration
+empty. Proposed upstream as
+[tagyoureit/nodejs-poolController#1240](https://github.com/tagyoureit/nodejs-poolController/pull/1240);
+this is ADR-13's holding position while that is in flight.
+
+Verified live: both files gained a new inode on njsPC's first save after the
+restart — a plain write keeps the inode — and came back valid across a reboot.
+The cost is about 11 ms of blocked event loop per save, measured on this card,
+at most once every three seconds.
+
+**Anything that resets `~/njspc` loses it** — a fresh clone, `git checkout` of
+a tag, a reinstall. Check with `git -C ~/njspc log --oneline -1`. To roll back
+without rebuilding, the pre-patch build is kept beside the new one:
+
+```bash
+cd ~/njspc && rm -rf dist && mv dist.pre-atomic dist && sudo systemctl restart njspc
+```
+
+**This checkout is also six commits behind upstream `master`**, and one of
+them matters to this repository specifically. `4c3975d6` *"correct cooldown
+delay calculation"* touches heater cooldown — and the supervisor runs its own
+purge **because** `NixieHeatpump.getCooldownTime()` returned 0 for heat pumps.
+If that commit changes the heat-pump case, upgrading njsPC would put two
+authorities on the exchanger at once, which ADR-7 forbids. Read it before
+moving `~/njspc` forward; the others include this project's own #1237 and new
+chlorinator model handling that the bus handover will want.
+
 ## 6. When the HAT arrives
 
 ### I2C first, or nothing on the card responds

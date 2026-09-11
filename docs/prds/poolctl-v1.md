@@ -1564,8 +1564,28 @@ listed as work because nobody checked the platform before writing the list:
 |---|---|
 | `fsck.repair=yes` on the kernel command line | **Already present** — Raspberry Pi OS default. A dirty root is repaired rather than dropping to emergency mode |
 | Volatile journald | **Already present** — `40-rpi-volatile-storage.conf`, shipped by `raspberrypi-sys-mods`. It spares the card and destroys the evidence; this incident is the cost |
-| Read-only root (overlay filesystem) | **Not done.** The one change that makes the OS itself immune to a cut |
-| Off-box backup of njsPC's configuration | **Not done.** The one thing on the card that exists nowhere else |
+| njsPC writes its config atomically | **Done 11 September 2026**, as a local patch — njsPC truncated `poolConfig.json` before rewriting it, so a cut mid-save emptied every circuit and schedule. Upstream as njsPC #1240; see `docs/pi-bringup.md` §5 |
+| No swap writes to the card | **Done 11 September 2026.** Swap was already zram, in RAM; what reached the card was zram *writeback* to a 1.9 GB `/var/swap`. Now `Mechanism=zram` in `/etc/rpi/swap.conf.d/`, and the file is gone |
+| Off-box backup of the irreplaceable files | **Done 11 September 2026.** `scripts/backup-pi.sh`, hourly from the Mac, into a local git repository — see below |
+| Read-only root (overlay filesystem) | **Deferred.** The one change that makes the OS itself immune to a cut. Needs a writable `/home` — code as well as data, or a deploy would silently revert at the next reboot — and root fills the whole card, so that means a USB SSD or an offline resize |
+
+**The backup never copies corruption.** Each file is parsed before it is
+accepted; a torn one on the Pi is logged and the last good copy kept. Tested
+by feeding it the first 3,000 bytes of `poolConfig.json` — what a cut
+`writeFileSync` leaves — and confirming the good copy's hash did not move. It
+backs up `poolConfig.json`, njsPC's `config.json` and the supervisor's
+`state.json`; not `auth.json`, whose secret `passwd.js` regenerates, and not
+`poolState.json`, which rebuilds itself. The repository is local and must never
+be pushed: it holds configuration.
+
+It runs as a launchd agent, and its log is the diagnostic the September
+incident lacked. Every hour leaves one line, telling apart a name that does
+not resolve, a box that does not answer on port 22, and an SSH key the Mac
+cannot use — the three failures that were indistinguishable that day. The
+last matters in practice: with a passphrase-protected key and no `UseKeychain`,
+the job works until the Mac next reboots and then logs *"REACHABLE, BUT SSH
+REFUSED"* until the key is loaded again. Whether to store that passphrase in
+the Keychain is an owner's decision, not made here.
 
 **And a fix aimed at the ambiguity, not the failure:** make *reachable by
 name* and *reachable by address* separately testable. Reserve the Pi a fixed
